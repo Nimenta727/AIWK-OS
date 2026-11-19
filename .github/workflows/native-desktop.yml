@@ -22,12 +22,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Verify core behavior
-        shell: pwsh
-        run: dotnet run --project desktop/AIWorkstation.Core.SmokeTests/AIWorkstation.Core.SmokeTests.csproj --configuration Release
       - name: Compile WPF Windows UI
         shell: pwsh
         run: dotnet build desktop/AIWorkstation.Desktop/AIWorkstation.Desktop.csproj --configuration Release
+      - name: Verify core behavior
+        shell: pwsh
+        run: dotnet run --project desktop/AIWorkstation.Core.SmokeTests/AIWorkstation.Core.SmokeTests.csproj --configuration Release
       - name: Publish self-contained Windows EXE
         shell: pwsh
         run: |

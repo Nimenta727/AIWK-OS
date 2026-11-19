@@ -12,7 +12,8 @@ static bool Throws(Action action)
     catch (ArgumentException) { return true; }
 }
 
-var workspace = Path.Combine(Path.GetTempPath(), "aiws-desktop-tests-" + Guid.NewGuid().ToString("N"));
+var safeBase = OperatingSystem.IsWindows() ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : Path.GetTempPath();
+var workspace = Path.Combine(safeBase, "aiws-desktop-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(workspace);
 try
 {
