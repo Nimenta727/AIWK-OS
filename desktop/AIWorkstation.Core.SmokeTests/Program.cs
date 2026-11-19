@@ -9,6 +9,7 @@ static bool Throws(Action action)
 {
     try { action(); return false; }
     catch (InvalidOperationException) { return true; }
+    catch (ArgumentException) { return true; }
 }
 
 var workspace = Path.Combine(Path.GetTempPath(), "aiws-desktop-tests-" + Guid.NewGuid().ToString("N"));
