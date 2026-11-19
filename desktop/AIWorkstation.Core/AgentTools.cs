@@ -32,20 +32,20 @@ public static class AgentTools
         var directory = WorkspaceGuard.RequireTrustedDirectory(workspace);
         var program = Locate(agent == AgentKind.ClaudeCode ? "claude" : "codex")
             ?? throw new FileNotFoundException($"未找到 {AgentLabel.Name(agent)}。请先通过官方安装程序安装并登录。");
-        Process.Start(new ProcessStartInfo
+        if (Process.Start(new ProcessStartInfo
         {
             FileName = program,
             WorkingDirectory = directory,
             UseShellExecute = true,
             ErrorDialog = false
-        }) ?? throw new IOException("无法启动外部 Agent 进程。");
+        }) is null) throw new IOException("无法启动外部 Agent 进程。");
     }
 
     public static void LaunchCompanion(string name)
     {
         if (name is not ("t3" or "openclaw")) throw new ArgumentException("程序不在允许列表中。");
         var program = Locate(name) ?? throw new FileNotFoundException($"未安装 {name}。请先参照官方文档安装。");
-        Process.Start(new ProcessStartInfo { FileName = program, UseShellExecute = true, WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) })
-            ?? throw new IOException("无法启动集成工具。");
+        if (Process.Start(new ProcessStartInfo { FileName = program, UseShellExecute = true, WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }) is null)
+            throw new IOException("无法启动集成工具。");
     }
 }
