@@ -255,8 +255,8 @@ public partial class MainWindow : Window
     private void RefreshTools_Click(object sender, RoutedEventArgs e) => RefreshTools();
     private void RefreshTools()
     {
-        ClaudeHealth.Text = AgentTools.Locate("claude") is string c ? "已检测 · " + c : "未检测到 CLI · 需要官方安装与登录";
-        CodexHealth.Text = AgentTools.Locate("codex") is string c ? "已检测 · " + c : "未检测到 CLI · 需要官方安装与登录";
+        ClaudeHealth.Text = AgentTools.Locate("claude") is string claudeLocation ? "已检测 · " + claudeLocation : "未检测到 CLI · 需要官方安装与登录";
+        CodexHealth.Text = AgentTools.Locate("codex") is string codexLocation ? "已检测 · " + codexLocation : "未检测到 CLI · 需要官方安装与登录";
     }
     private void LaunchT3_Click(object sender, RoutedEventArgs e) => Guard(() => AgentTools.LaunchCompanion("t3"));
     private void LaunchOpenClaw_Click(object sender, RoutedEventArgs e) => Guard(() => AgentTools.LaunchCompanion("openclaw"));
@@ -272,11 +272,12 @@ public partial class MainWindow : Window
     }
     private void Info(string message) => StatusLine.Text = DateTime.Now.ToString("HH:mm") + " · " + message;
 
-    private sealed class TaskItem(WorkTask task)
+    private sealed class TaskItem
     {
-        public WorkTask Task { get; } = task;
-        public string Title => task.Title;
-        public string Subtitle => $"{task.CompletedCount}/{task.Steps.Count} 阶段 · {task.CreatedAt:MM-dd HH:mm}";
+        public TaskItem(WorkTask task) => Task = task;
+        public WorkTask Task { get; }
+        public string Title => Task.Title;
+        public string Subtitle => $"{Task.CompletedCount}/{Task.Steps.Count} 阶段 · {Task.CreatedAt:MM-dd HH:mm}";
     }
     private sealed class FlowRow(WorkflowStep step, int index)
     {
