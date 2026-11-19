@@ -1,0 +1,37 @@
+# Request Trace V0.5 — local metadata + provider log import
+
+## What a request looks like
+
+1. `task.created` — plan created locally (zero model calls).
+2. `stage.approved` — user permits the step; a permission grant is not a model call.
+3. `prompt.prepared` / `prompt.reused` — optimized text copied locally; duplicates are detected using a SHA-256 hash. No model call is made.
+4. `stage.started` — official interactive CLI is launched, **but actual model request timing and hidden exchanges are not observable from AIWS**.
+5. Optional `trace.imported` — user imports a structured usage file from the official CLI. Only numbers and event totals are retained. An import fingerprint prevents double-counting.
+6. `stage.completed` — user verifies the result and records it, not necessarily the provider's completion time.
+
+## Usage origins and semantics
+
+- **Codex**: `codex exec --json` yields JSONL; `turn.completed.usage` contains input, cached input, and output token counts. Multiple turns are added; repeated identical imports are ignored. This is an **optional explicit import**, not unattended execution.
+- **Claude Code**: structured `result.usage` is imported as the last aggregate record; streaming intermediate assistant usage is deliberately ignored to avoid double-counting. Normalized input includes cache-read and cache-create tokens when provided, because Claude's uncached input excludes them.
+- Missing or unsupported usage is **unknown**, never 0. Different formats may expose different data. No subscription balance or pricing is implied.
+
+## Context reduction
+
+- Only the 2 most recently completed steps are included as evidence, up to 1,200 chars each. Older steps are referred to but not copied; duplicates are omitted.
+- The user's current stage instruction is **never silently shortened**.
+- Estimate display uses a mixed script character heuristic, not a tokenizer, so can be far from actual model usage. CLI system prompts, tool outputs, hidden reasoning and cache policies are not measurable in this preview.
+- Automatic deduplication of provider requests **is not implemented**; the duplicate marker flags redundant clipboard preparation only.
+
+## Security boundaries
+
+- Never parse private Claude/Codex credential stores or scrape desktop app internals.
+- Import is explicitly initiated from a user-selected JSONL/JSON file, max 5 MB or 20,000 lines.
+- Raw chat content, shell command arguments, and original logs are not persisted. Metadata stays in the local tasks.json; protect it as project activity information.
+- Avoid importing arbitrary untrusted logs into a privileged process. This importer is read-only and has bounded input, but has not received a third-party security audit.
+
+## Planned V0.6
+
+1. Supported streaming provider adapters with explicit authorization and real-time progress.
+2. Per-task budgets and enforceable stop controls *where the official interface supports them*; avoid pretending a soft estimate is a hard budget.
+3. Timeline UI details, exportable redacted summaries, and side-by-side efficiency comparisons.
+4. Windows guest acceptance testing and signed installer pipeline.

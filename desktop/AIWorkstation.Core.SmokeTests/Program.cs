@@ -10,6 +10,7 @@ static bool Throws(Action action)
     try { action(); return false; }
     catch (InvalidOperationException) { return true; }
     catch (ArgumentException) { return true; }
+    catch (InvalidDataException) { return true; }
 }
 
 var safeBase = OperatingSystem.IsWindows() ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : Path.GetTempPath();
@@ -48,6 +49,31 @@ try
     Assert(Throws(() => WorkspaceGuard.RequireTrustedDirectory(Path.GetPathRoot(workspace)!)), "reject drive root");
     Assert(WorkspaceGuard.RequireTrustedDirectory(workspace) == workspace, "trusted existing workspace accepted");
     Assert(AgentTools.Locate("claude") == null || AgentTools.Locate("claude") is string, "agent locator operates without shell");
+    // Request trace / usage import: only structured metadata; repeated imports must never double-count.
+    var first = task.Steps[0];
+    var before = new string('A', 3000);
+    first.Result = before;
+    var draft = HandoffBuilder.Prepare(task, task.Steps[1]);
+    Assert(draft.Text.Contains("已省略其余内容") && !draft.Text.Contains(before), "handoff prunes verbose history");
+    Assert(draft.Text.Contains("docs/routine"), "handoff preserves project policy");
+    Assert(draft.ApproxTokens > 0 && draft.SavedCharacters > 0, "estimates are labelled and context reduced");
+    RequestTrace.Record(task, task.Steps[1], "stage.started", "人工启动");
+    var codexLog = "{\"type\":\"thread.started\"}\n" +
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"output_tokens\":30,\"cached_input_tokens\":25}}\n" +
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":50,\"output_tokens\":20,\"cached_input_tokens\":10}}\n";
+    var report = RequestTrace.Import(task, task.Steps[1], codexLog);
+    Assert(report.UsageEvents == 2 && report.Input == 150 && report.CachedInput == 35 && report.Output == 50, "Codex usage aggregated across turns");
+    Assert(RequestTrace.Import(task, task.Steps[1], codexLog).WasDuplicate, "duplicate import does not count twice");
+    Assert(Throws(() => RequestTrace.Import(task, first, codexLog)), "mismatched provider is rejected");
+    var claudeLog = "{\"type\":\"assistant\",\"message\":{\"usage\":{\"input_tokens\":1000}}}\n" +
+        "{\"type\":\"result\",\"usage\":{\"input_tokens\":80,\"output_tokens\":15,\"cache_read_input_tokens\":20,\"cache_creation_input_tokens\":10}}\n";
+    var claudeReport = RequestTrace.Import(task, first, claudeLog);
+    Assert(claudeReport.Input == 110 && claudeReport.CachedInput == 20 && claudeReport.Output == 15, "Claude cache token categories normalized");
+    Assert(task.RequestEvents.Count >= 3, "trace persists workflow metadata");
+    repository.Save([task]);
+    var traced = repository.Load()[0];
+    Assert(traced.Steps[0].Usage.IsMeasured && traced.Steps[1].Usage.IsMeasured && traced.RequestEvents.Count > 0, "usage and trace persist without raw JSONL");
+    Assert(!File.ReadAllText(file).Contains("thread.started"), "raw provider log is not persisted");
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

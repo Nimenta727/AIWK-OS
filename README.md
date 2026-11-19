@@ -2,7 +2,19 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.4 status:** Windows WPF compilation, core smoke tests and self-contained EXE packaging passed on [GitHub Actions](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44564333810). Download the artifact `WindowsAIWorkstation-Native-win-x64` from that run. The executable is unsigned, and **Hyper-V guest GUI validation is still pending**. This remains a prototype, not a finished or audited operating system agent.
+> **V0.5 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+
+## V0.5 — Request Trace & Token Budget
+
+The native desktop now includes **请求追踪 / Token** in the left navigation:
+
+- Each step records local metadata events (created, approved, started, prompt copied/reused, completed). **Launching an interactive CLI does not expose its internal requests**; these events are not proof a model received a prompt.
+- Import a user-selected **Codex `exec --json` JSONL** log or **Claude Code `result.usage` JSON / JSONL** (only use supported/authorized export methods). AIWS stores **only token counts, event type totals, and an import hash**, never raw messages, tool commands, API keys, or CLI session databases.
+- Numbers labelled **actual** come from structured provider events; absent usage stays **unknown** rather than zero. Claude cache-read and cache-creation input tokens are normalized into input totals; cached input is a subset, not added again. No claim of financial cost, subscription usage quota, or visibility into providers' private model calls.
+- The handoff generator limits prior context to the **last two completed stages**, truncates each prior result to 1,200 characters, deduplicates identical results, and preserves the current task instructions. The displayed token estimate is a **character-based approximation**, not a billable token count or a guaranteed enforcement mechanism.
+- Copying an identical handoff twice is marked as a duplicate; **no automatic model call** is made when copying, approving, or preparing the request.
+
+[Request observability design and limitations](docs/REQUEST_TRACE.md)
 
 ## The new desktop edition
 

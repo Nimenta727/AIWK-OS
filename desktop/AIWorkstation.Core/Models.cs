@@ -13,6 +13,9 @@ public sealed class WorkflowStep
     public bool ApprovalGranted { get; set; }
     public string Instructions { get; set; } = "";
     public string Result { get; set; } = "";
+    public TokenUsage Usage { get; set; } = new();
+    public string ImportFingerprint { get; set; } = "";
+    public string LastPromptFingerprint { get; set; } = "";
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 }
@@ -24,6 +27,7 @@ public sealed class WorkTask
     public string Workspace { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public List<WorkflowStep> Steps { get; set; } = [];
+    public List<RequestTraceEvent> RequestEvents { get; set; } = [];
     public int CompletedCount => Steps.Count(x => x.Status == StepStatus.Completed);
 }
 
