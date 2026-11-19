@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIWS · Windows AI Workstation</title>
+<link rel="stylesheet" href="/app.css">
+<script defer src="/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-icon">✳</span><div>AIWS <small>WINDOWS AI WORKSTATION</small></div></div>
+    <nav><a href="#overview" class="active">◈ &nbsp; 工作台总览</a><a href="#new-task">▤ &nbsp; 创建任务</a><a href="#task-list">≡ &nbsp; 任务队列</a><a href="#environment">⌘ &nbsp; 环境与执行器</a></nav>
+    <div class="sidebar-bottom"><div class="dot"></div> 仅本机访问 <span>127.0.0.1</span><p>Beta · V0.1 · 无云端存储</p></div>
+  </aside>
+  <main>
+    <header class="top"><div><p class="eyebrow">CONTROL CENTER / HYPER-V GUEST</p><h1 id="overview">让两个 AI，成为一座工作台。</h1><p class="muted">统一管理任务、执行器与本地工作区。默认由你审批实际操作。</p></div><div class="pill">● PRIVATE / LOCAL</div></header>
+    <section class="stats"><article><span>总任务</span><strong id="stat-all">—</strong><p>已保存至本地 SQLite</p></article><article><span>待处理</span><strong id="stat-pending">—</strong><p>准备中与等待中的任务</p></article><article><span>已完成</span><strong id="stat-done">—</strong><p>包含只读分析结果</p></article><article><span>执行器</span><strong id="stat-agents">—</strong><p>CLI 安装检测</p></article></section>
+    <section class="section-grid">
+      <article class="panel" id="new-task"><div class="panel-header"><div><p class="eyebrow">NEW TASK</p><h2>创建一个新任务</h2></div><span class="chip">Agent Router · 规则版</span></div>
+      <form id="task-form"><label>任务名称<input name="title" maxlength="140" required placeholder="例如：分析项目并提出重构建议"></label><label>项目工作区<select name="project" id="project-select" required><option value="">选择项目</option></select></label><label>执行器<select name="agent"><option value="auto">自动建议</option><option value="claude">Claude Code</option><option value="codex">Codex CLI</option><option value="dual">Claude + Codex（人工交接）</option><option value="manual">暂不选择</option></select></label><label>任务描述<textarea name="description" rows="5" maxlength="8000" placeholder="说明目标、约束和期望交付物"></textarea></label><button class="btn primary" type="submit">＋ &nbsp; 创建任务</button></form>
+      </article>
+      <article class="panel" id="environment"><div class="panel-header"><div><p class="eyebrow">EXECUTION ENVIRONMENT</p><h2>CLI 和 Windows 环境</h2></div><span class="chip">本机检测</span></div>
+      <div id="agent-list" class="agent-list"></div><div class="environment-note"><strong>安全边界</strong><p>Claude 通过官方交互式 CLI 登录和执行；Codex 也默认手动运行。实验性 Codex 只读执行需要在启动时显式启用。</p></div><div class="path" id="workspace-path"></div>
+      <div class="project-new"><h3>添加一个空项目目录</h3><form id="project-form"><input name="name" required maxlength="80" placeholder="my-project（仅英文/数字/._-）"><button class="btn secondary" type="submit">创建目录</button></form><p class="hint">可将现有 Git 仓库复制/克隆至工作区的 projects 文件夹。</p></div>
+      </article>
+    </section>
+    <section class="panel tasks" id="task-list"><div class="panel-header"><div><p class="eyebrow">TASK QUEUE</p><h2>任务队列</h2></div><button id="refresh" class="btn ghost" type="button">↻ 刷新</button></div><div id="tasks-container" class="task-container"><p class="muted">加载任务中…</p></div></section>
+    <footer>AIWS V0.1 · 专门适配 Windows / Hyper-V · 开源原型 · 不保存 Claude / ChatGPT 密钥</footer>
+  </main>
+</div>
+<div id="toast" class="toast" aria-live="polite"></div>
+</body>
+</html>

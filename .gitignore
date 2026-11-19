@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+dist/
+build/
+*.spec
+*.sqlite3
+*.sqlite3-*
+aiws-package.zip
+.env
+.auth/
+*.log
+.DS_Store
