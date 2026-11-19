@@ -1,0 +1,50 @@
+name: Native Windows Desktop EXE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/native-desktop.yml'
+      - 'scripts/Build-NativeDesktop.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify core behavior
+        shell: pwsh
+        run: dotnet run --project desktop/AIWorkstation.Core.SmokeTests/AIWorkstation.Core.SmokeTests.csproj --configuration Release
+      - name: Compile WPF Windows UI
+        shell: pwsh
+        run: dotnet build desktop/AIWorkstation.Desktop/AIWorkstation.Desktop.csproj --configuration Release
+      - name: Publish self-contained Windows EXE
+        shell: pwsh
+        run: |
+          dotnet publish desktop/AIWorkstation.Desktop/AIWorkstation.Desktop.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            --output artifacts/win-x64
+          if (-not (Test-Path 'artifacts/win-x64/WindowsAIWorkstation.exe')) { throw 'Native EXE was not produced' }
+          Compress-Archive -Path 'artifacts/win-x64/*' -DestinationPath 'artifacts/WindowsAIWorkstation-win-x64.zip' -Force
+      - name: Upload native Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsAIWorkstation-Native-win-x64
+          path: artifacts/WindowsAIWorkstation-win-x64.zip
+          if-no-files-found: error
+          retention-days: 21

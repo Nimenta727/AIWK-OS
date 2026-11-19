@@ -1,0 +1,247 @@
+<Window x:Class="AIWorkstation.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI Workstation · Windows" Width="1430" Height="880" MinWidth="1090" MinHeight="700"
+        Background="{StaticResource Canvas}" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI" FontSize="13">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="232"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="320"/>
+        </Grid.ColumnDefinitions>
+        <!-- LEFT: native Windows sidebar -->
+        <Border Grid.Column="0" Background="{StaticResource Sidebar}" BorderBrush="{StaticResource Edge}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="18,28,18,20">
+                <StackPanel DockPanel.Dock="Top">
+                    <StackPanel Orientation="Horizontal" Margin="4,0,0,40">
+                        <Border Width="36" Height="36" Background="{StaticResource Accent}" CornerRadius="11">
+                            <TextBlock Text="✦" Foreground="White" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Margin="10,1,0,0">
+                            <TextBlock Text="atelier" FontSize="21" FontWeight="SemiBold" FontFamily="Georgia"/>
+                            <TextBlock Text="AI WORKSTATION" Foreground="{StaticResource Muted}" FontSize="9" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="工作空间" Style="{StaticResource SectionLabel}" Margin="12,0,0,12"/>
+                    <Button x:Name="NavHome" Click="HomeNav_Click" Style="{StaticResource NavButton}" Content="⌂   工作台概览"/>
+                    <Button x:Name="NavFlow" Click="FlowNav_Click" Style="{StaticResource NavButton}" Content="◇   可视化工作流"/>
+                    <Button x:Name="NavTools" Click="ToolsNav_Click" Style="{StaticResource NavButton}" Content="⊞   Agent 与集成"/>
+                    <Border Background="{StaticResource Edge}" Height="1" Margin="12,24,12,23"/>
+                    <TextBlock Text="最近项目" Style="{StaticResource SectionLabel}" Margin="12,0,0,12"/>
+                    <ListBox x:Name="TasksList" SelectionChanged="TasksList_SelectionChanged"
+                             BorderThickness="0" Background="Transparent" Height="325"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="10,10" Margin="0,2" Background="Transparent" CornerRadius="8">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom">
+                    <Border BorderBrush="{StaticResource Edge}" BorderThickness="0,1,0,0" Margin="8,0,8,18"/>
+                    <Border Background="#EDE8E1" CornerRadius="12" Padding="12">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource Good}" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="运行于本机" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Hyper-V Windows Guest" FontSize="10" Foreground="{StaticResource Muted}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <!-- MAIN: dashboard and interactive workflow canvas -->
+        <Grid Grid.Column="1" Margin="38,29,36,30">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,24">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="YOUR PRIVATE AI DESK" Foreground="{StaticResource Accent}" FontSize="10" FontWeight="Bold"/>
+                    <TextBlock x:Name="TopHeading" Text="工作台概览" FontSize="29" FontFamily="Georgia" Margin="0,7,0,0"/>
+                </StackPanel>
+                <Border Grid.Column="1" CornerRadius="16" Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" Padding="12,8" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="{StaticResource Good}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                        <TextBlock Text="Windows Native · v0.4" Foreground="{StaticResource Muted}" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <Grid Grid.Row="1">
+                <!-- HOME -->
+                <ScrollViewer x:Name="HomeView" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Border Background="#F4E8DE" CornerRadius="18" Padding="28,27" Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="把想法交给合适的 Agent。" FontSize="27" FontFamily="Georgia" Foreground="#4C3A32"/>
+                                <TextBlock Text="在同一个 Windows 工作台中规划、执行与审查。让 Claude 和 Codex 协作，不必切换多个窗口管理任务。" TextWrapping="Wrap" FontSize="13" Foreground="#826B5B" Margin="0,10,0,24"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="9" Height="9" Background="{StaticResource Accent}" CornerRadius="5" Margin="0,5,8,0"/>
+                                    <TextBlock Text="每个阶段都可见、可审批、可追踪" FontWeight="SemiBold" Foreground="#7E5749"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="开始一个新任务" FontWeight="SemiBold" FontSize="18" Margin="0,0,0,14"/>
+                        <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="15" Padding="22">
+                            <StackPanel>
+                                <TextBlock Text="任务名称" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="NewTaskTitle" Text="为我的项目构建功能"/>
+                                <TextBlock Text="Windows 工作目录" Style="{StaticResource FieldLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NewTaskWorkspace" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Style="{StaticResource SoftButton}" Margin="9,0,0,0" Content="选择文件夹" Click="PickFolder_Click"/>
+                                </Grid>
+                                <TextBlock Text="流程模板" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="NewTaskTemplate" SelectedIndex="0">
+                                    <ComboBoxItem Content="Claude → Codex → Claude · 编程协作"/>
+                                    <ComboBoxItem Content="Claude → Codex → 人工 · 研究协作"/>
+                                </ComboBox>
+                                <Button Content="创建可视化工作流   ↗" Style="{StaticResource PrimaryButton}" Margin="0,18,0,0" HorizontalAlignment="Left" Click="CreateTask_Click"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="为什么重新设计" FontSize="17" FontWeight="SemiBold" Margin="0,26,0,12"/>
+                        <UniformGrid Columns="2">
+                            <Border Background="White" CornerRadius="12" BorderBrush="{StaticResource Edge}" BorderThickness="1" Margin="0,0,8,0" Padding="17">
+                                <StackPanel><TextBlock Text="◇  可视化执行" FontWeight="SemiBold"/><TextBlock Text="任务步骤、审批与交接进度一目了然。" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" CornerRadius="12" BorderBrush="{StaticResource Edge}" BorderThickness="1" Margin="8,0,0,0" Padding="17">
+                                <StackPanel><TextBlock Text="⊞  原生 Windows" FontWeight="SemiBold"/><TextBlock Text="独立 EXE、系统目录与官方 CLI 集成。" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- VISUAL WORKFLOW -->
+                <Grid x:Name="FlowView" Visibility="Collapsed">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="14" Padding="17" Margin="0,0,0,18">
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="ActiveTaskTitle" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="ActiveTaskPath" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <Border Grid.Column="1" Background="{StaticResource SoftAccent}" CornerRadius="10" Padding="12,7" VerticalAlignment="Center">
+                                <TextBlock x:Name="ProgressText" Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="11"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <TextBlock Text="EXECUTION CANVAS" Style="{StaticResource SectionLabel}" Margin="0,1,0,16"/>
+                            <ItemsControl x:Name="StepsCanvas">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Stretch">
+                                            <Button Click="SelectStep_Click" Tag="{Binding Id}" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch" Padding="0" Cursor="Hand">
+                                                <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="15" Padding="18">
+                                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="45"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <Border Width="35" Height="35" Background="{StaticResource SoftAccent}" CornerRadius="10" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Number}" Foreground="{StaticResource Accent}" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"/>
+                                                            <TextBlock Text="{Binding Agent}" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2" Background="#F6F2EC" CornerRadius="9" Padding="11,7" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="{StaticResource Accent}"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </Button>
+                                            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,0">
+                                                <Border Height="19" Width="1" Background="#D9CEC4"/>
+                                                <TextBlock Text="↓" Foreground="{StaticResource Accent}" HorizontalAlignment="Center" Margin="0,-4,0,1"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Click="AddStep_Click" Style="{StaticResource SoftButton}" Content="＋  添加流程阶段" HorizontalAlignment="Stretch" Margin="0,8,0,35"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+                <!-- INTEGRATIONS -->
+                <ScrollViewer x:Name="ToolsView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="已连接的能力" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                        <TextBlock Text="使用你自己安装并登录的官方工具。登录凭据不会被读取或复制。" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,22"/>
+                        <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="14" Padding="21" Margin="0,0,0,14">
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock Text="Claude Code" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="ClaudeHealth" Foreground="{StaticResource Muted}" Margin="0,7,0,0"/></StackPanel>
+                                <Button Grid.Column="1" Style="{StaticResource SoftButton}" Content="定位状态" Click="RefreshTools_Click"/>
+                            </Grid>
+                        </Border>
+                        <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="14" Padding="21" Margin="0,0,0,14">
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock Text="Codex CLI" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="CodexHealth" Foreground="{StaticResource Muted}" Margin="0,7,0,0"/></StackPanel>
+                                <Button Grid.Column="1" Style="{StaticResource SoftButton}" Content="定位状态" Click="RefreshTools_Click"/>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="成熟平台 · 可选集成" FontSize="18" FontWeight="SemiBold" Margin="0,22,0,14"/>
+                        <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="14" Padding="20" Margin="0,0,0,13">
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock Text="T3 Code" FontWeight="SemiBold" FontSize="15"/><TextBlock Text="成熟多 Agent 编程控制台 · 独立启动" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/></StackPanel>
+                                <Button Grid.Column="1" Content="启动 T3 ↗" Click="LaunchT3_Click" Style="{StaticResource SoftButton}"/>
+                            </Grid>
+                        </Border>
+                        <Border Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="14" Padding="20">
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock Text="OpenClaw" FontWeight="SemiBold" FontSize="15"/><TextBlock Text="Windows 节点和通用 Agent 功能 · 独立部署" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/></StackPanel>
+                                <Button Grid.Column="1" Content="启动 CLI ↗" Click="LaunchOpenClaw_Click" Style="{StaticResource SoftButton}"/>
+                            </Grid>
+                        </Border>
+                        <Border Background="{StaticResource SoftAccent}" CornerRadius="12" Padding="16" Margin="0,24,0,0">
+                            <TextBlock Text="工作台不会伪装订阅 API，也不会将第三方账号令牌作为模型接口。所有启动操作均由用户点击触发。" TextWrapping="Wrap" Foreground="#8A5844" FontSize="12"/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+            <TextBlock Grid.Row="2" x:Name="StatusLine" Text="就绪 · 本机数据保存在用户目录" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,14,0,0" TextWrapping="Wrap"/>
+        </Grid>
+        <!-- RIGHT: inspector -->
+        <Border Grid.Column="2" Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,34,24,30">
+                    <TextBlock Text="INSPECTOR" Style="{StaticResource SectionLabel}"/>
+                    <TextBlock Text="阶段设置" FontFamily="Georgia" FontSize="24" Margin="0,12,0,7"/>
+                    <TextBlock Text="编辑流程节点、设置审批，再从这里启动官方 Agent。" Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,25"/>
+                    <Border Height="1" Background="{StaticResource Edge}" Margin="0,0,0,12"/>
+                    <TextBlock Text="阶段名称" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="StepTitleBox"/>
+                    <TextBlock Text="执行器" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="StepAgentCombo" SelectedIndex="0"><ComboBoxItem Content="Claude Code"/><ComboBoxItem Content="Codex CLI"/><ComboBoxItem Content="人工 / 审查"/></ComboBox>
+                    <CheckBox x:Name="NeedsApprovalCheck" Content="执行前需要显式审批" Margin="0,15,0,10" Foreground="{StaticResource Ink}"/>
+                    <TextBlock Text="阶段指令" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="StepInstructionsBox" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Height="102" VerticalScrollBarVisibility="Auto"/>
+                    <Button Content="保存节点修改" Click="SaveStep_Click" Style="{StaticResource SoftButton}" HorizontalAlignment="Stretch" Margin="0,8,0,12"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="↑ 上移" Click="MoveUp_Click" Style="{StaticResource SoftButton}" Padding="12,9" Margin="0,0,5,0"/>
+                        <Button Content="↓ 下移" Click="MoveDown_Click" Style="{StaticResource SoftButton}" Padding="12,9" Margin="5,0,0,0"/>
+                    </StackPanel>
+                    <Border Height="1" Background="{StaticResource Edge}" Margin="0,22,0,14"/>
+                    <TextBlock Text="执行与交接" FontWeight="SemiBold" FontSize="15"/>
+                    <TextBlock Text="点击复制当前阶段指令，并打开已登录的官方 CLI。" Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,12"/>
+                    <Button Content="复制阶段交接指令" Click="CopyPrompt_Click" Style="{StaticResource SoftButton}" Margin="0,0,0,9"/>
+                    <Button Content="批准当前阶段" Click="ApproveStep_Click" Style="{StaticResource SoftButton}" Margin="0,0,0,9"/>
+                    <Button Content="开始并启动 Agent ↗" Click="StartAgent_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,0,16"/>
+                    <TextBlock Text="执行结果 / 审查意见" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="StepResultBox" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" Height="104"/>
+                    <Button Content="标记阶段完成 ✓" Click="CompleteStep_Click" Style="{StaticResource SoftButton}" Margin="0,8,0,8"/>
+                    <Button Content="标记失败 / 重置" Click="FailOrRetryStep_Click" Style="{StaticResource SoftButton}" Margin="0,0,0,10"/>
+                    <TextBlock Text="注意：流程跟踪为原生实现；CLI 在独立终端中执行，结果需要人工核实与回填。" Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>
