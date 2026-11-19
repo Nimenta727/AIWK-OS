@@ -53,6 +53,31 @@ class HTTPTests(unittest.TestCase):
         status,_=self.req('POST',f'/api/tasks/{task_id}/codex-readonly',{'confirmed':True},token)
         self.assertEqual(status,403)
 
+    def test_workflow_http_gates(self):
+        _,session = self.req('GET','/api/session')
+        token = session['csrf']
+        self.req('POST','/api/projects',{'name':'demo'},token)
+        _,response = self.req('POST','/api/tasks',
+            {'title':'架构设计与重构测试','description':'一阶段分析二阶段实现','project':'demo','agent':'dual'},token)
+        task_id = response['task']['id']
+        _,all_tasks = self.req('GET','/api/tasks')
+        self.assertEqual(len(all_tasks['tasks'][0]['steps']),3)
+        status,_ = self.req('POST',f'/api/tasks/{task_id}/step-finish',
+            {'state':'done','result':'skip'},token)
+        self.assertEqual(status,400)
+        self.req('POST',f'/api/tasks/{task_id}/prepare',{},token)
+        status,_ = self.req('POST',f'/api/tasks/{task_id}/launch',{'agent':'codex'},token)
+        self.assertEqual(status,400)
+        status,response = self.req('POST',f'/api/tasks/{task_id}/step-finish',
+            {'state':'done','result':'design approved'},token)
+        self.assertEqual(status,200)
+        self.assertEqual(response['task']['status'],'pending')
+        self.assertEqual(response['task']['steps'][0]['status'],'done')
+        status,_ = self.req('POST',f'/api/tasks/{task_id}/codex-readonly',{'confirmed':True},token)
+        self.assertEqual(status,400)
+        status,_ = self.req('POST',f'/api/tasks/{task_id}/worktree',{'confirmed':False},token)
+        self.assertEqual(status,400)
+
     def test_host_header_and_origin(self):
         status,_=self.req('GET','/api/tasks',headers={'Host':'untrusted.example'})
         self.assertEqual(status,403)

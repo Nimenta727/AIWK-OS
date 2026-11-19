@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from .router import recommend
 from .store import Store
 from .tools import inventory, interactive, codex_readonly
+from .gitops import create_task_worktree
 from . import __version__
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -63,11 +64,11 @@ class AppHandler(BaseHTTPRequestHandler):
         if route == "/api/projects":
             return self._send({"projects":self.server.store.projects()})
         if route == "/api/tasks":
-            return self._send({"tasks":self.server.store.list_tasks()})
+            return self._send({"tasks":[self.server.store.task_view(t) for t in self.server.store.list_tasks()]})
         if route.startswith("/api/tasks/") and route.count("/") == 3:
             try:
                 task = self.server.store.get(route.split("/")[-1])
-                return self._send({"task":task})
+                return self._send({"task":self.server.store.task_view(task)})
             except KeyError:
                 return self._error(404,"未找到任务")
         safe_static = {"/":"index.html", "/index.html":"index.html", "/app.js":"app.js", "/app.css":"app.css"}
@@ -141,12 +142,29 @@ class AppHandler(BaseHTTPRequestHandler):
                 agent = obj.get("agent", task["agent"])
                 if agent not in ("claude","codex"):
                     raise ValueError("选择 Claude 或 Codex 进行交互式执行")
-                if task["status"] != "prepared":
-                    raise ValueError("请先生成任务交接文档")
-                interactive(agent,store.project_path(task["project"]))
+                step = store.active_step(task_id)
+                if task["status"] != "prepared" or step is None or step["status"] != "prepared":
+                    raise ValueError("请先生成当前阶段交接文档")
+                if step["agent"] != "manual" and step["agent"] != agent:
+                    raise ValueError("当前阶段只能调用规划的 Agent")
+                interactive(agent,store.task_workspace(task_id))
                 store.audit("launch_interactive",{"id":task_id,"agent":agent})
                 return self._send({"launched":agent,"brief":str(store.tasks_root / (task_id + ".md"))})
+            if action == "worktree":
+                if obj.get("confirmed") is not True:
+                    return self._error(400, "需要明确确认新建 Git 工作区")
+                if task["status"] != "pending":
+                    raise ValueError("请在生成交接文档之前创建隔离工作区")
+                path = create_task_worktree(task,store)
+                return self._send({"path":str(path),"task":store.task_view(task)},201)
+            if action == "step-finish":
+                updated = store.finish_step(task_id,obj.get("state"),obj.get("result"))
+                store.audit("workflow_step_finished",{"id":task_id,"state":obj.get("state")})
+                return self._send({"task":updated})
             if action == "codex-readonly":
+                step = store.active_step(task_id)
+                if step is None or step["agent"] != "codex" or task["agent"] != "codex":
+                    raise ValueError("实验性只读执行仅支持 Codex 单阶段任务")
                 if not self.server.allow_codex_readonly:
                     return self._error(403,"实验性自动执行未启用；请手动配置启动参数")
                 if obj.get("confirmed") is not True:
@@ -161,7 +179,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 state = obj.get("state")
                 if state not in ("done","failed"):
                     raise ValueError("状态必须是 done 或 failed")
-                updated = store.update(task_id,state)
+                updated = store.finish_step(task_id,state,obj.get("result", ""))
                 store.audit("complete_task",{"id":task_id,"state":state})
                 return self._send({"task":updated})
         return self._error(404,"未知操作")

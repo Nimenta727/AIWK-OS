@@ -40,7 +40,7 @@ def codex_readonly(task, store):
         raise ValueError("自动 Codex 执行要求项目已初始化 Git；避免跳过项目检查")
     if task["status"] == "running":
         raise ValueError("任务已运行")
-    store.update(task["id"], "running")
+    store.start_step(task["id"])
     store.audit("codex_run_started", {"id":task["id"], "mode":"read-only"})
     prompt = (f"任务：{task['title']}\n\n{task['description']}\n\n"
               "请只读分析当前仓库并给出建议。不要修改文件，不要推送代码，"
@@ -59,14 +59,14 @@ def codex_readonly(task, store):
             except subprocess.TimeoutExpired:
                 proc.kill()
                 out, _ = proc.communicate()
-                store.update(task["id"], "failed", "超时（300秒）。\n" + out[-9000:])
+                store.finish_step(task["id"], "failed", "超时（300秒）。\n" + out[-9000:], allow_running=True)
                 store.audit("codex_run_timeout", {"id":task["id"]})
                 return
             status = "done" if proc.returncode == 0 else "failed"
-            store.update(task["id"], status, out[-11000:])
+            store.finish_step(task["id"], status, out[-11000:] or "CLI 未输出文本", allow_running=True)
             store.audit("codex_run_finished", {"id":task["id"],"exit_code":proc.returncode})
         except Exception as exc:
-            store.update(task["id"], "failed", str(exc))
+            store.finish_step(task["id"], "failed", str(exc) or type(exc).__name__, allow_running=True)
             store.audit("codex_run_error", {"id":task["id"],"error_type":type(exc).__name__})
 
     thread = threading.Thread(target=worker, name=f"codex-{task['id']}", daemon=True)

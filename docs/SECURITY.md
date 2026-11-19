@@ -19,6 +19,8 @@
 - Task descriptions have length limits; project paths are rooted and canonicalized.
 - Codex opt-in defaults OFF, uses read-only sandbox, no untrusted prompt in Windows command-line arguments, bounded timeout.
 - No automatic git push, package install, admin elevation, VM snapshot or GUI control from dashboard.
+- Worktree creation requires explicit opt-in and a clean Git root; path, branch, and command arguments are controlled by AIWS. Trust the repository before granting Git operations: repository Git configuration/filters can still execute other programs.
+- Staged workflows cannot skip a step by calling the completion API. Manual workflow completion is disallowed while a background Codex worker is running. Previous-stage outputs are explicitly labeled untrusted data.
 
 ## Known limitations requiring validation
 
@@ -29,7 +31,9 @@
 - CLI / WinGet ID stability and installer behavior must be verified inside the real VM, especially after software updates.
 - In-process daemon threads are not a durable queue; on restart formerly `running` tasks are marked `failed`; job results still require manual reconciliation.
 - Project names use a Windows-compatible restricted set but NTFS reparse points and special filesystem conditions still require security review.
-- T3/OpenClaw API integration, WSL2 and GUI automation are not implemented.
+- T3/OpenClaw API integration, WSL2 and GUI automation are not implemented. The new workflow and worktree features are independent, not upstream code copies.
+- Git worktrees are not OS sandboxes; a CLI may still read other files available to the same Windows user. Worktree operations can invoke Git filters configured by a repository, so only create them from trusted projects.
+- End-to-end Windows GUI behavior, CLI OAuth status, and git-worktree ACLs still require testing in the actual Hyper-V VM.
 
 ## Acceptance gates before expanding permissions
 
