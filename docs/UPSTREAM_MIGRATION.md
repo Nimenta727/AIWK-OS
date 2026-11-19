@@ -1,4 +1,4 @@
-# Upstream migration decisions — AIWS V0.2
+# Upstream migration decisions — AIWS V0.3
 
 Review date: **2026-11-19**. The goal is a maintainable Windows-native control plane, not a monolithic copy of several upstream programs.
 
@@ -29,3 +29,10 @@ Review date: **2026-11-19**. The goal is a maintainable Windows-native control p
 2. **Kandev-inspired**: Durable job receipt/outbox and cancellation with recoverable states (independent implementation).
 3. **OpenClaw-inspired**: Windows capability broker, per-tool allowlists, user approval audit and sandbox evidence.
 4. **Windows**: Verify Hyper-V guest Worktree, PowerShell Direct, NTFS access control and actual CLI authentication paths.
+
+## V0.3 independently implemented improvements
+
+- T3-inspired provider separation: `CLIAdapters` advertises support, and the Codex worker is explicitly read-only; Claude remains interactive.
+- Kandev-inspired durable intent: persisted `approvals` and `jobs` rows, one-time consumption, restart reconciliation and queue state views. **No AGPL code copied.**
+- OpenClaw-inspired capability boundary: local policy descriptor with deny-by-default tool categories and per-request approvals, without borrowing or falsely claiming Windows Hub sandboxing. **No upstream code copied.**
+- Further Windows/Hyper-V integration remains blocked on testing the actual guest; no native third-party binaries included.

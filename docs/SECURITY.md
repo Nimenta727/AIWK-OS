@@ -17,7 +17,7 @@
 - Localhost-only listener, minimal endpoint surface, host and origin filtering, anti-CSRF for POST, no CORS headers, restrictive CSP.
 - No endpoint to execute arbitrary user-provided commands.
 - Task descriptions have length limits; project paths are rooted and canonicalized.
-- Codex opt-in defaults OFF, uses read-only sandbox, no untrusted prompt in Windows command-line arguments, bounded timeout.
+- Codex opt-in defaults OFF, uses persisted one-shot approvals and a read-only sandbox, no untrusted prompt in Windows command-line arguments, bounded timeout. A user may cancel only queued jobs; running-process cancellation is planned.
 - No automatic git push, package install, admin elevation, VM snapshot or GUI control from dashboard.
 - Worktree creation requires explicit opt-in and a clean Git root; path, branch, and command arguments are controlled by AIWS. Trust the repository before granting Git operations: repository Git configuration/filters can still execute other programs.
 - Staged workflows cannot skip a step by calling the completion API. Manual workflow completion is disallowed while a background Codex worker is running. Previous-stage outputs are explicitly labeled untrusted data.
@@ -29,7 +29,10 @@
 - Codex project MCP configurations can grant additional capabilities; only use known trusted repositories with experimental mode.
 - Python HTTP service and local processes have not been pen-tested or load-tested.
 - CLI / WinGet ID stability and installer behavior must be verified inside the real VM, especially after software updates.
-- In-process daemon threads are not a durable queue; on restart formerly `running` tasks are marked `failed`; job results still require manual reconciliation.
+- Jobs and approvals are persisted in SQLite. Running jobs are marked `interrupted` after restart and are not retried automatically; operator reconciliation is still required. The worker runs as a daemon thread, so force-closing AIWS while Codex is active does not prove its subprocess terminated immediately.
+- Only one AIWS process may hold an individual workspace lock. Back up the SQLite DB when no work is running.
+- Background `codex-readonly` has a one-time approval gate, but it does not isolate arbitrary MCP tools; disable untrusted plugins/MCP, use a non-admin Windows user and trusted Git projects.
+- CLI results stored in the local SQLite DB may include sensitive output. Protect and periodically review the workspace; do not share logs or databases publicly.
 - Project names use a Windows-compatible restricted set but NTFS reparse points and special filesystem conditions still require security review.
 - T3/OpenClaw API integration, WSL2 and GUI automation are not implemented. The new workflow and worktree features are independent, not upstream code copies.
 - Git worktrees are not OS sandboxes; a CLI may still read other files available to the same Windows user. Worktree operations can invoke Git filters configured by a repository, so only create them from trusted projects.

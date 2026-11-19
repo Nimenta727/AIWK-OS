@@ -10,8 +10,8 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="brand-icon">✳</span><div>AIWS <small>WINDOWS AI WORKSTATION</small></div></div>
-    <nav><a href="#overview" class="active">◈ &nbsp; 工作台总览</a><a href="#new-task">▤ &nbsp; 创建任务</a><a href="#task-list">≡ &nbsp; 任务队列</a><a href="#environment">⌘ &nbsp; 环境与执行器</a></nav>
-    <div class="sidebar-bottom"><div class="dot"></div> 仅本机访问 <span>127.0.0.1</span><p>Beta · V0.2 · 无云端存储</p></div>
+    <nav><a href="#overview" class="active">◈ &nbsp; 工作台总览</a><a href="#new-task">▤ &nbsp; 创建任务</a><a href="#task-list">≡ &nbsp; 任务队列</a><a href="#approvals">✓ &nbsp; 审批中心</a><a href="#environment">⌘ &nbsp; 环境与执行器</a></nav>
+    <div class="sidebar-bottom"><div class="dot"></div> 仅本机访问 <span>127.0.0.1</span><p>Beta · V0.3 · 无云端存储</p></div>
   </aside>
   <main>
     <header class="top"><div><p class="eyebrow">CONTROL CENTER / HYPER-V GUEST</p><h1 id="overview">让两个 AI，成为一座工作台。</h1><p class="muted">统一管理任务、执行器和隔离工作区；Claude → Codex → Claude 分阶段交接，全程由你审批。</p></div><div class="pill">● PRIVATE / LOCAL</div></header>
@@ -26,7 +26,8 @@
       </article>
     </section>
     <section class="panel tasks" id="task-list"><div class="panel-header"><div><p class="eyebrow">TASK QUEUE</p><h2>任务队列</h2></div><button id="refresh" class="btn ghost" type="button">↻ 刷新</button></div><div id="tasks-container" class="task-container"><p class="muted">加载任务中…</p></div></section>
-    <footer>AIWS V0.2 · 专门适配 Windows / Hyper-V · 开源原型 · 不保存 Claude / ChatGPT 密钥</footer>
+    <section class="panel tasks" id="approvals"><div class="panel-header"><div><p class="eyebrow">APPROVAL CENTER</p><h2>一次性审批与持久任务队列</h2></div><span class="chip">执行前批准 · 重启不中途重跑</span></div><p class="muted">只有已准备的 Codex 单阶段任务能够申请后台只读分析。Claude Code 仍由你在官方终端中操作；系统管理、任意 Shell、桌面控制与外部发布均未开放。</p><div id="approval-list" class="task-container"></div><h3 class="queue-title">后台任务历史</h3><div id="job-list" class="task-container"></div></section>
+    <footer>AIWS V0.3 · 专门适配 Windows / Hyper-V · 开源原型 · 不保存 Claude / ChatGPT 密钥</footer>
   </main>
 </div>
 <div id="toast" class="toast" aria-live="polite"></div>

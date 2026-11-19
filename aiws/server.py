@@ -10,7 +10,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 from .router import recommend
 from .store import Store
-from .tools import inventory, interactive, codex_readonly
+from .tools import inventory, interactive
+from .execution import CLIAdapters, QueueEngine
+from .policy import public_policy, require
+from .singleton import WorkspaceLock
 from .gitops import create_task_worktree
 from . import __version__
 
@@ -63,6 +66,12 @@ class AppHandler(BaseHTTPRequestHandler):
                                "tools":inventory(),"workspace":str(self.server.store.workspace)})
         if route == "/api/projects":
             return self._send({"projects":self.server.store.projects()})
+        if route == "/api/approvals":
+            return self._send({"approvals":self.server.store.approvals()})
+        if route == "/api/jobs":
+            return self._send({"jobs":self.server.store.jobs()})
+        if route == "/api/policy":
+            return self._send({"capabilities":public_policy(),"adapters":CLIAdapters.inventory()})
         if route == "/api/tasks":
             return self._send({"tasks":[self.server.store.task_view(t) for t in self.server.store.list_tasks()]})
         if route.startswith("/api/tasks/") and route.count("/") == 3:
@@ -128,6 +137,22 @@ class AppHandler(BaseHTTPRequestHandler):
             task = store.create_task(title.strip(),description.strip(),project,agent,pick["reason"])
             store.audit("create_task",{"id":task["id"],"agent":task["agent"]})
             return self._send({"task":task},201)
+        if route.startswith("/api/approvals/"):
+            parts = route.strip("/").split("/")
+            if len(parts) != 4 or parts[:2] != ["api", "approvals"] or parts[3] != "decide":
+                return self._error(404,"未知审批操作")
+            if not self.server.allow_codex_readonly:
+                return self._error(403,"后台队列未启用")
+            result = store.decide(parts[2],obj.get("decision"))
+            if result["job_id"] is not None:
+                self.server.engine.wake()
+            return self._send(result)
+        if route.startswith("/api/jobs/"):
+            parts = route.strip("/").split("/")
+            if len(parts) != 4 or parts[:2] != ["api", "jobs"] or parts[3] != "cancel":
+                return self._error(404,"未知队列操作")
+            store.cancel_queued(parts[2])
+            return self._send({"cancelled":parts[2]})
         if route.startswith("/api/tasks/"):
             parts = route.strip("/").split("/")
             if len(parts) != 4 or parts[:2] != ["api", "tasks"]:
@@ -147,12 +172,12 @@ class AppHandler(BaseHTTPRequestHandler):
                     raise ValueError("请先生成当前阶段交接文档")
                 if step["agent"] != "manual" and step["agent"] != agent:
                     raise ValueError("当前阶段只能调用规划的 Agent")
+                require("launch_official_cli")
                 interactive(agent,store.task_workspace(task_id))
                 store.audit("launch_interactive",{"id":task_id,"agent":agent})
                 return self._send({"launched":agent,"brief":str(store.tasks_root / (task_id + ".md"))})
             if action == "worktree":
-                if obj.get("confirmed") is not True:
-                    return self._error(400, "需要明确确认新建 Git 工作区")
+                require("git_worktree", confirmed=obj.get("confirmed") is True)
                 if task["status"] != "pending":
                     raise ValueError("请在生成交接文档之前创建隔离工作区")
                 path = create_task_worktree(task,store)
@@ -161,18 +186,13 @@ class AppHandler(BaseHTTPRequestHandler):
                 updated = store.finish_step(task_id,obj.get("state"),obj.get("result"))
                 store.audit("workflow_step_finished",{"id":task_id,"state":obj.get("state")})
                 return self._send({"task":updated})
-            if action == "codex-readonly":
-                step = store.active_step(task_id)
-                if step is None or step["agent"] != "codex" or task["agent"] != "codex":
-                    raise ValueError("实验性只读执行仅支持 Codex 单阶段任务")
+            if action == "request-readonly":
                 if not self.server.allow_codex_readonly:
-                    return self._error(403,"实验性自动执行未启用；请手动配置启动参数")
-                if obj.get("confirmed") is not True:
-                    return self._error(400,"需要在界面中明确确认")
-                if task["status"] not in ("pending","prepared","failed"):
-                    raise ValueError("任务当前状态不允许重新启动")
-                codex_readonly(task,store)
-                return self._send({"task":store.get(task_id)})
+                    return self._error(403,"实验性只读后台执行未启用")
+                approval = store.request_readonly(task_id)
+                return self._send({"approval":approval},201)
+            if action == "codex-readonly":
+                return self._error(403,"V0.3 要求先申请一次性审批，再通过审批中心启动队列")
             if action == "complete":
                 if task["status"] == "running":
                     raise ValueError("后台执行中的任务不能手动完成")
@@ -189,13 +209,31 @@ class AppHandler(BaseHTTPRequestHandler):
         pass
 
 
-def make_server(workspace: Path, port=8765, *, allow_codex_readonly=False):
+class WorkstationServer(ThreadingHTTPServer):
+    def server_close(self):
+        if getattr(self, "engine", None):
+            self.engine.stop()
+        if getattr(self, "workspace_lock", None):
+            self.workspace_lock.release()
+        super().server_close()
+
+
+def make_server(workspace: Path, port=8765, *, allow_codex_readonly=False, executor=None):
     if port != 0 and (port < 1024 or port > 65535):
         raise ValueError("端口必须在 1024 到 65535 之间")
-    httpd = ThreadingHTTPServer(("127.0.0.1",port),AppHandler)
-    httpd.store = Store(workspace)
+    locker = WorkspaceLock(workspace).acquire()
+    try:
+        httpd = WorkstationServer(("127.0.0.1",port),AppHandler)
+        httpd.workspace_lock = locker
+        httpd.store = Store(workspace)
+    except Exception:
+        locker.release()
+        raise
     httpd.csrf = secrets.token_urlsafe(32)
     httpd.allow_codex_readonly = allow_codex_readonly
+    httpd.engine = QueueEngine(httpd.store) if executor is None else QueueEngine(httpd.store,executor=executor)
+    if allow_codex_readonly:
+        httpd.engine.start()
     return httpd
 
 

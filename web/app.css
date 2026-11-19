@@ -2,3 +2,6 @@
 
 /* V0.2 staged agent workflows */
 .stage-list{margin:14px 0;padding:10px 12px;background:#0b1524;border:1px solid #273b56;border-radius:9px}.stage-row{display:flex;gap:10px;align-items:center;padding:7px 0;color:#c4d4ed;font-size:12px}.stage-row+.stage-row{border-top:1px solid #26384f}.stage-index{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#263e66;color:#a9c5ff;font-weight:700;flex-shrink:0}.stage-info{flex:1}.stage-status{color:#a2b3c9;font-size:11px}.stage-done .stage-index{background:#174b42;color:#81e6bf}.stage-done .stage-status{color:#81e6bf}.stage-result{margin:4px 0 6px 32px;color:#94acd3;font-size:11px}.step-form{border:1px dashed #405679;padding:13px;border-radius:9px;margin-top:12px;gap:8px}.step-form label{font-size:11px}.step-form textarea{min-height:75px}.step-form button{align-self:flex-start}
+
+/* V0.3 approval center and durable jobs */
+.approval-row{border:1px solid var(--border);background:#0e1829;border-radius:10px;padding:13px 15px;display:flex;gap:9px;flex-direction:column}.approval-row strong{font-size:12px}.approval-row small{font-size:11px;color:var(--sub)}.queue-title{margin:24px 0 12px}.approval-row .task-actions{margin-top:3px}

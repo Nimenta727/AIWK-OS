@@ -74,9 +74,32 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(response['task']['status'],'pending')
         self.assertEqual(response['task']['steps'][0]['status'],'done')
         status,_ = self.req('POST',f'/api/tasks/{task_id}/codex-readonly',{'confirmed':True},token)
-        self.assertEqual(status,400)
+        self.assertEqual(status,403)
         status,_ = self.req('POST',f'/api/tasks/{task_id}/worktree',{'confirmed':False},token)
         self.assertEqual(status,400)
+
+    def test_policy_api_and_readonly_disabled(self):
+        status, data = self.req('GET','/api/policy')
+        self.assertEqual(status,200)
+        self.assertFalse(data['capabilities']['system_admin']['implemented'])
+        self.assertFalse(data['adapters']['claude']['background_readonly'])
+        _, session = self.req('GET','/api/session')
+        self.req('POST','/api/projects',{'name':'code'},session['csrf'])
+        _, task = self.req('POST','/api/tasks',
+            {'title':'inspect','description':'','project':'code','agent':'codex'},session['csrf'])
+        task_id=task['task']['id']
+        self.req('POST',f'/api/tasks/{task_id}/prepare',{},session['csrf'])
+        status,_=self.req('POST',f'/api/tasks/{task_id}/request-readonly',{},session['csrf'])
+        self.assertEqual(status,403)
+        status, data=self.req('GET','/api/approvals')
+        self.assertEqual(status,200)
+        self.assertEqual(data['approvals'],[])
+
+    def test_workspace_singleton_lock(self):
+        from aiws.server import make_server
+        with self.assertRaises(RuntimeError):
+            duplicate = make_server(Path(self.temp.name), 0)
+            duplicate.server_close()
 
     def test_host_header_and_origin(self):
         status,_=self.req('GET','/api/tasks',headers={'Host':'untrusted.example'})

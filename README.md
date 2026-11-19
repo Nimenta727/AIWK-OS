@@ -1,8 +1,8 @@
-# AIWS · Windows AI Workstation (V0.2)
+# AIWS · Windows AI Workstation (V0.3)
 
 > A runnable **prototype**, not a finished or audited Windows AI operating system. Built for a Windows 10/11 guest running in Microsoft Hyper-V.
 
-**What works in V0.2**: staged dual-agent workflows (Claude analysis → Codex implementation → Claude review) with SQLite step persistence, explicit per-step approval and handoff summaries; user-confirmed isolated Git worktrees for clean trusted repositories; plus V0.1 features: a localhost-only browser dashboard, isolated project directory selection, SQLite tasks, deterministic agent recommendations, task briefs for agent handoff, detection of local Claude/Codex/T3/OpenClaw CLIs, interactive Claude/Codex terminal launch on Windows, and **opt-in experimental** Codex read-only analysis with result capture. Includes Hyper-V host→guest copy script, WinGet/bootstrap scripts, unit/HTTP tests, source audit, and `docs/routine/`. GitHub Actions runs Python tests on Windows and Linux, validates PowerShell syntax on Windows, and produces a source-only portable ZIP artifact.
+**What works in V0.3**: a durable SQLite job queue with crash recovery, per-stage one-time approval requests, approve/deny/cancel in a unified dashboard, a capability policy map denying arbitrary shell/admin/GUI actions, a workspace singleton lock, official CLI adapter capability inventory, and an opt-in worker for approved Codex read-only single-stage tasks. Also retained from V0.2: staged dual-agent workflows (Claude analysis → Codex implementation → Claude review) with SQLite step persistence, explicit per-step approval and handoff summaries; user-confirmed isolated Git worktrees for clean trusted repositories; plus V0.1 features: a localhost-only browser dashboard, isolated project directory selection, SQLite tasks, deterministic agent recommendations, task briefs for agent handoff, detection of local Claude/Codex/T3/OpenClaw CLIs, interactive Claude/Codex terminal launch on Windows, and **opt-in experimental** Codex read-only analysis with result capture. Includes Hyper-V host→guest copy script, WinGet/bootstrap scripts, unit/HTTP tests, source audit, and `docs/routine/`. GitHub Actions runs Python tests on Windows and Linux, validates PowerShell syntax on Windows, and produces a source-only portable ZIP artifact.
 
 **Not implemented**: fully automatic Claude subscription orchestration, OS-wide GUI automation, unified ChatGPT/Claude chats and memories, unattended administrative operations, integration with T3 Code/OpenClaw internal APIs, or a precompiled/signed Windows executable. The packaged ZIP contains **our code and installer scripts only**; it does **not** redistribute Claude Code, Codex or account tokens.
 
@@ -49,7 +49,18 @@ After testing the official CLI in an ordinary account, optionally start with:
 .\scripts\Start-AIWS.ps1 -EnableCodexReadonly
 ```
 
-This makes the **Codex 只读分析** button available **only for single-stage Codex tasks**. It requires explicit per-task confirmation, a Git-initialized project, a local CLI login, and invokes `codex exec --sandbox read-only --ephemeral -` with the prompt via **stdin**. It captures the output to SQLite, stops after 300 seconds, and does not intentionally edit files. **Warning:** repo-defined MCP tools and external side effects can exceed this sandbox boundary, and native Windows sandbox behavior varies by CLI version. Only test on trusted repositories; do not infer from this feature that the VM is hardened against arbitrary agent commands.
+V0.3 uses a **two-step, durable approval flow** for **single-stage Codex tasks only**:
+
+1. Create a Codex task in a **trusted** Git-initialized project; click **生成当前阶段交接文档**.
+2. Click **申请 Codex 只读后台执行**. This creates a pending approval; no CLI runs yet.
+3. In **审批中心**, review the task and click **批准一次** (or **拒绝**). Approval enqueues exactly one immutable job.
+4. The worker picks an approved queued job, runs `codex exec --sandbox read-only --ephemeral -` with the brief on **stdin**, and records the result.
+5. If the workstation restarts during execution, the job becomes `interrupted` and the task becomes `failed`. It **never automatically reruns**. Review any side effects, regenerate the stage brief and request a fresh approval if appropriate. Approved queued jobs remain queued on restart and are processed only when you start with `-EnableCodexReadonly`.
+6. A queued job can be cancelled before the worker claims it. Running process cancellation is **not** implemented in V0.3.
+
+**Important:** Codex read-only sandbox does not prove installed MCP services or plugins cannot have extra effects; actual OS-level isolation depends on your Windows version, user permissions and Codex version. Claude subscription login is not used as a third-party API; Claude runs only in its official interactive CLI.
+
+The **Windows capability policy** (`/api/policy`) explicitly exposes what is implemented: project metadata, interactive CLI, confirmed Git worktree creation, and one-time-approved read-only Codex jobs. Generic PowerShell, system administration, GUI automation, writes and external publishing remain **not exposed**. Policy metadata is **not** equivalent to an OS sandbox.
 
 ### 2. Hyper-V host-assisted copy (optional)
 
@@ -77,15 +88,16 @@ The installer resolves the upstream tools directly, and the user performs offici
 - Script install only when an operator runs `-InstallTools` or `-InstallT3`.
 - Audit metadata is written to local `logs/audit.jsonl`; raw OAuth/API tokens are not requested.
 - A VM snapshot is helpful for rollback but is **not** a backup and not a complete security isolation boundary.
+- At most **one** AIWS server can hold a given workspace lock. Do not share the SQLite workspace between VM instances.
 - Your CLI's own permissions, MCP settings, account entitlements and provider terms still apply.
 
-Read [Architecture](docs/ARCHITECTURE.md) and [Risk Controls](docs/SECURITY.md) before enabling extra permissions.
+Read [Architecture](docs/ARCHITECTURE.md), [Risk Controls](docs/SECURITY.md), and [V0.3 operations](docs/V03_OPERATIONS.md) before enabling extra permissions.
 
 ## 5. Project layout
 
 ```
 AIWS-Prototype/
-├── aiws/                 # Stdlib backend, staged workflows, Git worktrees, routing, SQLite, CLI adapters
+├── aiws/                 # Stdlib backend, state machine, approvals, queue, policy, local CLI adapters
 ├── web/                  # Offline browser UI
 ├── scripts/              # Hyper-V + Windows setup, optional packaging
 ├── docs/ARCHITECTURE.md # Reviewed upstream source references

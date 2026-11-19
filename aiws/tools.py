@@ -1,9 +1,7 @@
 """Explicit, minimal subprocess integration; no credentials or general command runner."""
-import os
 import platform
 import shutil
 import subprocess
-import threading
 from pathlib import Path
 
 AGENTS = {"claude": "claude", "codex": "codex", "t3": "t3", "openclaw": "openclaw"}
@@ -26,48 +24,3 @@ def interactive(agent: str, project: Path):
     # current directory first, allowing an untrusted repo to shadow codex/claude.
     subprocess.Popen(["cmd.exe", "/k", f'"{binary}"'], cwd=str(project),
                      creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-
-def codex_readonly(task, store):
-    """Opt-in read-only analysis only; stdin avoids Windows npm .cmd argument injection."""
-    if platform.system() != "Windows":
-        raise OSError("自动执行只在 Windows 来宾系统中支持")
-    binary = shutil.which("codex")
-    if not binary:
-        raise FileNotFoundError("Codex CLI 不在 PATH")
-    project = store.project_path(task["project"])
-    if not (project / ".git").exists():
-        raise ValueError("自动 Codex 执行要求项目已初始化 Git；避免跳过项目检查")
-    if task["status"] == "running":
-        raise ValueError("任务已运行")
-    store.start_step(task["id"])
-    store.audit("codex_run_started", {"id":task["id"], "mode":"read-only"})
-    prompt = (f"任务：{task['title']}\n\n{task['description']}\n\n"
-              "请只读分析当前仓库并给出建议。不要修改文件，不要推送代码，"
-              "不要执行安装或系统配置。将建议用中文输出。")
-
-    def worker():
-        try:
-            # codex exec - consumes prompt via stdin. Keep arguments constant (no shell command injection).
-            proc = subprocess.Popen([binary, "exec", "--sandbox", "read-only",
-                                     "--ephemeral", "-"], cwd=str(project),
-                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True,
-                                    encoding="utf-8", errors="replace")
-            try:
-                out, _ = proc.communicate(input=prompt, timeout=300)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                out, _ = proc.communicate()
-                store.finish_step(task["id"], "failed", "超时（300秒）。\n" + out[-9000:], allow_running=True)
-                store.audit("codex_run_timeout", {"id":task["id"]})
-                return
-            status = "done" if proc.returncode == 0 else "failed"
-            store.finish_step(task["id"], status, out[-11000:] or "CLI 未输出文本", allow_running=True)
-            store.audit("codex_run_finished", {"id":task["id"],"exit_code":proc.returncode})
-        except Exception as exc:
-            store.finish_step(task["id"], "failed", str(exc) or type(exc).__name__, allow_running=True)
-            store.audit("codex_run_error", {"id":task["id"],"error_type":type(exc).__name__})
-
-    thread = threading.Thread(target=worker, name=f"codex-{task['id']}", daemon=True)
-    thread.start()
