@@ -52,8 +52,10 @@ async function mountMock(page,{slowCreate=false}={}) {
 test('navigation, selection, project, plan, help keyboard and search work',async({page})=>{
  await mountMock(page);
  await expect(page.getByRole('navigation',{name:'核心工作区'})).toBeVisible();
+ await page.screenshot({path:'test-results/studio-mission-desktop.png',fullPage:true});
  await page.getByRole('button',{name:'AI 计划中心'}).click();
  await expect(page.getByRole('heading',{name:'计划中心'})).toBeVisible();
+ await page.screenshot({path:'test-results/studio-plan-desktop.png',fullPage:true});
  await page.getByRole('button',{name:'可视化工作流'}).click();
  await expect(page.getByRole('heading',{name:'AIWS 产品重构'})).toBeVisible();
  await page.getByRole('button',{name:'文件与 Git 变更'}).click();
@@ -77,7 +79,7 @@ test('create via keyboard only once, retain native result, and close via Escape'
  await expect(page.getByRole('textbox',{name:/任务名称/})).toBeFocused();
  await page.keyboard.press('Escape');
  await expect(page.getByRole('dialog',{name:'创建协作任务'})).not.toBeVisible();
- await page.getByRole('button',{name:'新建任务',exact:true}).click();
+ await page.locator('.top-create').click();
  const modal=page.getByRole('dialog',{name:'创建协作任务'});
  await modal.getByRole('textbox',{name:/任务名称/}).fill('新版交互质量验证');
  await modal.getByRole('button',{name:'选择目录'}).click();

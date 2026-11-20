@@ -31,6 +31,14 @@ jobs:
           npm run build
           if (-not (Test-Path 'dist/index.html')) { throw 'Frontend build missing' }
           npm run test:ui
+      - name: Upload browser interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIWS-Studio-UI-browser-evidence
+          path: desktop/AIWorkstation.Frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
