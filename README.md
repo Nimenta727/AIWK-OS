@@ -1,3 +1,13 @@
+# AIWS V1.0 — source-level modular Windows workstation
+
+**New default:** our own Windows EXE hosting an offline React workspace UI, backed by the AIWS .NET workflow/approval/trace core. **Not** T3/OpenClaw embedded application pages or upstream servers. See [modular recomposition design](docs/MODULAR_RECOMPOSITION_V1.md).
+
+Run `scripts/Build-NativeDesktop.ps1` on a Windows 11 VM with .NET 10 SDK, Node.js 22, and WebView2 Runtime; the distribution consists of `WindowsAIWorkstation.exe` **and** `ui-dist/` assets. Frontend source lives in `desktop/AIWorkstation.Frontend`; adapted MIT T3 components are documented at `third_party/t3code/NOTICE.md`.
+
+The host does not automatically send prompts or convert ChatGPT/Claude subscriptions into API keys. CLI execution requires local confirmation and inherits Windows user permissions.
+
+---
+
 # Windows AI Workstation · native desktop edition
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.

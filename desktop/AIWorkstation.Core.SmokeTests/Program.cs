@@ -196,6 +196,25 @@ try
     catch (UnauthorizedAccessException) { Console.WriteLine("SKIP: symlink creation needs privileges"); }
     catch (IOException) { Console.WriteLine("SKIP: symlink creation unavailable"); }
 
+    // V1.0 source-recomposition: bridge-independent controller tests.
+    var bridgeRoot = Path.Combine(workspace, "bridge-root");
+    var projectRoot = Path.Combine(workspace, "bridge-project");
+    Directory.CreateDirectory(projectRoot);
+    string controllerTaskId;
+    using (var ctl = new WorkstationController(bridgeRoot))
+    {
+        var created = ctl.CreateTask("AIWS use case", projectRoot, "dual");
+        controllerTaskId = created.Id;
+        Assert(ctl.Tasks.Count == 1, "AIWS controller creates a real durable task");
+        Assert(Throws(() => ctl.Approve(controllerTaskId, created.Steps[1].Id)), "controller respects prerequisite ordering");
+        Assert(ThrowsAny(() => ctl.Launch(controllerTaskId, created.Steps[0].Id,
+            _ => { }, (_, _) => throw new IOException("simulated external CLI failure"))), "external launch failure surfaces to UI");
+        Assert(created.Steps[0].Status == StepStatus.Failed && created.RequestEvents.Any(e => e.Kind == "cli.failed"),
+            "failed CLI launch never masquerades as successful provider request");
+    }
+    using (var reopened = new WorkstationController(bridgeRoot))
+        Assert(reopened.GetTask(controllerTaskId).Steps[0].Status == StepStatus.Failed,
+            "controller persisted failure survives restart");
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

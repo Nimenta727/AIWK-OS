@@ -1,0 +1,13 @@
+<Window x:Class="AIWorkstation.Desktop.ModularWorkstationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Windows AI Workstation" Width="1440" Height="900"
+        MinWidth="980" MinHeight="650" Background="#FCFAF7"
+        WindowStartupLocation="CenterScreen" Loaded="OnLoaded">
+    <Grid>
+        <TextBlock x:Name="LoadingMessage" Text="AI Workstation · 正在启动本地工作台…" Foreground="#786D62"
+                   FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center" />
+        <wv:WebView2 x:Name="FrontendView" Visibility="Collapsed" />
+    </Grid>
+</Window>
