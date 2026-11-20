@@ -1,0 +1,16 @@
+# Real Debian Live XFCE/LightDM + Chromium + AIWS Agent smoke ISO.
+# Reduces optional developer toolchains; NOT the full distributable profile.
+linux-image-amd64
+live-boot
+live-config
+systemd-sysv
+xorg
+xfce4
+lightdm
+xfce4-terminal
+chromium
+curl
+ca-certificates
+python3
+git
+sudo

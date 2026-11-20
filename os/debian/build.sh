@@ -25,6 +25,14 @@ lb config --distribution trixie --architectures amd64 --binary-images iso-hybrid
   --debian-installer none --archive-areas main --linux-flavours amd64 \
   --bootappend-live "boot=live components console=ttyS0,115200n8"
 cp -a -- "$repo/os/debian/config/." "$out/config/"
+case "${AIWS_OS_PROFILE:-full}" in
+  full) ;;
+  smoke)
+    # Real bootable XFCE+Agent+React ISO with fewer optional compilers.
+    cp -- "$repo/os/debian/profiles/smoke.list.chroot" "$out/config/package-lists/aiws-desktop.list.chroot"
+    ;;
+  *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
+esac
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
 cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
 ui="$repo/desktop/AIWorkstation.Frontend/dist"

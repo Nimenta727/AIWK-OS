@@ -57,7 +57,7 @@ in {
   environment.systemPackages = with pkgs; [
     workbench toolctl openWorkbench probe chromium firefox
     geany mousepad python3 nodejs_22 clang cmake git
-    ripgrep golang-go rustc cargo curl
+    ripgrep go rustc cargo curl
   ];
   environment.etc."xdg/autostart/aiws-workbench.desktop".text = ''
     [Desktop Entry]

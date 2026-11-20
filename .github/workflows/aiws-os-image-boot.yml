@@ -1,0 +1,101 @@
+name: AIWS OS image and virtual-machine boot acceptance
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'os/**'
+      - '.github/workflows/aiws-os-image-boot.yml'
+      - 'desktop/AIWorkstation.Frontend/src/os/**'
+      - 'desktop/AIWorkstation.Frontend/src/main.tsx'
+      - 'flake.nix'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nixos-evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Parse NixOS image profile
+        run: |
+          nix-instantiate --parse flake.nix > /dev/null
+          nix-instantiate --parse os/platforms/nixos/aiws.nix > /dev/null
+      - name: Evaluate NixOS declarative ISO configuration
+        run: nix eval --raw .#nixosConfigurations.aiws-live.config.system.build.isoImage.name
+
+  debian-boot-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile shared AIWS React workspace
+        working-directory: desktop/AIWorkstation.Frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          test -s dist/index.html
+      - name: Build genuine Debian Live guest ISO in disposable trixie container
+        timeout-minutes: 50
+        run: |
+          docker run --rm --privileged -v "$PWD":/repo -w /repo debian:trixie bash -lc '
+            set -eu
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools
+            AIWS_OS_PROFILE=smoke AIWS_OS_OUTPUT=/repo/out/aiws-os-smoke ./os/debian/build.sh
+          '
+          test -s out/aiws-os-smoke/live-image-amd64.hybrid.iso
+          (cd out/aiws-os-smoke && sha256sum -c live-image-amd64.hybrid.iso.sha256)
+      - name: Install QEMU (software emulation: hosted runners lack /dev/kvm)
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+      - name: Boot guest with no NIC and validate serial receipt
+        timeout-minutes: 15
+        run: |
+          set -Eeuo pipefail
+          iso="$PWD/out/aiws-os-smoke/live-image-amd64.hybrid.iso"
+          serial="$PWD/out/aiws-os-smoke/boot-serial.log"
+          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 \
+            -boot d -cdrom "$iso" -nic none -display none -vga std \
+            -serial "file:$serial" -monitor none -no-reboot &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          passed=0
+          for attempt in $(seq 1 360); do
+            if [[ -f "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_PASS' "$serial"; then
+              passed=1
+              break
+            fi
+            if [[ -f "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_FAIL' "$serial"; then
+              echo 'Guest reported boot integration failure'
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then echo 'QEMU exited unexpectedly'; break; fi
+            sleep 2
+          done
+          echo '--- Last 120 guest serial lines ---'
+          tail -n 120 "$serial" || true
+          if [[ "$passed" != 1 ]]; then exit 1; fi
+      - name: Upload boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-os-guest-boot-evidence
+          path: |
+            out/aiws-os-smoke/boot-serial.log
+            out/aiws-os-smoke/live-image-amd64.hybrid.iso.sha256
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload experimental smoke ISO
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-os-debian-live-smoke-iso
+          path: out/aiws-os-smoke/live-image-amd64.hybrid.iso
+          compression-level: 0
+          retention-days: 3
