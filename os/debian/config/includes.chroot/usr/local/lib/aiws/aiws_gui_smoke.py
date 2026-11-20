@@ -15,6 +15,8 @@ def main():
     workspace.mkdir(mode=0o700,parents=True,exist_ok=True)
     (workspace/"AIWS-GUEST-SMOKE.txt").write_text(
         "AIWS guest-only file manager acceptance fixture\n",encoding="utf-8")
+    (workspace/"aiws-kernel.fragment").write_text(
+        "CONFIG_VIRTIO=y\nCONFIG_SECCOMP=y\n",encoding="ascii")
     options=webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
@@ -48,7 +50,24 @@ def main():
         browser.find_element(By.XPATH,"//nav//button[contains(.,'本地 AI 助手')]").click()
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
         assert "DISABLED" in browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text
-        print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional",flush=True)
+        # A genuine guest-only *candidate* pipeline, not a running kernel edit.
+        browser.find_element(By.XPATH,"//nav//button[contains(.,'系统与安全')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-system-console"))
+        wait.until(lambda b:"CONFIG" not in b.find_element(By.CSS_SELECTOR,".aiws-os-system-console").text)
+        browser.find_element(By.XPATH,"//button[contains(.,'提交候选验证和暂存审批')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
+        wait.until(lambda b:b.find_elements(By.XPATH,
+            "//button[contains(@class,'aiws-os-task') and contains(.,'验证并暂存客户机内核配置候选')]"))
+        browser.find_element(By.XPATH,
+            "//button[contains(@class,'aiws-os-task') and contains(.,'验证并暂存客户机内核配置候选')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-stage-status"))
+        browser.find_element(By.XPATH,"//button[contains(.,'批准客体写操作')]").click()
+        wait.until(lambda b:b.find_elements(By.XPATH,"//button[contains(.,'运行客户机阶段')]"))
+        browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
+        wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
+        wait.until(lambda b:'"deployed": false' in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
+        print("AIWS_GUI_BROWSER: kernel candidate approved/staged without deployment",flush=True)
+        print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional kernel=candidate-only",flush=True)
 
 if __name__=="__main__":
     main()
