@@ -34,7 +34,7 @@ AIWS 是自己的 **WPF / .NET 10 Windows 桌面 EXE**，通过 WebView2 承载�
 
 - 系统底座不固定 Debian：Debian live-build 仍是第一套开机验证配方，新增 NixOS 26.05 声明式 ISO 配方。后续可为 mkosi、Fedora bootc 等开发独立 adapter。
 - 已提交 Linux 工作台服务、MCP 工具接口、C#/Swift 代码分析和 React OS 页面；现有 Windows 工作台保留原有运行路径。
-- 真正的 ISO 构建、虚拟机开机、XFCE/LightDM/Chromium/Agent 同时运行，必须以 image-and-boot CI 结果为证。自主模型 Agent、统一任务状态迁移、特权 Broker 和虚拟机隔离验收尚未完成。
+- **已实测：** Debian 实验 ISO 真正构建并 SHA 校验；[QEMU 直接内核启动与 LightDM/XFCE/guest HTTP/MCP](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44762589191) 全部通过。尚未完成原生固件 ISO 启动、工作台 GUI 实际可见与点击、NixOS ISO build/boot、自主 Agent、统一任务 DAG 迁移、权限 Broker 和宿主隔离安全验收。
 
 工程说明：[AIWS OS 模块化重构](docs/AIWS_MODULAR_OS.md)、[OS 工程](os/README.md)、[镜像与 QEMU 启动验证](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/aiws-os-image-boot.yml)。
 

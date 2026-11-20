@@ -15,3 +15,8 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-20 23:17 — Debian GUI 与工作台系统集成](2026-11-20_2317-debian-desktop-workbench-guest-boot.md)
 - [2026-11-20 23:24 — NixOS 声明式系统配方](2026-11-20_2324-nixos-declarative-adapter.md)
 - [2026-11-20 23:29 — 真实 ISO 与 QEMU 启动 CI](2026-11-20_2329-os-real-image-qemu-boot-workflow.md)
+
+- [2026-11-21 00:53 — 只允许客户机的权限隔离 / Guest only](2026-11-21_0053-guest-only-host-deny-boundary.md)
+- [2026-11-21 00:57 — P0/P1 强制验收清单与挂载检查 / Priority gates](2026-11-21_0057-host-boundary-p0-p1-acceptance.md)
+- [2026-11-21 01:01 — 客户机文件服务与哈希前置条件 / Guest file API](2026-11-21_0101-workbench-guest-file-api.md)
+- [2026-11-21 01:04 — Linux 工作台文件结构浏览 / Guest file UI](2026-11-21_0104-guest-files-visual-ui.md)
