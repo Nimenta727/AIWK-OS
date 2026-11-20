@@ -1,5 +1,7 @@
 # AIWS V1.7.2 — Token-aware local handoff preflight
 
+> **产品核心：统一 Agent 任务控制平面，而非多模型聊天启动器。** 任务、计划、上下文、模型切换、Git 变更和调用证据必须共享同一套状态。详见 [统一 Agent 控制平面设计](docs/UNIFIED_AGENT_CONTROL_PLANE.md)（设计目标，非已完成自动调度）。
+
 New tasks default to a **lean single-Agent + human-review** workflow. Before launching an official interactive CLI, AIWS previews the *estimated* size of its own handoff prompt and prevents over-limit or unconfirmed duplicate launches **before copying to the clipboard**. Per-task warning/stop estimates can be configured in the stage inspector; the default is 2,500 / 6,000 estimated tokens. This is **not a provider-side token cap** or a claim to observe all internal CLI usage. Reading plans, files, Git and execution graphs does not call a model.
 
 See [V1.7.2 context and budget design](docs/TOKEN_EFFICIENCY_V172.md) and [routine record](docs/routine/2026-11-20_1745-context-budget-preflight.md). Continue to use `ui-dist/` alongside the Windows EXE. Hyper-V GUI acceptance remains pending.

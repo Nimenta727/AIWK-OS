@@ -6,6 +6,10 @@
 >
 > This is a proposed delivery roadmap, not a promise of completion dates or a claim that future capabilities already exist.
 
+## 产品架构北极星：统一 Agent 控制平面
+
+当前运行时代码已推进至 V1.7.2；下面的 V1.2 基线表为路线图最初建立时的历史快照。**后续优先解决“任务分散、跨 Agent 上下文丢失、模型切换重复开销”，而不只增加模型数量。** 详见 [统一 Agent 控制平面与交接协议](UNIFIED_AGENT_CONTROL_PLANE.md)。现有 lean 模板与本地预算预检是第一步；ContextManifest、ProviderCapability、可恢复自动调度及真实 Token 证据仍需实现和验收。
+
 ## 2026-11-20 开发验证快照 / Verified implementation snapshot
 
 **源码实现与 Windows CI 已通过；Hyper-V GUI 尚未验收。** 此处的“已实现”指功能代码和自动测试通过，而非最终稳定版或无人值守自动化完成。
