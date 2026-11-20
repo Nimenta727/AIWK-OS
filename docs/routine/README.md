@@ -32,3 +32,13 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 02:16 — 拒绝主机训练数据读取](2026-11-21_0216-lora-train-guest-data-guard.md)
 
 - [2026-11-21 02:26 — 本地模型从工作台受控启停](2026-11-21_0226-local-model-workbench-toggle.md)
+
+- [2026-11-21 02:35 — 客户机系统服务与内核候选版本控制](2026-11-21_0235-guest-service-kernel-candidate-core.md)
+- [2026-11-21 02:43 — 系统服务、内核与模型计划统一 DAG](2026-11-21_0243-unified-guest-services-kernel-model-dag.md)
+- [2026-11-21 02:51 — 中断重新审批与审计完整性](2026-11-21_0251-guest-dag-recovery-audit-integrity.md)
+- [2026-11-21 03:00 — 系统服务/内核可视化页面](2026-11-21_0300-system-service-kernel-console.md)
+- [2026-11-21 03:09 — 模型版本导入、SHA 校验与回滚](2026-11-21_0309-guest-model-versioned-provisioning.md)
+- [2026-11-21 03:16 — 模型启动前强制权重完整性检查](2026-11-21_0316-model-registry-startup-integrity-gate.md)
+- [2026-11-21 03:22 — 本地模型一键生成待执行 DAG 与数据目录保护](2026-11-21_0322-model-to-dag-state-boundary-hardening.md)
+- [2026-11-21 03:28 — QEMU 内核候选图形验收](2026-11-21_0328-guest-gui-kernel-candidate-acceptance.md)
+- [2026-11-21 03:36 — AI 原生工作台整合架构及验收界限](2026-11-21_0336-aiws-guest-agent-model-kernel-architecture.md)

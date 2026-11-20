@@ -52,3 +52,5 @@
 > 本次添加双语导读和索引，**不等于逐句完成所有历史资料全文翻译**。原始记录保持可审计。
 > 
 > Bilingual abstracts and links are supplied without claiming word-for-word translations of every historical page.
+
+- [AIWS OS unified guest model, persistent agent, system services and kernel candidate pipeline](AIWS_GUEST_AGENT_SYSTEM_KERNEL.md) — 客户机系统整合进展与验收条件

@@ -64,3 +64,14 @@ GitHub Actions run 44787989404 completed successfully with Debian real ISO + QEM
 - Guest serial emitted AIWS_GUI_BROWSER_PASS and AIWS_BOOT_SMOKE_PASS with shell=aiws gui=clicked. CI also captured a 1280x800 framebuffer showing the AIWS Workbench UI.
 - This is the first P0-A GUI smoke acceptance, not a full production desktop quality gate (still needs native firmware ISO boot, long-running stability, IME/audio, accessibility, all functionality).
 - Guest model is still deliberately not present in the ISO; the GUI confirmed its optional inactive state. Host access remains forbidden.
+
+
+## 2026-11-21 unified control-plane milestone (in validation)
+- GuestTaskStore now supports a central persistent DAG for guest read/write tools, guest-only systemd user operations (only model service may restart) and kernel candidate stage/verify/recovery_plan/abandon.
+- Guest-local Qwen3.5-2B llama.cpp planner proposes **only read-only tools**; reviewed proposal can be saved as a pending SQLite DAG. No model may auto-approve/restart/mutate kernel.
+- Restart recovery clears approval for interrupted write stages; audit hash chain validation fails closed before scheduling; singleton controller lock reduces duplicate live dispatch. The audit remains writable by the guest account and is NOT root-resistant attestation.
+- Model registry accepts only guest-sourced GGUF with explicit SHA-256 and license declaration, tracks versioned hashes and allows previous guest model rollback while stopped; model weights and LoRA are NOT bundled, installed or trained.
+- Kernel only has verified guest workspace config fragments and SHA256-pinned staged candidates; can abandon staging metadata but has **no live kernel installation, boot-slot switch, kernel signing or proven A/B rollback**.
+- Real Debian/QEMU basic GUI click passed before the new kernel candidate test; new full candidate-flow QEMU run still pending at authoring. NixOS ISO remains eval-only, not built/booted.
+
+All above lives inside a dedicated unprivileged guest. No guest agent API can control host files, root, host kernel, hypervisor, shared folders or host GPU.

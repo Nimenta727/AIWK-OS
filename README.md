@@ -137,3 +137,8 @@ Read the [documentation index](docs/README.md), [security guide](docs/SECURITY.m
 ---
 
 **Status / 状态**：v1.9.0-preview.1 is a **preview**. Windows CI and release artifacts are tracked separately from real Hyper-V GUI and permission testing. The latter remains pending. This README describes supported behavior, not inaccessible provider internals.
+
+
+### AIWS OS guest control plane / 客户机统一系统控制
+
+已提交 guest-local SQLite DAG 任务与审核/重启恢复、AIWS systemd 用户服务固定白名单、内核版本化候选/哈希验证/撤销及恢复预案、本地 Qwen 2B 的可选 llama.cpp 适配与 GGUF 权重 SHA-256 版本注册和回滚。工作台已经增加客户机系统服务与内核候选页面，并可将本地小模型的只读建议保存为未执行的持久任务。**当前并不包含/实际运行 Qwen 2B 权重，LoRA 未训练，真实内核 A/B 启动/回滚机制未完成。** 客户机真实界面基础 smoke 已通过，扩展到内核候选图形审批的新验收仍待当前 CI 实际运行完成。详情见 [AIWS 客户机控制架构](docs/AIWS_GUEST_AGENT_SYSTEM_KERNEL.md)。
