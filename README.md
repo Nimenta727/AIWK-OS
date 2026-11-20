@@ -1,3 +1,5 @@
+**V1.3–V1.6 首轮模块集成已完成 Windows CI 构建验证（2026-11-20）。** 包含 Git Worktree 隔离、ConPTY 内置终端、事件账本和可编辑 DAG；[Windows EXE 构建 #44696677670](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677670) 与 [回归测试 #44696677697](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677697) 均通过。**尚未完成 Hyper-V 实机 GUI 验收、自动多模型无人值守交接、逐 hunk 变更应用审批。** [范围与限制详见实施说明](docs/IMPLEMENTATION_V13_V16.md) 和 [路线图](docs/ROADMAP.md)。
+
 # AIWS V1.3–V1.6 — Worktree · Windows ConPTY · Execution Ledger · Multi-Agent DAG
 
 **当前开发交付：** 本轮新增源码和测试，Windows CI 与 Hyper-V 实机 GUI 验收须分别进行，不能以本地逻辑测试替代 EXE 编译。 [完整实施说明](docs/IMPLEMENTATION_V13_V16.md) · [产品路线图](docs/ROADMAP.md) · [开发日志](docs/routine/)。

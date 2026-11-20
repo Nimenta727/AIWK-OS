@@ -6,6 +6,23 @@
 >
 > This is a proposed delivery roadmap, not a promise of completion dates or a claim that future capabilities already exist.
 
+## 2026-11-20 开发验证快照 / Verified implementation snapshot
+
+**源码实现与 Windows CI 已通过；Hyper-V GUI 尚未验收。** 此处的“已实现”指功能代码和自动测试通过，而非最终稳定版或无人值守自动化完成。
+
+| 路线图节点 | 已实现且经 Windows CI 验证的范围 | 尚未完成的验收/能力 |
+| --- | --- | --- |
+| V1.3 | 独立 Git Worktree/分支、阶段工作区映射、Git 证据读取、真实 Git smoke tests | 逐 hunk 写回审批、长期分支清理策略、真实 VM 文件权限验收 |
+| V1.4 | ConPTY P/Invoke、xterm.js 嵌入终端、输入/输出/调整大小/关闭、手工确认 | 在真实 VM 中测试输入法、退出和进程树取消、长时间运行、崩溃恢复 |
+| V1.5 | 持久化元数据事件账本、稳定 task/stage/run ID、证据强度标签和可视化时间线 | 独立高可靠事件总线、工具过程全量追踪、供应商内部完整请求 |
+| V1.6 | 可编辑依赖 DAG、拓扑校验、并行分支隔离限制、仅带直接依赖结果的交接 | 无人值守自动多模型调度、条件分支、持久化流程定义版本与完整自动重试 |
+
+**证据：** [Native Windows Desktop EXE #44696677670](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677670)（成功）、[Python & Windows checks #44696677697](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677697)（成功）；被验证代码提交 `2ba146eaa53805c0dbbde731fe8e49ffb3fc7e32`。首个编译失败 [#44696421362](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696421362) 已因 TypeScript 类型与变量引用错误修复。
+
+**下一轮优先任务：** 实机 ConPTY 生命周期验证、可回滚的 hunk 审批、事件账本迁移与备份、CLI 官方结构化事件适配器、用户确认下的可恢复 DAG 调度。确保每次升级都留下 `docs/routine/` 记录。
+
+---
+
 ## 1. 当前基线与已知限制
 
 基线提交：2ebeb1b50d601f5ab081326fddbeb06c2d6fcc3f；最近一次成功的原生 Windows 构建记录：Actions 44688011400（对应此前的 V1.2 编译提交）。不要把这两项混同为当前 HEAD 已在用户 Hyper-V 虚拟机中运行验收。
