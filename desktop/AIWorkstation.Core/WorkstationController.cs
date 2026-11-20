@@ -67,6 +67,15 @@ public sealed class WorkstationController : IDisposable
         });
     }
 
+    public void StartManual(string taskId, string stepId)
+        => Change(taskId, task =>
+        {
+            var step = WorkflowEngine.EnsureStartable(task, stepId);
+            if (step.Agent != AgentKind.Manual) throw new InvalidOperationException("此阶段不是人工执行器。");
+            WorkflowEngine.Start(task, stepId);
+            RequestTrace.Record(task, step, "manual.started", "用户手动开始人工阶段；未启动模型");
+        });
+
     public void Retry(string taskId, string stepId)
         => Change(taskId, task => WorkflowEngine.Retry(task, stepId));
 

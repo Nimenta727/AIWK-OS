@@ -94,6 +94,7 @@ public partial class ModularWorkstationWindow : Window
                 "steps.approve" => StepAction(payload, "approve"),
                 "steps.complete" => StepAction(payload, "complete"),
                 "steps.retry" => StepAction(payload, "retry"),
+                "steps.startManual" => StepAction(payload, "startManual"),
                 "steps.launch" => StepAction(payload, "launch"),
                 _ => throw new InvalidOperationException("不允许的工作台操作。")
             };
@@ -140,6 +141,7 @@ public partial class ModularWorkstationWindow : Window
             case "approve": _controller.Approve(taskId, stepId); break;
             case "complete": _controller.Complete(taskId, stepId, ReadField(payload,"result")); break;
             case "retry": _controller.Retry(taskId, stepId); break;
+            case "startManual": _controller.StartManual(taskId, stepId); break;
             case "launch":
                 var task = _controller.GetTask(taskId);
                 var step = WorkflowEngine.EnsureStartable(task, stepId);

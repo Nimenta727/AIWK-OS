@@ -215,6 +215,18 @@ try
     using (var reopened = new WorkstationController(bridgeRoot))
         Assert(reopened.GetTask(controllerTaskId).Steps[0].Status == StepStatus.Failed,
             "controller persisted failure survives restart");
+    using (var manualControl = new WorkstationController(Path.Combine(workspace, "manual-test-store")))
+    {
+        var manualTask = manualControl.CreateTask("research", projectRoot, "research");
+        WorkflowEngine.Start(manualTask, manualTask.Steps[0].Id);
+        WorkflowEngine.Complete(manualTask, manualTask.Steps[0].Id, "plan");
+        WorkflowEngine.Start(manualTask, manualTask.Steps[1].Id);
+        WorkflowEngine.Complete(manualTask, manualTask.Steps[1].Id, "review");
+        Assert(Throws(() => manualControl.StartManual(manualTask.Id, manualTask.Steps[2].Id)), "manual phase approval required");
+        manualControl.Approve(manualTask.Id, manualTask.Steps[2].Id);
+        manualControl.StartManual(manualTask.Id, manualTask.Steps[2].Id);
+        Assert(manualTask.Steps[2].Status == StepStatus.Running && manualTask.RequestEvents.Any(e => e.Kind == "manual.started"), "manual stage starts without a model call");
+    }
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

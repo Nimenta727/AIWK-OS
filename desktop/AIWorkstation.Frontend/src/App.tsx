@@ -28,9 +28,9 @@ export default function App(){
  const step=useMemo(()=>task?.steps.find(x=>x.id===selectedNode)||null,[task,selectedNode]);
  const action=useCallback(async(name:string,payload:Record<string,unknown>={})=>{
    setBusy(true);setError('');try{
-     await bridge.call(name,payload);
+     const response=await bridge.call<{id?:string}>(name,payload);
      await load();
-     if(name==='tasks.create'){setShowCreate(false);setTitle('');}
+     if(name==='tasks.create'){setShowCreate(false);setTitle('');if(response?.id){setSelectedTask(response.id);setSelectedNode(null);setPage('flow');}}
    }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
  },[load]);
  const create=async()=>{if(!workspace||!title.trim())return;await action('tasks.create',{title,workspace,template});};
