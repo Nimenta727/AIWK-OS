@@ -1,0 +1,18 @@
+#!/bin/sh
+# AIWS is the sole visible GUI; Openbox supplies minimal X11 window management.
+# Guest-only disposable VM profile. Never run on host or as root.
+set -eu
+if [ "$(id -u)" -eq 0 ]; then echo 'No root graphical AIWS session' >&2; exit 1; fi
+export XDG_CURRENT_DESKTOP=AIWS
+export DESKTOP_SESSION=aiws
+export XDG_SESSION_DESKTOP=aiws
+mkdir -p "$HOME/.local/share/aiws"
+openbox &
+wm=$!
+trap 'kill "$wm" 2>/dev/null || true' EXIT INT TERM
+sleep 1
+while kill -0 "$wm" 2>/dev/null; do
+    /usr/local/bin/aiws-open-workbench || true
+    sleep 2
+done
+exit 1

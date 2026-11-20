@@ -42,7 +42,8 @@ if [[ ! -s "$ui/index.html" ]]; then
 fi
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
 cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
-chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-toolctl" \
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-session" \
+  "$out/config/includes.chroot/usr/local/bin/aiws-toolctl" \
   "$out/config/includes.chroot/usr/local/bin/aiws-workbench" \
   "$out/config/includes.chroot/usr/local/bin/aiws-open-workbench" \
   "$out/config/includes.chroot/usr/local/bin/aiws-boot-smoke"

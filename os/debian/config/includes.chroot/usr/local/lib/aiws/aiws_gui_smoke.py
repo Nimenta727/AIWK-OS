@@ -1,0 +1,54 @@
+"""In-guest browser click acceptance; no host access, no network adapter."""
+from pathlib import Path
+import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+
+def main():
+    if os.geteuid() == 0 or not os.environ.get("DISPLAY"):
+        raise RuntimeError("GUI smoke must run as unprivileged graphical guest user")
+    if not Path("/etc/aiws/guest-managed").is_file():
+        raise RuntimeError("AIWS guest image marker missing")
+    workspace = Path.home() / ".local/share/aiws/projects"
+    workspace.mkdir(mode=0o700,parents=True,exist_ok=True)
+    (workspace/"AIWS-GUEST-SMOKE.txt").write_text(
+        "AIWS guest-only file manager acceptance fixture\n",encoding="utf-8")
+    options=webdriver.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-proxy-server")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-first-run")
+    options.add_argument("--window-size=1280,800")
+    with webdriver.Chrome(service=Service("/usr/bin/chromedriver"),options=options) as browser:
+        wait=WebDriverWait(browser,30)
+        browser.set_page_load_timeout(30)
+        browser.get("http://127.0.0.1:17640/")
+        wait.until(lambda b:b.find_elements(By.XPATH,"//nav//button[contains(.,'AI 文件管理')]"))
+        print("AIWS_GUI_BROWSER: React workbench rendered",flush=True)
+        browser.find_element(By.XPATH,"//nav//button[contains(.,'AI 文件管理')]").click()
+        wait.until(lambda b:b.find_elements(By.XPATH,
+            "//div[contains(@class,'aiws-os-file-list')]//button[contains(.,'AIWS-GUEST-SMOKE.txt')]"))
+        browser.find_element(By.XPATH,
+            "//div[contains(@class,'aiws-os-file-list')]//button[contains(.,'AIWS-GUEST-SMOKE.txt')]").click()
+        wait.until(lambda b:"guest-only file manager acceptance fixture" in
+            b.find_element(By.CSS_SELECTOR,".aiws-os-file-detail pre").text)
+        print("AIWS_GUI_BROWSER: guest file explorer click/read verified",flush=True)
+        browser.find_element(By.XPATH,"//nav//button[contains(.,'持久任务与 DAG')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio input"))
+        browser.find_element(By.CSS_SELECTOR,".aiws-os-studio input").send_keys("GUI guest smoke")
+        browser.find_element(By.CSS_SELECTOR,".aiws-os-studio textarea").send_keys("List guest workspace")
+        browser.find_element(By.XPATH,"//button[contains(.,'保存任务与 DAG')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-stage-status"))
+        browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
+        wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
+        print("AIWS_GUI_BROWSER: DAG stage executed",flush=True)
+        browser.find_element(By.XPATH,"//nav//button[contains(.,'本地 AI 助手')]").click()
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
+        assert "DISABLED" in browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text
+        print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional",flush=True)
+
+if __name__=="__main__":
+    main()

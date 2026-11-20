@@ -3,20 +3,21 @@
 set -u
 emit() { printf '%s\n' "$1" > /dev/ttyS0 2>/dev/null || printf '%s\n' "$1"; }
 if ! command -v lightdm >/dev/null 2>&1 ||
-   ! command -v xfce4-session >/dev/null 2>&1; then
+   ! command -v openbox >/dev/null 2>&1 ||
+   ! command -v chromium >/dev/null 2>&1; then
     emit "AIWS_BOOT_SMOKE_FAIL: desktop-packages"
     exit 1
 fi
 desktop=0
 for i in $(seq 1 65); do
-    if systemctl is-active --quiet display-manager && pgrep -x xfce4-session >/dev/null; then
+    if systemctl is-active --quiet display-manager && pgrep -x openbox >/dev/null; then
         desktop=1
         break
     fi
     sleep 2
 done
 if [ "$desktop" -ne 1 ]; then
-    emit "AIWS_BOOT_SMOKE_FAIL: display-manager-or-xfce-not-running"
+    emit "AIWS_BOOT_SMOKE_FAIL: display-manager-or-aiws-shell-not-running"
     exit 1
 fi
 health=0
@@ -36,5 +37,23 @@ if ! /usr/local/bin/aiws-toolctl --list | grep -q '"code.symbols"'; then
     emit "AIWS_BOOT_SMOKE_FAIL: mcp-unavailable"
     exit 1
 fi
-emit "AIWS_BOOT_SMOKE_PASS: lightdm=active xfce=active workbench=active tools=mcp ui=react"
+visible=0
+for i in $(seq 1 45); do
+    if runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
+        xdotool search --onlyvisible --class Chromium >/dev/null 2>&1; then
+        visible=1
+        break
+    fi
+    sleep 2
+done
+if [ "$visible" -ne 1 ]; then
+    emit "AIWS_BOOT_SMOKE_FAIL: chromium-kiosk-not-visible"
+    exit 1
+fi
+if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
+   python3 /usr/local/lib/aiws/aiws_gui_smoke.py; then
+    emit "AIWS_BOOT_SMOKE_FAIL: workbench-gui-clicks-or-dag"
+    exit 1
+fi
+emit "AIWS_BOOT_SMOKE_PASS: lightdm=active shell=aiws chromium=visible workbench=active tools=mcp gui=clicked"
 exit 0

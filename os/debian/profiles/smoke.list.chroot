@@ -14,3 +14,9 @@ ca-certificates
 python3
 git
 sudo
+
+# Guest-only AIWS primary GUI shell and click acceptance dependencies
+openbox
+xdotool
+chromium-driver
+python3-selenium

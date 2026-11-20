@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=AIWS Workbench Shell
+Comment=Guest-only AI-native OS shell
+Exec=/usr/local/bin/aiws-session
+TryExec=/usr/local/bin/aiws-session
+Type=Application
+DesktopNames=AIWS
