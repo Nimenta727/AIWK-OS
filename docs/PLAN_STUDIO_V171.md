@@ -1,6 +1,6 @@
 # AIWS V1.7.1 — Plan Studio / AI 计划中心
 
-Status: implementation candidate; **Windows CI and Hyper-V GUI acceptance are separate**. This feature was requested after the V1.7 Execution Atlas and does not replace the planned V1.8 Windows capability broker.
+Status: **Windows CI verified** on 2026-11-20 (native run 44708213179; regression run 44708213271); **Hyper-V GUI acceptance remains pending**. This feature was requested after the V1.7 Execution Atlas and does not replace the planned V1.8 Windows capability broker.
 
 ## Product objective
 
@@ -47,3 +47,10 @@ A Claude/Codex plan that exists only in a remote or interactive CLI session, and
 3. Persistent version diff between plans, superseded plan comparison and task-to-plan-item links (stronger than title similarity).
 4. Optional file-system change notification (alongside the polling fallback) and throttled long-document indexing.
 5. True streamed provider plan events only through documented, authorized integration; maintain *unknown* for inaccessible internal planning steps.
+
+## Verified build evidence (2026-11-20)
+
+- React/TypeScript, .NET/WPF compile, core smoke suite and Windows self-contained EXE artifact: [Actions 44708213179](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213179).
+- Repository-wide regression checks: [Actions 44708213271](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213271).
+- The compiled artifact was inspected in the working environment: it contains `WindowsAIWorkstation.exe`, `ui-dist/index.html`, and the Plan Studio strings in the bundled JS. This does not demonstrate actual Hyper-V GUI behavior.
+- A metadata-only subsequent change aligns `.csproj` package version to V1.7.1 and requires its own CI run before final release.
