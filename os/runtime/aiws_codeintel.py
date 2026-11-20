@@ -120,7 +120,7 @@ def _sources(root, path, resolve_path):
             file = Path(base) / name
             if file.is_symlink() or not file.is_file():
                 continue
-            if file.suffix.lower() not in CODE | MANIFEST and name not in {"Package.swift", "Package.resolved"}:
+            if file.suffix.lower() not in (set(CODE) | MANIFEST) and name not in {"Package.swift", "Package.resolved"}:
                 continue
             if scanned >= MAX_FILES:
                 truncated = True
