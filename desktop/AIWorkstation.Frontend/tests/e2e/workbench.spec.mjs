@@ -117,6 +117,6 @@ test('bilingual internal observatory uses local evidence and switches language',
  await page.getByRole('tab',{name:'执行事件'}).click();
  await page.getByRole('button',{name:'Switch to English'}).click();
  await expect(page.getByRole('heading',{name:'Internal Observatory'})).toBeVisible();
- await expect(page.getByRole('button',{name:'Plan Studio'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Plan Studio'}).first()).toBeVisible();
  await page.screenshot({path:'test-results/studio-internal-observatory-en.png',fullPage:true});
 });
