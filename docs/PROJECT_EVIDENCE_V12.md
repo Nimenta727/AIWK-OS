@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：项目文件树、Git 差异和阶段前后检查点。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Project file tree, Git differences and stage checkpoint evidence. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # V1.2 · Project structure, Git evidence and stage correlation
 
 ## Goal

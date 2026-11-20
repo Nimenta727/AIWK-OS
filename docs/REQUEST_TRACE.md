@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：本地请求追踪、Token 导入与证据限制。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Local request tracing, imported token evidence and limitations. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # Request Trace V0.6 — interactive evidence-based call flow
 
 ## What a request looks like

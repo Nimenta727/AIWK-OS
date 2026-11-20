@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：早期内嵌完整专业前端的方案与技术限制。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Historical full-upstream frontend hosting and its limitations. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # Professional upstream frontends — V0.8 integration
 
 Review and design date: 2026-11-20. Primary source: [T3 Code](https://github.com/pingdotgg/t3code), MIT; optional [OpenClaw](https://github.com/openclaw/openclaw), MIT. Source structures checked against current upstream repositories.
