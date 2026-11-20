@@ -57,7 +57,8 @@ public sealed class WorkstationController : IDisposable
 
     public void Complete(string taskId, string stepId, string result)
     {
-        if (result?.Length > 12_000) throw new ArgumentException("阶段结果不能超过 12,000 字符。", nameof(result));
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.Length > 12_000) throw new ArgumentException("阶段结果不能超过 12,000 字符。", nameof(result));
         Change(taskId, task =>
         {
             var step = WorkflowEngine.Find(task, stepId);
