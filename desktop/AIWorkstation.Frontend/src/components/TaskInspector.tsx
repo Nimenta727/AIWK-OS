@@ -9,6 +9,8 @@ export function TaskInspector({task,step,action,busy}:{task:WorkTask;step:WorkSt
   const pending=step.status==='Pending', running=step.status==='Running';
   return <div className="inspector-body">
     <div className="overline">阶段检查器</div><h2>{step.title}</h2><div className="pill-row"><span className="pill">{agentName(step.agent)}</span><span className="pill muted">{step.status}</span></div>
+    <div className="divider"/><div className="field"><label>依赖与隔离</label><p className="supporting">{step.dependsOn?.length?`依赖 ${step.dependsOn.length} 个已完成阶段`:'无显式依赖（旧流程默认串行）'}<br/>{step.worktreePath?`Worktree：${step.worktreePath}`:'尚未创建阶段独立 Worktree'}</p></div>
+    {pending&&!step.worktreePath&&<button className="button secondary full" disabled={busy} onClick={()=>action('worktrees.create',{taskId:task.id,stepId:step.id})}>创建阶段隔离 Git Worktree</button>}
     <div className="divider"/><div className="field"><label>任务目标</label><p className="instructions">{step.instructions}</p></div>
     <div className="field"><label>安全审批</label><p className="supporting">{step.requiresApproval?step.approvalGranted?'已为此阶段一次性批准':'需要批准后才可启动':'无需额外审批，但启动外部 CLI 仍需明确确认'}</p></div>
     {pending&&step.requiresApproval&&!step.approvalGranted&&<button className="button secondary full" disabled={busy} onClick={()=>action('steps.approve',{taskId:task.id,stepId:step.id})}><ClipboardCheck size={16}/> 批准该阶段</button>}

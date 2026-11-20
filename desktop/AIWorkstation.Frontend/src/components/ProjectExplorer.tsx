@@ -35,15 +35,16 @@ export function ProjectExplorer({task}:{task:WorkTask|null}) {
   const refresh=useCallback(async()=>{
     if(!task)return;
     setBusy(true);setError('');
-    try { const value=await bridge.call<ProjectOverview>('project.overview',{taskId:task.id});setOverview(value); }
+    try { const value=await bridge.call<ProjectOverview>('project.overview',{taskId:task.id,stepId});setOverview(value); }
     catch(ex){setError(ex instanceof Error?ex.message:String(ex));}
     finally{setBusy(false);}
-  },[task?.id]);
-  useEffect(()=>{setCollapsed(new Set());setOverview(null);setFile('');setReview(null);setReport(null);setStageId(task?.steps.find(x=>x.status==='Running')?.id||[...(task?.steps||[])].reverse().find(x=>x.startedAt)?.id||task?.steps[0]?.id||'');if(task)void refresh();},[task?.id,refresh]);
+  },[task?.id,stageId]);
+  useEffect(()=>{setCollapsed(new Set());setOverview(null);setFile('');setReview(null);setReport(null);setStageId(task?.steps.find(x=>x.status==='Running')?.id||[...(task?.steps||[])].reverse().find(x=>x.startedAt)?.id||task?.steps[0]?.id||'');},[task?.id]);
+  useEffect(()=>{if(task&&stageId)void refresh();},[task?.id,stageId,refresh]);
   const openFile=async(path:string)=>{
     if(!task)return;
     setFile(path);setReview(null);setError('');
-    try {setReview(await bridge.call<FileReview>('project.review',{taskId:task.id,path}));}
+    try {setReview(await bridge.call<FileReview>('project.review',{taskId:task.id,stepId,path}));}
     catch(ex){setError(ex instanceof Error?ex.message:String(ex));}
   };
   const examineStage=useCallback(async()=>{
@@ -58,7 +59,7 @@ export function ProjectExplorer({task}:{task:WorkTask|null}) {
   if(!task)return <div className="project-page"><div className="eyebrow">PROJECT EVIDENCE</div><h1>项目文件与 Git 变更</h1><div className="blank-state">先选择一个任务及其受信任的工作目录。</div></div>;
   return <div className="project-page">
     <div className="project-top"><div><div className="eyebrow">PROJECT STRUCTURE / GIT EVIDENCE</div><h1>项目文件与 Git 变更</h1><p>将代码差异关联到工作流阶段，同时保留证据来源与观察边界。</p></div><button className="button secondary small" onClick={refresh} disabled={busy}><RefreshCw size={15}/>{busy?'读取中…':'刷新项目'}</button></div>
-    <div className="project-repo-strip"><span><Folder size={15}/>{task.workspace}</span><span><GitBranch size={14}/>{overview?.branch||'Git 信息未知'}</span><span><GitCommit size={14}/>{formatShortHead(overview?.head||'')}</span><span className="project-count">{overview?`${overview.changedCount} 个 Git 状态条目`:'加载中…'}</span></div>
+    <div className="project-repo-strip"><span><Folder size={15}/>{overview?.workspace||task.workspace}</span><span><GitBranch size={14}/>{overview?.branch||'Git 信息未知'}</span><span><GitCommit size={14}/>{formatShortHead(overview?.head||'')}</span><span className="project-count">{overview?`${overview.changedCount} 个 Git 状态条目`:'加载中…'}</span></div>
     <div className="project-truth-note"><AlertTriangle size={16}/><span>这里展示的是<strong>工作区与 Git 的真实观察结果</strong>，不是 AI 自述，也不能仅凭时间证明某个文件由 Agent 修改。不会自动发送代码内容给模型。</span></div>
     {error&&<div className="tool-error" role="alert">{error}</div>}
     {overview?.notices.map((x,i)=><div className="tool-note" role="status" key={i}>{x}</div>)}

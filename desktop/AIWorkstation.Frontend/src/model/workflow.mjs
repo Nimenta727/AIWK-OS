@@ -1,4 +1,22 @@
 /** Pure AIWS graph projection. No provider API calls, tokens or network access. */
+export function graphLayers(task){
+ if(!task?.graphMode)return [];
+ const steps=task.steps||[];
+ const byId=new Map(steps.map(s=>[s.id,s]));
+ const depths=new Map();const visiting=new Set();
+ function depth(id){if(depths.has(id))return depths.get(id);if(visiting.has(id))throw new Error('依赖存在环');
+  const stage=byId.get(id);if(!stage)throw new Error('依赖不存在');visiting.add(id);
+  const result=Math.max(0,...(stage.dependsOn||[]).map(dep=>depth(dep)+1));visiting.delete(id);depths.set(id,result);return result;}
+ for(const stage of steps)depth(stage.id);
+ const layers=[];for(const stage of steps){const pos=depths.get(stage.id);(layers[pos]??=[]).push(stage);}
+ return layers;
+}
+export function readyStageIds(task){if(!task)return [];
+ return (task.steps||[]).filter((s,index)=>s.status==='Pending'&&(
+  task.graphMode?(s.dependsOn||[]).every(id=>task.steps.some(p=>p.id===id&&p.status==='Completed')):
+    task.steps.slice(0,index).every(p=>p.status==='Completed'))).map(s=>s.id);
+}
+
 export function flowNodes(task) {
   if (!task) return [];
   const stages = Array.isArray(task.steps) ? task.steps : [];
@@ -10,7 +28,7 @@ export function flowNodes(task) {
       label: agentName(s.agent), agent: String(s.agent || ''), index,
       measured: s.usage?.isMeasured === true || (s.usage?.input != null && s.usage?.output != null),
       tokens: (s.usage?.input || 0) + (s.usage?.output || 0),
-      needsApproval: Boolean(s.requiresApproval && !s.approvalGranted),
+      needsApproval: Boolean(s.requiresApproval && !s.approvalGranted),dependsOn:s.dependsOn||[],
     })),
     { id: 'output', kind: 'output', title: '结果交付', status: stages.every(s => String(s.status).toLowerCase() === 'completed') ? 'completed' : 'pending', label: '记录、日志与文件' },
   ];

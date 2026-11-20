@@ -46,6 +46,12 @@ public sealed class TaskRepository
                     throw new InvalidDataException("任务库含有缺失或重复的任务标识，已拒绝加载。");
                 if (task.Steps.Count > 200 || task.RequestEvents.Count > 10_000)
                     throw new InvalidDataException("任务阶段或事件数量超过安全上限。");
+                if (task.ExecutionRecords is null || task.ExecutionRecords.Count > ExecutionLedger.Limit)
+                    throw new InvalidDataException("执行事件记录无效或超过容量限制。");
+                var eventIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var ev in task.ExecutionRecords)
+                    if (ev is null || string.IsNullOrWhiteSpace(ev.Id) || !eventIds.Add(ev.Id))
+                        throw new InvalidDataException("执行事件 ID 缺失或重复。");
                 var stageIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var step in task.Steps)
                 {
@@ -53,9 +59,12 @@ public sealed class TaskRepository
                         throw new InvalidDataException("任务库含有缺失或重复的阶段标识，已拒绝加载。");
                     if ((step.GitBefore?.Files?.Count ?? 0) > 800 || (step.GitAfter?.Files?.Count ?? 0) > 800)
                         throw new InvalidDataException("Git 检查点条目超过安全上限。");
+                    if (step.DependsOn is null || step.RunId is null || step.WorktreePath is null)
+                        throw new InvalidDataException("阶段新字段无效。");
                     if (!Enum.IsDefined(step.Agent) || !Enum.IsDefined(step.Status))
                         throw new InvalidDataException("任务库含有未知的 Agent 或阶段状态。");
                 }
+                WorkflowGraph.Validate(task);
             }
             return tasks;
         }

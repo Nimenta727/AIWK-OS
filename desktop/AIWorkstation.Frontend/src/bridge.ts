@@ -6,20 +6,32 @@ export type ProjectFile = {path:string;isDirectory:boolean;status:string;size:nu
 export type ProjectOverview = {workspace:string;rootName:string;branch:string;head:string;files:ProjectFile[];changedCount:number;truncated:boolean;notices:string[]};
 export type FileReview = {path:string;status:string;diff:string;truncated:boolean;isPreview:boolean;note:string};
 export type StageChangeReport = {stageId:string;stageTitle:string;fromHead:string;toHead:string;headChanged:boolean;files:{path:string;kind:string;before:string;after:string}[];committedFiles:string[];partial:boolean;notice:string;startedAt:string|null;completedAt:string|null};
-export type WorkStep = { gitBefore:GitCheckpoint|null;gitAfter:GitCheckpoint|null; id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
-export type WorkTask = { id:string; title:string; workspace:string; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
+export type ExecutionRecord = {id:string;stageId:string;runId:string;kind:string;source:string;evidence:'observed'|'imported'|'inferred'|'unknown';at:string;metadata:string};
+export type WorkStep = { dependsOn:string[];worktreePath:string;worktreeBaseline:string;runId:string;  gitBefore:GitCheckpoint|null;gitAfter:GitCheckpoint|null; id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
+export type WorkTask = { id:string; title:string; workspace:string; graphMode:boolean; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
 export type Snapshot = { version:string; tasks:WorkTask[]; agents:Record<string,boolean>; limitations:string[] };
 type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void };
 type Message = {id:number;action:string;payload:Record<string,unknown>};
 declare global { interface Window { chrome?:{webview?:{postMessage:(x:string)=>void;addEventListener:(name:string,fn:(event:MessageEvent)=>void)=>void}} } }
 class WorkstationBridge {
   private serial = 0;
+  private listeners = new Map<string,Set<(data:unknown)=>void>>();
+  onEvent(name:string,callback:(data:unknown)=>void):()=>void {
+    const callbacks=this.listeners.get(name)||new Set<(data:unknown)=>void>();
+    callbacks.add(callback);this.listeners.set(name,callbacks);
+    return ()=>{callbacks.delete(callback);if(!callbacks.size)this.listeners.delete(name);};
+  }
   private pending = new Map<number,Pending>();
   constructor(){
     window.chrome?.webview?.addEventListener('message',e => {
       try {
         const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        if(!msg || typeof msg.id !== 'number') return;
+        if(!msg)return;
+        if(typeof msg.eventName==='string'){
+          for(const callback of this.listeners.get(msg.eventName)||[])callback(msg.data);
+          return;
+        }
+        if(typeof msg.id !== 'number') return;
         const op = this.pending.get(msg.id); if(!op) return;
         this.pending.delete(msg.id);
         if(msg.ok) op.resolve(msg.data); else op.reject(new Error(String(msg.error || '原生服务请求失败')));

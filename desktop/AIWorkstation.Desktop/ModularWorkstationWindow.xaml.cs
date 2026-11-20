@@ -16,6 +16,7 @@ public partial class ModularWorkstationWindow : Window
 {
     private const string TrustedHost = "aiws.local";
     private readonly WorkstationController _controller;
+    private ConPtyTerminal? _terminal;
     private static readonly JsonSerializerOptions WireOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
@@ -26,7 +27,7 @@ public partial class ModularWorkstationWindow : Window
         InitializeComponent();
         var appRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WindowsAIWorkstation");
         _controller = new WorkstationController(appRoot);
-        Closed += (_, _) => _controller.Dispose();
+        Closed += (_, _) => { _terminal?.Dispose(); _controller.Dispose(); };
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -96,13 +97,20 @@ public partial class ModularWorkstationWindow : Window
                 "steps.retry" => await StepActionAsync(payload, "retry"),
                 "steps.startManual" => await StepActionAsync(payload, "startManual"),
                 "steps.launch" => await StepActionAsync(payload, "launch"),
+                "steps.add" => AddStep(payload),
+                "steps.dependencies" => UpdateDependencies(payload),
+                "worktrees.create" => await CreateWorktree(payload),
+                "ledger.timeline" => ExecutionLedger.Timeline(_controller.GetTask(ReadField(payload,"taskId"))),
+                "terminal.start" => OpenTerminal(payload),
+                "terminal.write" => WriteTerminal(payload),
+                "terminal.resize" => ResizeTerminal(payload),
+                "terminal.close" => CloseTerminal(payload),
                 "tools.gitInspect" => await GitWorkspaceService.InspectAsync(
-                    _controller.GetTask(ReadField(payload, "taskId")).Workspace, ReadField(payload, "view")),
+                    ResolveWorkspace(payload), ReadField(payload, "view")),
                 "tools.capabilities" => WindowsToolPolicy.Describe(),
-                "project.overview" => await ProjectWorkspaceService.InspectAsync(
-                    _controller.GetTask(ReadField(payload, "taskId")).Workspace),
+                "project.overview" => await ProjectWorkspaceService.InspectAsync(ResolveWorkspace(payload)),
                 "project.review" => await ProjectWorkspaceService.ReviewAsync(
-                    _controller.GetTask(ReadField(payload, "taskId")).Workspace, ReadField(payload, "path")),
+                    ResolveWorkspace(payload), ReadField(payload, "path")),
                 "project.stageChanges" => await StageChangeDetails(payload),
                 "tools.openShell" => OpenUserShell(payload),
                 _ => throw new InvalidOperationException("不允许的工作台操作。")
@@ -118,7 +126,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.2.0-project-evidence",
+        Version = "1.6.0-local-graph-conpty-ledger",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -146,9 +154,10 @@ public partial class ModularWorkstationWindow : Window
         var task = _controller.GetTask(ReadField(payload, "taskId"));
         var stage = WorkflowEngine.Find(task, ReadField(payload, "stepId"));
         // A running stage is compared to a fresh read-only snapshot, never treated as complete.
+        var workspace = task.WorkspaceFor(stage);
         var current = stage.Status == StepStatus.Running
-            ? await ProjectWorkspaceService.CaptureAsync(task.Workspace) : stage.GitAfter;
-        return await ProjectWorkspaceService.AnalyzeStageAsync(task.Workspace, stage.Id, stage.Title,
+            ? await ProjectWorkspaceService.CaptureAsync(workspace) : stage.GitAfter;
+        return await ProjectWorkspaceService.AnalyzeStageAsync(workspace, stage.Id, stage.Title,
             stage.GitBefore, current, stage.StartedAt, stage.CompletedAt);
     }
 
@@ -166,7 +175,7 @@ public partial class ModularWorkstationWindow : Window
                 var task = _controller.GetTask(taskId);
                 var step = WorkflowEngine.EnsureStartable(task, stepId);
                 if (MessageBox.Show(this,
-                        $"将以当前 Windows 用户身份启动 {AgentLabel.Name(step.Agent)}，目录：\n{task.Workspace}\n\nAIWS 会将交接提示词复制到剪贴板，但不会自动发送给模型。\n确认继续？",
+                        $"将以当前 Windows 用户身份启动 {AgentLabel.Name(step.Agent)}，目录：\n{task.WorkspaceFor(step)}\n\nAIWS 会将交接提示词复制到剪贴板，但不会自动发送给模型。\n确认继续？",
                         "确认执行官方 Agent", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     throw new OperationCanceledException("已取消外部程序启动。");
                 await _controller.LaunchWithGitAsync(taskId, stepId,
@@ -187,6 +196,92 @@ public partial class ModularWorkstationWindow : Window
             throw new OperationCanceledException("已取消打开终端。");
         WindowsToolPolicy.OpenUserPowerShell(task.Workspace);
         return new { success = true };
+    }
+
+    private string ResolveWorkspace(JsonElement payload)
+    {
+        var task=_controller.GetTask(ReadField(payload,"taskId"));
+        return payload.ValueKind==JsonValueKind.Object && payload.TryGetProperty("stepId",out var field) && field.ValueKind==JsonValueKind.String
+            ? task.WorkspaceFor(WorkflowEngine.Find(task,field.GetString()??"")) : task.Workspace;
+    }
+
+    private static List<string> ReadDependencies(JsonElement payload)
+    {
+        if(!payload.TryGetProperty("dependsOn",out var value) || value.ValueKind!=JsonValueKind.Array)
+            throw new ArgumentException("缺少依赖列表。");
+        if(value.GetArrayLength()>100)throw new ArgumentException("依赖列表过长。");
+        return value.EnumerateArray().Select(x=>x.ValueKind==JsonValueKind.String?x.GetString()??"":
+            throw new ArgumentException("依赖标识必须是字符串。")).ToList();
+    }
+    private object AddStep(JsonElement payload)
+    {
+        var agent=ReadField(payload,"agent");
+        if(!Enum.TryParse<AgentKind>(agent,false,out var parsed) || !Enum.IsDefined(parsed))
+            throw new ArgumentException("未知 Agent 类型。");
+        _controller.AddStep(ReadField(payload,"taskId"),ReadField(payload,"title"),parsed,ReadDependencies(payload));
+        return new {success=true};
+    }
+    private object UpdateDependencies(JsonElement payload)
+    {
+        _controller.SetDependencies(ReadField(payload,"taskId"),ReadField(payload,"stepId"),ReadDependencies(payload));
+        return new {success=true};
+    }
+    private async Task<object> CreateWorktree(JsonElement payload)
+    {
+        var task=_controller.GetTask(ReadField(payload,"taskId"));
+        var stage=WorkflowEngine.Find(task,ReadField(payload,"stepId"));
+        if(MessageBox.Show(this,
+            "将创建独立 Git Worktree 和新的本地分支：\n"+task.Workspace+"\n阶段："+stage.Title+
+            "\n\n不会修改或清理你的主仓库，但 Git 是同一 Windows 用户权限，不是 OS 沙箱。确认？",
+            "创建隔离 Worktree",MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes)
+            throw new OperationCanceledException("已取消 Worktree 操作。");
+        return new {path=await _controller.CreateStageWorktreeAsync(task.Id,stage.Id)};
+    }
+    private object OpenTerminal(JsonElement payload)
+    {
+        var workspace=ResolveWorkspace(payload);
+        if(_terminal is not null)throw new InvalidOperationException("已有终端会话；请先关闭。");
+        if(MessageBox.Show(this,"将在已验证目录中打开应用内 Windows PowerShell：\n"+workspace+
+            "\n\n这是你直接控制的交互终端，可以执行系统命令。Agent 无法通过工具接口直接输入。确认？",
+            "启动 ConPTY 终端",MessageBoxButton.YesNo,MessageBoxImage.Warning)!=MessageBoxResult.Yes)
+            throw new OperationCanceledException("终端启动已取消。");
+        var pty=ConPtyTerminal.StartPowerShell(workspace);
+        pty.Output+=text=>Dispatcher.BeginInvoke(new Action(()=>SendEvent("terminal.output",new {sessionId=pty.Id,text})));
+        pty.Exited+=code=>Dispatcher.BeginInvoke(new Action(()=>SendEvent("terminal.exited",new {sessionId=pty.Id,code})));
+        _terminal=pty;
+        return new {sessionId=pty.Id};
+    }
+    private object WriteTerminal(JsonElement payload)
+    {
+        var pty=RequireTerminal(payload);
+        pty.Write(ReadField(payload,"text"));
+        return new {success=true};
+    }
+    private object ResizeTerminal(JsonElement payload)
+    {
+        var pty=RequireTerminal(payload);
+        if(!payload.TryGetProperty("columns",out var columns)||!columns.TryGetInt32(out var c)
+            ||!payload.TryGetProperty("rows",out var rows)||!rows.TryGetInt32(out var r))
+            throw new ArgumentException("终端尺寸无效。");
+        pty.Resize(c,r);return new {success=true};
+    }
+    private object CloseTerminal(JsonElement payload)
+    {
+        var pty=RequireTerminal(payload);
+        _terminal=null;
+        pty.Dispose();
+        return new {success=true};
+    }
+    private ConPtyTerminal RequireTerminal(JsonElement payload)
+    {
+        if(_terminal is null || _terminal.Id!=ReadField(payload,"sessionId"))
+            throw new InvalidOperationException("终端会话不存在或已关闭。");
+        return _terminal;
+    }
+    private void SendEvent(string kind,object data)
+    {
+        if(FrontendView.CoreWebView2 is not { } host)return;
+        host.PostWebMessageAsJson(JsonSerializer.Serialize(new {eventName=kind,data},WireOptions));
     }
 
     private static string ReadField(JsonElement root, string key)

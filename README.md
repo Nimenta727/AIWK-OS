@@ -1,6 +1,15 @@
-# Product roadmap / 后续开发总规划
+# AIWS V1.3–V1.6 — Worktree · Windows ConPTY · Execution Ledger · Multi-Agent DAG
 
-**[完整路线图：V1.3–V2.0、架构拆分、模块迁移、验收与风险](docs/ROADMAP.md)** · [开发日志](docs/routine/)
+**当前开发交付：** 本轮新增源码和测试，Windows CI 与 Hyper-V 实机 GUI 验收须分别进行，不能以本地逻辑测试替代 EXE 编译。 [完整实施说明](docs/IMPLEMENTATION_V13_V16.md) · [产品路线图](docs/ROADMAP.md) · [开发日志](docs/routine/)。
+
+- **V1.3**：每个 Agent 阶段按需建立受控的独立 Git Worktree / 分支；检查点和代码树在实际执行目录采集。
+- **V1.4**：通过 Windows ConPTY + xterm.js 实现工作台内 PowerShell；必须人工确认启动，终端内容不存档也不自动发送模型。
+- **V1.5**：持久化元数据事件账本，区分已记录的本地操作与未知模型活动。
+- **V1.6**：具依赖校验与并发隔离约束的多 Agent DAG、可视化编排及只传直接依赖结果的上下文。
+
+**重要边界**：这些能力不会将 Claude/ChatGPT 订阅登录信息转换为第三方 API；外部 Claude Code / Codex 仍通过官方 CLI 在人工确认后启动，无法自动捕获其全部模型回复。不提供未经批准的 Agent Shell 权限。独立 Worktree 不等于 Windows 安全沙箱。
+
+Windows 构建：在 Windows 11 + Node.js 22 + .NET 10 下运行 `scripts/Build-NativeDesktop.ps1`。发布 EXE 需要相邻 `ui-dist/` 文件夹。旧版 V1.2 JSON 自动保留原任务数据；在升级前请备份 `%LOCALAPPDATA%\WindowsAIWorkstation`。
 
 ---
 

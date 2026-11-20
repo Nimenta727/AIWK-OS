@@ -350,6 +350,74 @@ try
         manualControl.StartManual(manualTask.Id, manualTask.Steps[2].Id);
         Assert(manualTask.Steps[2].Status == StepStatus.Running && manualTask.RequestEvents.Any(e => e.Kind == "manual.started"), "manual stage starts without a model call");
     }
+    // V1.3–V1.6: persisted events, safe DAG and stage-isolated execution model.
+    var dag=WorkflowTemplates.ParallelReview("parallel-dag",workspace);
+    WorkflowGraph.Validate(dag);
+    Assert(dag.GraphMode && dag.Steps.Count==4 && WorkflowGraph.Ready(dag).Count==1,"DAG template starts with one prerequisite");
+    WorkflowEngine.Start(dag,dag.Steps[0].Id);
+    WorkflowEngine.Complete(dag,dag.Steps[0].Id,"scope reviewed");
+    Assert(WorkflowGraph.Ready(dag).Count==2,"DAG branches become ready after planning");
+    WorkflowEngine.Approve(dag,dag.Steps[1].Id);
+    Assert(Throws(()=>WorkflowEngine.Start(dag,dag.Steps[1].Id))==false,"first branch can start");
+    WorkflowEngine.Approve(dag,dag.Steps[2].Id);
+    Assert(Throws(()=>WorkflowEngine.Start(dag,dag.Steps[2].Id)),"shared workspace prevents unsafe concurrent branches");
+    dag.Steps[1].WorktreePath=workspace+"-isolated-one";
+    dag.Steps[2].WorktreePath=workspace+"-isolated-two";
+    WorkflowEngine.Start(dag,dag.Steps[2].Id);
+    Assert(dag.Steps[2].Status==StepStatus.Running && dag.Steps[1].Status==StepStatus.Running,"independent worktrees permit concurrent DAG stages");
+    Assert(Throws(()=>WorkflowEngine.Start(dag,dag.Steps[3].Id)),"join blocked until both branches complete");
+    WorkflowEngine.Complete(dag,dag.Steps[1].Id,"implementation done");
+    WorkflowEngine.Complete(dag,dag.Steps[2].Id,"review done");
+    Assert(WorkflowGraph.Ready(dag).Single().Id==dag.Steps[3].Id,"DAG join unlocked after both dependencies finish");
+    var compact=HandoffBuilder.Build(dag,dag.Steps[3]);
+    Assert(compact.Contains("implementation done")&&compact.Contains("review done")&&!compact.Contains("scope reviewed"),"DAG context includes only direct dependencies");
+    dag.Steps[0].DependsOn=[dag.Steps[3].Id];
+    Assert(Throws(()=>WorkflowGraph.Validate(dag)),"DAG cycle rejected before persistence");
+    dag.Steps[0].DependsOn=[];
+    ExecutionLedger.Append(dag,dag.Steps[1],"git.worktree.observed",metadata:"local checkpoint");
+    ExecutionLedger.Append(dag,dag.Steps[1],"provider.request.unknown",evidence:"unknown");
+    Assert(ExecutionLedger.Timeline(dag).Count==2&&ExecutionLedger.Timeline(dag)[1].Evidence=="unknown","ledger distinguishes actual observation from unknown provider events");
+    Assert(Throws(()=>ExecutionLedger.Append(dag,null,"too.much",metadata:new string('X',201))),"ledger rejects unbounded secret-bearing metadata");
+    var dagFile=Path.Combine(workspace,"dag.json");
+    var dagRepo=new TaskRepository(dagFile);
+    dagRepo.Save([dag]);
+    Assert(dagRepo.Load()[0].GraphMode && dagRepo.Load()[0].ExecutionRecords.Count==2,"DAG and evidence ledger persist in existing JSON format");
+    using(var graphController=new WorkstationController(Path.Combine(workspace,"graph-controller")))
+    {
+        var project=Path.Combine(workspace,"graph-project");Directory.CreateDirectory(project);
+        var graphTask=graphController.CreateTask("graph editing",project,"dag");
+        graphController.AddStep(graphTask.Id,"extra review",AgentKind.Manual,[graphTask.Steps[1].Id]);
+        Assert(graphTask.Steps.Count==5,"DAG editor adds a native persisted stage");
+        Assert(Throws(()=>graphController.SetDependencies(graphTask.Id,graphTask.Steps[0].Id,[graphTask.Steps[4].Id])),"DAG editor refuses circular dependencies");
+        Assert(graphTask.Steps[0].DependsOn.Count==0,"invalid DAG edit rolls back in memory");
+    }
+    if(AgentTools.Locate("git") is not null)
+    {
+        var source=Path.Combine(workspace,"isolation-repo");Directory.CreateDirectory(source);
+        static void FixtureGit(string directory,params string[] args)
+        {
+            var p=new System.Diagnostics.ProcessStartInfo("git") {WorkingDirectory=directory,UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
+            foreach(var a in args)p.ArgumentList.Add(a);
+            using var process=System.Diagnostics.Process.Start(p)!;
+            var stdout=process.StandardOutput.ReadToEnd();var stderr=process.StandardError.ReadToEnd();
+            process.WaitForExit();if(process.ExitCode!=0)throw new Exception("git fixture failed: "+stderr+stdout);
+        }
+        FixtureGit(source,"init","-q");
+        FixtureGit(source,"config","user.name","AIWS Tests");
+        FixtureGit(source,"config","user.email","tests@aiws.invalid");
+        File.WriteAllText(Path.Combine(source,"baseline.txt"),"stable base");
+        FixtureGit(source,"add","baseline.txt");FixtureGit(source,"commit","-qm","baseline");
+        var tid=Guid.NewGuid().ToString("N");var sid=Guid.NewGuid().ToString("N");
+        var created=GitWorktreeService.CreateAsync(source,tid,sid).GetAwaiter().GetResult();
+        Assert(Directory.Exists(created.Path)&&created.Head.Length>=7&&File.Exists(Path.Combine(created.Path,"baseline.txt")),"Git Worktree created from actual clean baseline");
+        File.WriteAllText(Path.Combine(created.Path,"separate.txt"),"isolated change");
+        Assert(!File.Exists(Path.Combine(source,"separate.txt")),"isolated change does not appear in main checkout");
+        Assert(ThrowsAny(()=>GitWorktreeService.CreateAsync(source,tid,sid).GetAwaiter().GetResult()),"duplicate worktree creation is refused");
+        Assert(ThrowsAny(()=>GitWorktreeService.CreateAsync(source,"../../bad",sid).GetAwaiter().GetResult()),"invalid task worktree id rejected");
+    }
+    Assert(!OperatingSystem.IsWindows() ? ThrowsAny(()=>ConPtyTerminal.StartPowerShell(workspace)) : true,
+        "ConPTY rejects unsupported OS (real terminal requires Windows GUI acceptance)");
+
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

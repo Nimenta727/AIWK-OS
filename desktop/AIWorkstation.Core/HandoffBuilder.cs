@@ -19,7 +19,9 @@ public static class HandoffBuilder
     {
         var index = task.Steps.IndexOf(step);
         if (index < 0) throw new ArgumentException("阶段不属于当前任务。");
-        var history = task.Steps.Take(index).Where(x => x.Status == StepStatus.Completed).ToList();
+        var history = (task.GraphMode
+            ? task.Steps.Where(x=>step.DependsOn.Contains(x.Id))
+            : task.Steps.Take(index)).Where(x => x.Status == StepStatus.Completed).ToList();
         var sb = new StringBuilder();
         sb.AppendLine($"# {task.Title}");
         sb.AppendLine($"阶段 {index + 1}/{task.Steps.Count}：{step.Title}");

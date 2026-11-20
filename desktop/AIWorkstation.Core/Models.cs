@@ -20,6 +20,10 @@ public sealed class WorkflowStep
     public int? ImportedUsageEvents { get; set; }
     public List<ProviderEventSummary> ProviderEvents { get; set; } = [];
     public string LastPromptFingerprint { get; set; } = "";
+    public List<string> DependsOn { get; set; } = [];
+    public string WorktreePath { get; set; } = "";
+    public string WorktreeBaseline { get; set; } = "";
+    public string RunId { get; set; } = "";
     public ProjectWorkspaceService.GitCheckpoint? GitBefore { get; set; }
     public ProjectWorkspaceService.GitCheckpoint? GitAfter { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
@@ -32,7 +36,10 @@ public sealed class WorkTask
     public string Title { get; set; } = "未命名任务";
     public string Workspace { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    public bool GraphMode { get; set; }
     public List<WorkflowStep> Steps { get; set; } = [];
+    public List<ExecutionRecord> ExecutionRecords { get; set; } = [];
+    public string WorkspaceFor(WorkflowStep step) => string.IsNullOrWhiteSpace(step.WorktreePath) ? Workspace : step.WorktreePath;
     public List<RequestTraceEvent> RequestEvents { get; set; } = [];
     public int CompletedCount => Steps.Count(x => x.Status == StepStatus.Completed);
 }
@@ -68,6 +75,19 @@ public static class WorkflowTemplates
             new() { Title = "独立复核与交付", Agent = AgentKind.ClaudeCode, Instructions = "核对变更和测试证据，记录存在的问题。GitHub 修改后在 docs/routine 生成包含时间、变更和下一步规划的开发日志。", RequiresApproval = false }
         ]
     };
+
+    public static WorkTask ParallelReview(string name, string workspace)
+    {
+        var plan = new WorkflowStep { Title = "目标与范围分析", Agent = AgentKind.ClaudeCode,
+            Instructions = "梳理现有架构和风险，输出简明可验证的实施方案。", RequiresApproval = false };
+        var build = new WorkflowStep { Title = "实现与测试", Agent = AgentKind.Codex,
+            Instructions = "按方案实施并验证；所有写操作只在明确的工作区进行。", DependsOn = [plan.Id] };
+        var audit = new WorkflowStep { Title = "独立审查", Agent = AgentKind.ClaudeCode,
+            Instructions = "独立审查代码、安全边界与测试；不要假装看到不可观察的模型调用。", DependsOn = [plan.Id] };
+        var ship = new WorkflowStep { Title = "整合验收", Agent = AgentKind.Manual,
+            Instructions = "核实两个分支的产物，决定是否合并与提交。", DependsOn = [build.Id, audit.Id] };
+        return new WorkTask { Title = name, Workspace = workspace, GraphMode = true, Steps = [plan,build,audit,ship] };
+    }
 
     public static WorkTask Research(string name, string workspace) => new()
     {

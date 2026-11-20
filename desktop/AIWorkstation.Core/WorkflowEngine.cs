@@ -15,7 +15,8 @@ public static class WorkflowEngine
         var step = EnsureStartable(task, stepId);
         step.ApprovalGranted = false; // One-shot approval; it cannot be reused after a failure.
         step.Status = StepStatus.Running;
-        step.StartedAt = DateTimeOffset.Now;
+        step.RunId = Guid.NewGuid().ToString("N");
+        step.StartedAt = DateTimeOffset.UtcNow;
     }
 
     public static void Complete(WorkTask task, string stepId, string result)
@@ -48,6 +49,7 @@ public static class WorkflowEngine
         step.StartedAt = null;
         step.CompletedAt = null;
         step.ApprovalGranted = false;
+        step.RunId = "";
     }
 
     public static WorkflowStep EnsureStartable(WorkTask task, string stepId)
@@ -56,8 +58,11 @@ public static class WorkflowEngine
         VerifyPrerequisites(task, step);
         if (step.Status != StepStatus.Pending) throw new InvalidOperationException("当前阶段不可重复启动。");
         if (step.RequiresApproval && !step.ApprovalGranted) throw new InvalidOperationException("请先批准当前阶段。");
-        if (task.Steps.Any(x => x != step && x.Status == StepStatus.Running))
-            throw new InvalidOperationException("当前任务已有执行中的阶段。");
+        var running = task.Steps.Where(x=>x!=step && x.Status==StepStatus.Running).ToArray();
+        if (running.Length>0 && (!task.GraphMode || string.IsNullOrWhiteSpace(step.WorktreePath)
+            || running.Any(x=>string.IsNullOrWhiteSpace(x.WorktreePath) ||
+                string.Equals(x.WorktreePath, step.WorktreePath, OperatingSystem.IsWindows()?StringComparison.OrdinalIgnoreCase:StringComparison.Ordinal))))
+            throw new InvalidOperationException("并发阶段必须使用不同的独立 Git Worktree，不能共用执行目录。");
         return step;
     }
 
@@ -83,7 +88,13 @@ public static class WorkflowEngine
     {
         var index = task.Steps.IndexOf(step);
         if (index < 0) throw new InvalidOperationException("阶段不属于此任务。");
-        if (task.Steps.Take(index).Any(s => s.Status != StepStatus.Completed))
+        WorkflowGraph.Validate(task);
+        if (task.GraphMode)
+        {
+            if (step.DependsOn.Any(id=>task.Steps.Single(x=>x.Id==id).Status!=StepStatus.Completed))
+                throw new InvalidOperationException("DAG 依赖阶段尚未完成。");
+        }
+        else if (task.Steps.Take(index).Any(s => s.Status != StepStatus.Completed))
             throw new InvalidOperationException("请先完成此前的工作阶段。");
     }
 }
