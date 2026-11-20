@@ -17,6 +17,8 @@ public sealed class UnifiedTaskState
     public List<UnifiedWorkItem> WorkItems { get; set; } = [];
     public List<TaskArtifactRef> Artifacts { get; set; } = [];
     public List<AgentRunRecord> AgentRuns { get; set; } = [];
+    public int MaxRecommendedActive { get; set; } = 1; // Scheduler planning only; not an OS lock.
+    public List<DispatchRequest> DispatchRequests { get; set; } = [];
 }
 
 public sealed class PlanRevision
@@ -79,6 +81,7 @@ public static class UnifiedTaskCore
         state.Plans ??= [];
         state.AgentRuns ??= [];
         state.Artifacts ??= [];
+        state.DispatchRequests ??= [];
         foreach (var step in task.Steps)
         {
             var item = state.WorkItems.FirstOrDefault(x => x.StageId == step.Id);
@@ -143,7 +146,8 @@ public static class UnifiedTaskCore
             state.AcceptanceCriteria is null || state.AcceptanceCriteria.Length > 6000 ||
             state.Plans is null || state.WorkItems is null || state.Artifacts is null || state.AgentRuns is null ||
             state.Plans.Count > MaxPlanRevisions || state.Artifacts.Count > MaxArtifactRefs ||
-            state.AgentRuns.Count > MaxRunRecords || state.WorkItems.Count > 200)
+            state.AgentRuns.Count > MaxRunRecords || state.WorkItems.Count > 200 ||
+            state.MaxRecommendedActive is < 1 or > 4 || state.DispatchRequests is null || state.DispatchRequests.Count > 120)
             throw new InvalidDataException("统一任务字段或 schema 版本无效。");
         var stageIds = task.Steps.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
         if (state.WorkItems.Count != task.Steps.Count ||
@@ -161,6 +165,12 @@ public static class UnifiedTaskCore
             (x.Kind == "stage-result" && (!stageIds.Contains(x.StageId) || x.Reference != "stage:" + x.StageId))) ||
             state.Artifacts.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != state.Artifacts.Count)
             throw new InvalidDataException("任务工件指针无效。");
+        if (state.DispatchRequests.Any(x=> x is null || string.IsNullOrWhiteSpace(x.Id) ||
+            !stageIds.Contains(x.StageId) || x.AdapterId is not ("claude-cli" or "codex-cli" or "manual") ||
+            !IsHexHash(x.HandoffFingerprint) || x.State is not ("queued" or "consumed" or "cancelled")) ||
+            state.DispatchRequests.Select(x=>x.Id).Distinct(StringComparer.Ordinal).Count()!=state.DispatchRequests.Count ||
+            state.DispatchRequests.Where(x=>x.State=="queued").GroupBy(x=>x.StageId).Any(x=>x.Count()>1))
+            throw new InvalidDataException("调度票据损坏、重复或超出允许范围。");
         if (state.AgentRuns.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) ||
             !stageIds.Contains(x.StageId) || x.AdapterId != ProviderAdapterRegistry.IdFor(x.Agent) ||
             x.Evidence != "local-intent") ||

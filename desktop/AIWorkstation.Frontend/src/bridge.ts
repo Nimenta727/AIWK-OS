@@ -1,3 +1,6 @@
+export type DispatchSlot={stageId:string;title:string;adapterId:string;agent:string;status:string;reason:string;dependencyCount:number;approxTokens:number;canQueue:boolean;needsApproval:boolean;isQueued:boolean;ticketId:string|null;recommendedAgent:WorkStep['agent']|null};
+export type DispatchPlan={taskId:string;mode:string;maxRecommendedActive:number;activeStages:number;completedStages:number;readyStages:number;queuedStages:number;nextStageId:string|null;evidenceNotice:string;stages:DispatchSlot[]};
+export type HealthSnapshot={version:string;inspectedAt:string;tasks:number;runningStages:number;interruptedStages:number;pendingApprovals:number;queuedStages:number;importedUsageStages:number;unknownUsageStages:number;backupAvailable:boolean;securityNotice:string;releaseNotice:string};
 export type TokenUsage = { input: number|null; output:number|null; cachedInput:number|null; source:string; isMeasured?:boolean };
 export type TraceEvent = { at:string; stageId:string; kind:string; summary:string };
 export type GitObservedFile = {path:string;status:string;signature:string};
@@ -12,13 +15,14 @@ export type PlanRevision = {id:string;relativePath:string;sha256:string;linkedAt
 export type UnifiedWorkItem = {id:string;stageId:string;title:string;status:WorkStep['status'];agent:WorkStep['agent'];dependsOn:string[]};
 export type TaskArtifactRef = {id:string;kind:'plan'|'stage-result';stageId:string;reference:string;contentHash:string;recordedAt:string};
 export type AgentRunRecord = {id:string;stageId:string;agent:WorkStep['agent'];adapterId:string;status:WorkStep['status'];evidence:string;startedAt:string|null;completedAt:string|null};
-export type UnifiedTaskState = {schemaVersion:number;goal:string;acceptanceCriteria:string;plans:PlanRevision[];workItems:UnifiedWorkItem[];artifacts:TaskArtifactRef[];agentRuns:AgentRunRecord[]};
+export type DispatchRequest = {id:string;stageId:string;adapterId:string;handoffFingerprint:string;state:string;createdAt:string;updatedAt:string};
+export type UnifiedTaskState = {maxRecommendedActive:number;dispatchRequests:DispatchRequest[];schemaVersion:number;goal:string;acceptanceCriteria:string;plans:PlanRevision[];workItems:UnifiedWorkItem[];artifacts:TaskArtifactRef[];agentRuns:AgentRunRecord[]};
 export type ProviderCapability = {id:string;name:string;agent:WorkStep['agent'];toolName:string;available:boolean;requiresUserLaunch:boolean;supportsUnattended:boolean;supportsLocalWorktree:boolean;canImportStructuredUsage:boolean;canObserveInternalRequests:boolean;notice:string};
 export type ContextManifestEntry = {kind:string;reference:string;contentHash:string;characters:number;included:boolean;evidence:string};
 export type HandoffSummary = {version:number;taskId:string;stageId:string;adapterId:string;fingerprint:string;approxTokens:number;sentCharacters:number;savedCharacters:number;manifest:ContextManifestEntry[];evidenceNotice:string};
 export type WorkTask = { unified:UnifiedTaskState; id:string; title:string; workspace:string; graphMode:boolean; promptWarningTokens:number; promptStopTokens:number; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
 export type Snapshot = { version:string; tasks:WorkTask[]; providers:ProviderCapability[]; agents:Record<string,boolean>; limitations:string[] };
-type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void };
+type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void; timer?:ReturnType<typeof setTimeout> };
 type Message = {id:number;action:string;payload:Record<string,unknown>};
 declare global { interface Window { chrome?:{webview?:{postMessage:(x:string)=>void;addEventListener:(name:string,fn:(event:MessageEvent)=>void)=>void}} } }
 class WorkstationBridge {
@@ -42,6 +46,7 @@ class WorkstationBridge {
         if(typeof msg.id !== 'number') return;
         const op = this.pending.get(msg.id); if(!op) return;
         this.pending.delete(msg.id);
+        if(op.timer)clearTimeout(op.timer);
         if(msg.ok) op.resolve(msg.data); else op.reject(new Error(String(msg.error || '原生服务请求失败')));
       } catch { /* Unrecognized host event; not a model response. */ }
     });
@@ -49,11 +54,17 @@ class WorkstationBridge {
   call<T>(action:string,payload:Record<string,unknown>={}):Promise<T>{
     const host=window.chrome?.webview;
     if(!host) return Promise.reject(new Error('当前是前端预览环境。请从 WindowsAIWorkstation.exe 启动以使用本地任务。'));
+    if(this.pending.size>=64) return Promise.reject(new Error('本地请求过多：请检查是否有未完成的操作。'));
     const id=++this.serial;
     const request:Message={id,action,payload};
     return new Promise<T>((resolve,reject)=>{
-      this.pending.set(id,{resolve:resolve as (x:unknown)=>void,reject});
-      host.postMessage(JSON.stringify(request));
+      const op:Pending={resolve:resolve as (x:unknown)=>void,reject};
+      // Only a known read operation times out: write/launch operations must never be retried implicitly.
+      if(['state','scheduler.plan','diagnostics.health','atlas.flow','context.bundle','providers.capabilities'].includes(action))
+        op.timer=setTimeout(()=>{if(this.pending.delete(id))reject(new Error('本地只读请求超时；未执行任何自动重试。'));},30000);
+      this.pending.set(id,op);
+      try{host.postMessage(JSON.stringify(request));}
+      catch(ex){if(op.timer)clearTimeout(op.timer);this.pending.delete(id);reject(ex instanceof Error?ex:new Error(String(ex)));}
       // No hidden polling or model calls. The native host always replies on the same ID.
     });
   }

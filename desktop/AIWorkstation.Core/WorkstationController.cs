@@ -39,6 +39,8 @@ public sealed class WorkstationController : IDisposable
     }
 
     public IReadOnlyList<WorkTask> Tasks => _tasks;
+    public WorkstationDiagnostics.Health Health() => WorkstationDiagnostics.Inspect(_tasks,_repository.HasBackup);
+    public string RedactedDiagnosticReport() => WorkstationDiagnostics.CreateRedactedReport(_tasks,_repository.HasBackup);
     public WorkTask GetTask(string taskId) => _tasks.FirstOrDefault(t => t.Id == taskId)
         ?? throw new ArgumentException("任务不存在。", nameof(taskId));
 
@@ -74,6 +76,7 @@ public sealed class WorkstationController : IDisposable
         ContextBudgetPolicy.Validate(warningTokens, stopTokens);
         Change(taskId, task =>
         {
+            foreach(var stage in task.Steps) {AgentScheduler.CancelForStage(task,stage.Id); if(stage.Status==StepStatus.Pending)stage.ApprovalGranted=false;}
             task.PromptWarningTokens = warningTokens;
             task.PromptStopTokens = stopTokens;
             ExecutionLedger.Append(task, null, "context.budget.updated",
@@ -92,6 +95,7 @@ public sealed class WorkstationController : IDisposable
         {
             if (task.Steps.Any(x => x.Status == StepStatus.Running))
                 throw new InvalidOperationException("执行期间不能修改任务总目标；请先完成或中断阶段。");
+            foreach(var stage in task.Steps) {AgentScheduler.CancelForStage(task,stage.Id); if(stage.Status==StepStatus.Pending)stage.ApprovalGranted=false;}
             task.Unified.Goal = goal;
             task.Unified.AcceptanceCriteria = acceptanceCriteria;
             ExecutionLedger.Append(task, null, "task.brief.updated", metadata: "AIWS-owned task goal and acceptance");
@@ -107,7 +111,11 @@ public sealed class WorkstationController : IDisposable
         Change(taskId, current =>
         {
             added = UnifiedTaskCore.AttachPlan(current, document);
-            if (added) ExecutionLedger.Append(current, null, "plan.revision.linked", metadata: "plan metadata only");
+            if (added)
+            {
+                foreach(var stage in current.Steps) {AgentScheduler.CancelForStage(current,stage.Id); if(stage.Status==StepStatus.Pending)stage.ApprovalGranted=false;}
+                ExecutionLedger.Append(current, null, "plan.revision.linked", metadata: "plan metadata only");
+            }
         });
         return added;
     }
@@ -120,6 +128,7 @@ public sealed class WorkstationController : IDisposable
             var step = WorkflowEngine.Find(task, stepId);
             ProviderAdapterRegistry.EnsureSwitchable(task, step, agent);
             if (step.Agent == agent) return;
+            AgentScheduler.CancelForStage(task,step.Id);
             step.Agent = agent;
             if (agent != AgentKind.Manual) step.RequiresApproval = true;
             step.ApprovalGranted = false; // Previous approval never applies to a different provider.
@@ -128,6 +137,39 @@ public sealed class WorkstationController : IDisposable
                 metadata: $"adapter={ProviderAdapterRegistry.IdFor(agent)}; pending-only");
         });
     }
+
+    public AgentScheduler.DispatchPlan SchedulerPlan(string taskId)
+        => AgentScheduler.Build(GetTask(taskId),ProviderAdapterRegistry.Describe());
+
+    public void SetRecommendedConcurrency(string taskId,int limit)
+    {
+        if (limit is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(limit),"并行建议容量必须为 1–4。");
+        Change(taskId,task=>
+        {
+            task.Unified.MaxRecommendedActive=limit;
+            ExecutionLedger.Append(task,null,"scheduler.policy.updated",metadata:$"recommended-active={limit}");
+        });
+    }
+
+    public string QueueStage(string taskId,string stepId,IReadOnlyList<ProviderCapability>? providers = null)
+    {
+        string ticket="";
+        Change(taskId,task=>
+        {
+            ticket=AgentScheduler.Queue(task,stepId,providers ?? ProviderAdapterRegistry.Describe());
+            ExecutionLedger.Append(task,WorkflowEngine.Find(task,stepId),"scheduler.stage.queued",metadata:"no CLI invoked");
+        });
+        return ticket;
+    }
+
+    public void CancelQueuedStage(string taskId,string ticketId)
+        => Change(taskId,task=>
+        {
+            var ticket=task.Unified.DispatchRequests.FirstOrDefault(x=>x.Id==ticketId);
+            AgentScheduler.Cancel(task,ticketId);
+            ExecutionLedger.Append(task,ticket is null?null:WorkflowEngine.Find(task,ticket.StageId),
+                "scheduler.stage.cancelled",metadata:"no CLI invoked");
+        });
 
     public void Approve(string taskId, string stepId)
         => Change(taskId, task => { WorkflowEngine.Approve(task, stepId);
@@ -142,6 +184,7 @@ public sealed class WorkstationController : IDisposable
                 throw new ArgumentException("阶段标题或依赖数量无效。");
             var step = new WorkflowStep { Title=title.Trim(), Agent=agent, DependsOn=dependencies.ToList(),
                 Instructions="检查依赖阶段产物，并记录本阶段实际结果。" };
+            foreach(var existing in task.Steps) {AgentScheduler.CancelForStage(task,existing.Id); if(existing.Status==StepStatus.Pending)existing.ApprovalGranted=false;}
             task.Steps.Add(step);
             WorkflowGraph.Validate(task);
             ExecutionLedger.Append(task,step,"workflow.step.added");
@@ -153,6 +196,7 @@ public sealed class WorkstationController : IDisposable
             if(!task.GraphMode || task.Steps.Any(s=>s.Status!=StepStatus.Pending))
                 throw new InvalidOperationException("运行后的 DAG 结构不可修改；请另建任务。");
             var step=WorkflowEngine.Find(task,stepId);
+            foreach(var existing in task.Steps) {AgentScheduler.CancelForStage(task,existing.Id); if(existing.Status==StepStatus.Pending)existing.ApprovalGranted=false;}
             step.DependsOn=dependencies.ToList();
             WorkflowGraph.Validate(task);
             ExecutionLedger.Append(task,step,"workflow.dependencies.updated");
@@ -170,6 +214,8 @@ public sealed class WorkstationController : IDisposable
             Change(taskId, t=>
             {
                 var s=WorkflowEngine.Find(t,stepId);
+                AgentScheduler.CancelForStage(t,s.Id);
+                s.ApprovalGranted=false;
                 s.WorktreePath=created.Path;
                 s.WorktreeBaseline=created.Head;
                 ExecutionLedger.Append(t,s,"git.worktree.created",metadata:"local git worktree");
@@ -199,6 +245,7 @@ public sealed class WorkstationController : IDisposable
         {
             var step = WorkflowEngine.Find(task, stepId);
             WorkflowEngine.Complete(task, stepId, result);
+            AgentScheduler.ConsumeIfQueued(task,step);
             step.GitAfter = after;
             RequestTrace.Record(task, step, "stage.completed", "阶段结果已由用户确认并保存；模型调用次数未知");
             ExecutionLedger.Append(task,step,"stage.completed",metadata:after is null?"no git checkpoint":"git checkpoint");
@@ -221,12 +268,14 @@ public sealed class WorkstationController : IDisposable
             step.GitBefore = before;
             step.GitAfter = null;
             WorkflowEngine.Start(task, stepId);
+            AgentScheduler.ConsumeIfQueued(task,step);
             RequestTrace.Record(task, step, "manual.started", "用户手动开始人工阶段；未启动模型");
             ExecutionLedger.Append(task,step,"stage.started",metadata:"manual");
         });
 
     public void Retry(string taskId, string stepId)
         => Change(taskId, task => {var step=WorkflowEngine.Find(task,stepId);
+            AgentScheduler.CancelForStage(task,stepId);
             WorkflowEngine.Retry(task,stepId);ExecutionLedger.Append(task,step,"stage.retry.armed");});
 
     public async Task LaunchWithGitAsync(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli, bool confirmDuplicate = false)
@@ -260,6 +309,8 @@ public sealed class WorkstationController : IDisposable
             ExecutionLedger.Append(task,step,"cli.launch.intent",evidence:"unknown");
             Save();
             startCli(step.Agent, folder); // Official installed program, not an embedded API.
+            // The launch was explicit; a queued ticket may now be retired. No remote request is inferred.
+            Change(taskId,t=>AgentScheduler.ConsumeIfQueued(t,WorkflowEngine.Find(t,stepId)));
         }
         catch (Exception ex)
         {

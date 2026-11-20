@@ -674,6 +674,78 @@ try
     Assert(legacyRepo.Load().Single().Unified.WorkItems.Count==2,
         "migration remains valid under atomic backup and round-trip JSON validation");
 
+    // Phases 4–6: restart-safe, zero-token scheduler, consolidated health evidence and privacy export.
+    var schedulerData=Path.Combine(workspace,"scheduler-restart-data");
+    var available=ProviderAdapterRegistry.Describe(name=>name=="codex");
+    string scheduledTaskId, scheduledStageId, firstTicket;
+    using(var ctrl=new WorkstationController(schedulerData))
+    {
+        var work=ctrl.CreateTask("SECRET_TASK_NAME",planRoot,"lean");
+        scheduledTaskId=work.Id;
+        scheduledStageId=work.Steps[0].Id;
+        var firstPlan=AgentScheduler.Build(work,available);
+        Assert(firstPlan.Stages[0].Status=="approval" && firstPlan.NextStageId==scheduledStageId
+            && firstPlan.ReadyStages==0 && firstPlan.QueuedStages==0,
+            "scheduler surfaces explicit approval without any hidden provider call");
+        Assert(ThrowsAny(()=>ctrl.QueueStage(work.Id,scheduledStageId,available)),
+            "scheduler refuses enqueue before an approved stage");
+        ctrl.Approve(work.Id,scheduledStageId);
+        var ready=AgentScheduler.Build(work,available);
+        Assert(ready.Stages[0].Status=="ready" && ready.Stages[0].ApproxTokens>0,
+            "scheduler derives readiness and estimates from persisted AIWS evidence");
+        firstTicket=ctrl.QueueStage(work.Id,scheduledStageId,available);
+        Assert(firstTicket.Length>10 && AgentScheduler.Build(work,available).Stages[0].Status=="queued"
+            && work.Steps[0].Status==StepStatus.Pending,
+            "queue persists only intent, never starts a CLI or modifies stage state");
+        Assert(ThrowsAny(()=>ctrl.QueueStage(work.Id,scheduledStageId,available)),
+            "duplicate dispatch ticket is rejected");
+        Assert(ThrowsAny(()=>ctrl.SetRecommendedConcurrency(work.Id,6)),
+            "recommended concurrency limit is bounded");
+        ctrl.SetRecommendedConcurrency(work.Id,2);
+        Assert(AgentScheduler.Build(work,available).MaxRecommendedActive==2,
+            "scheduler concurrency policy updates local projections only");
+        var redacted=ctrl.RedactedDiagnosticReport();
+        Assert(redacted.Contains("unknownUsageStages",StringComparison.OrdinalIgnoreCase)
+            && !redacted.Contains("SECRET_TASK_NAME") && !redacted.Contains(planRoot),
+            "diagnostic export excludes task names, project paths and raw source content");
+    }
+    using(var reopened=new WorkstationController(schedulerData))
+    {
+        var work=reopened.GetTask(scheduledTaskId);
+        Assert(work.Unified.DispatchRequests.Single(x=>x.Id==firstTicket).State=="queued"
+            && work.Unified.MaxRecommendedActive==2,
+            "scheduler tickets and concurrency preferences survive process restart");
+        reopened.CancelQueuedStage(work.Id,firstTicket);
+        Assert(work.Unified.DispatchRequests.Single(x=>x.Id==firstTicket).State=="cancelled",
+            "operator can revoke a ticket without starting a model");
+        var second=reopened.QueueStage(work.Id,scheduledStageId,available);
+        Assert(second!=firstTicket,"requeued work obtains a fresh non-replayable ticket");
+        reopened.SetTaskBrief(work.Id,"NEW_SECRET_GOAL","validated output");
+        Assert(work.Unified.DispatchRequests.Single(x=>x.Id==second).State=="cancelled"
+            && !work.Steps[0].ApprovalGranted,
+            "editing task intent invalidates queued prompt fingerprints and approval");
+        Assert(ThrowsAny(()=>reopened.QueueStage(work.Id,scheduledStageId,available)),
+            "a changed goal cannot reuse an old write/launch approval");
+        reopened.Approve(work.Id,scheduledStageId);
+        var fresh=reopened.QueueStage(work.Id,scheduledStageId,available);
+        var launched=0;
+        reopened.Launch(work.Id,scheduledStageId,_=>{},(_agent,_root)=>launched++);
+        Assert(launched==1 && work.Steps[0].Status==StepStatus.Running &&
+            work.Unified.DispatchRequests.Single(x=>x.Id==fresh).State=="consumed",
+            "explicitly approved CLI dispatch consumes queued intent exactly once");
+        Assert(ThrowsAny(()=>reopened.Launch(work.Id,scheduledStageId,_=>{},(_agent,_root)=>launched++))
+            && launched==1,"replay of running dispatch is blocked");
+        var diagnostic=reopened.RedactedDiagnosticReport();
+        Assert(!diagnostic.Contains("NEW_SECRET_GOAL") && !diagnostic.Contains("SECRET_TASK_NAME"),
+            "health export never includes the live user goal or task title");
+    }
+    using(var reopened=new WorkstationController(schedulerData))
+    {
+        var work=reopened.GetTask(scheduledTaskId);
+        Assert(work.Steps[0].Status==StepStatus.Interrupted
+            && work.Unified.DispatchRequests.All(x=>x.State!="queued"),
+            "restart marks incomplete execution interrupted; scheduler never replays it automatically");
+    }
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

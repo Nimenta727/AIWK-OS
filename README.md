@@ -1,3 +1,11 @@
+# AIWS V1.8 preview — Agent 调度、统一总控台、可靠性加固
+
+已接入第 4–6 阶段的**可验证核心能力**：DAG 就绪计算、经审批的持久化调度队列、执行器可用性建议、统一计划/调用/Git 总控视图、写操作串行化、脱敏诊断导出和 Hyper-V 发行包只读预检。UI 入口：**AI 协作总控台**。
+
+重要限制：队列**不会自动发起 Claude/Codex 请求**；CLI 仍需用户通过 Windows 原生确认。没有完成独立权限 Worker、无人值守官方适配器、签名安装器以及 Hyper-V GUI/ACL 验收，**不是正式 V2.0 稳定版**。技术说明：[UNIFIED_ORCHESTRATION_V18.md](docs/UNIFIED_ORCHESTRATION_V18.md)，开发记录：[routine](docs/routine/2026-11-20_1910-phases-4-5-6-orchestration.md)。
+
+---
+
 # AIWS — Unified Task Core · Context Compiler · Provider Adapters (V1.7.3)
 
 **Windows CI verified:** [Native Windows EXE #44717741460](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741460) and [Python/Windows regression #44717741422](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741422) passed. Hyper-V real-GUI verification is still pending. See [verification routine](docs/routine/2026-11-20_1820-unified-core-windows-ci-verified.md).

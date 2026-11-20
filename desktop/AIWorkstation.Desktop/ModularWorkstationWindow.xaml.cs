@@ -17,6 +17,8 @@ public partial class ModularWorkstationWindow : Window
     private const string TrustedHost = "aiws.local";
     private readonly WorkstationController _controller;
     private ConPtyTerminal? _terminal;
+    // A native confirmation must not race another mutation while its modal dialog is open.
+    private readonly SemaphoreSlim _mutationGate = new(1,1);
     private static readonly JsonSerializerOptions WireOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
@@ -87,9 +89,19 @@ public partial class ModularWorkstationWindow : Window
             var action = ReadField(root, "action");
             var payload = root.TryGetProperty("payload", out var node) && node.ValueKind == JsonValueKind.Object
                 ? node : default;
+            var mutation = IsMutationAction(action);
+            if (mutation) await _mutationGate.WaitAsync();
+            try
+            {
             object? result = action switch
             {
                 "state" => Snapshot(),
+                "scheduler.plan" => _controller.SchedulerPlan(ReadField(payload,"taskId")),
+                "scheduler.queue" => new {ticketId=_controller.QueueStage(ReadField(payload,"taskId"),ReadField(payload,"stepId"))},
+                "scheduler.cancel" => CancelDispatch(payload),
+                "scheduler.parallel" => SetSchedulerParallel(payload),
+                "diagnostics.health" => _controller.Health(),
+                "diagnostics.export" => ExportDiagnosticReport(),
                 "workspaces.pick" => PickDirectory(),
                 "tasks.create" => CreateTask(payload),
                 "steps.approve" => await StepActionAsync(payload, "approve"),
@@ -137,6 +149,8 @@ public partial class ModularWorkstationWindow : Window
                 _ => throw new InvalidOperationException("不允许的工作台操作。")
             };
             Reply(id, true, result, null);
+            }
+            finally { if (mutation) _mutationGate.Release(); }
         }
         catch (Exception ex)
         {
@@ -147,7 +161,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.7.3-unified-task-handoff-adapters",
+        Version = "1.8-orchestration-mission-control-preview",
         Providers = ProviderAdapterRegistry.Describe(),
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
@@ -161,6 +175,37 @@ public partial class ModularWorkstationWindow : Window
             "Windows CLI 继承当前用户权限；工作目录检查不是沙箱。"
         }
     };
+
+    private static bool IsMutationAction(string action) => action is
+        "tasks.create" or "tasks.setPromptBudget" or "tasks.setBrief" or "plans.link" or
+        "steps.approve" or "steps.complete" or "steps.retry" or "steps.startManual" or
+        "steps.launch" or "steps.switchAgent" or "steps.add" or "steps.dependencies" or
+        "worktrees.create" or "scheduler.queue" or "scheduler.cancel" or "scheduler.parallel" or
+        "diagnostics.export" or "terminal.start" or "terminal.write" or "terminal.resize" or
+        "terminal.close" or "tools.openShell";
+
+    private object CancelDispatch(JsonElement payload)
+    {
+        _controller.CancelQueuedStage(ReadField(payload,"taskId"),ReadField(payload,"ticketId"));
+        return new {success=true};
+    }
+    private object SetSchedulerParallel(JsonElement payload)
+    {
+        if(!payload.TryGetProperty("limit",out var item) || !item.TryGetInt32(out var limit))
+            throw new ArgumentException("并行调度建议值需要 1–4 整数。");
+        _controller.SetRecommendedConcurrency(ReadField(payload,"taskId"),limit);
+        return new {success=true};
+    }
+    private object ExportDiagnosticReport()
+    {
+        var dialog=new SaveFileDialog { Title="导出脱敏的 AIWS 本地诊断信息",
+            Filter="JSON 诊断报告 (*.json)|*.json", FileName="AIWS-diagnostics-redacted.json",
+            DefaultExt=".json", AddExtension=true, OverwritePrompt=true };
+        if(dialog.ShowDialog(this)!=true) return new {saved=false};
+        // No user prompts, stage outputs, task names, raw events or project paths are included.
+        File.WriteAllText(dialog.FileName,_controller.RedactedDiagnosticReport());
+        return new {saved=true};
+    }
 
     private object SetTaskBrief(JsonElement payload)
     {
