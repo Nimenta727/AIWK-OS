@@ -13,6 +13,9 @@ model="$HOME/.local/share/aiws/models/aiws-local.gguf"
 if [ -L "$model" ] || [ ! -f "$model" ]; then
    echo 'No regular guest-local GGUF weights found' >&2; exit 1
 fi
+if ! python3 /usr/local/lib/aiws/aiws_model_registry.py --verify >/dev/null; then
+   echo 'GGUF version is not registered or SHA-256 verification failed' >&2; exit 1
+fi
 if ! command -v llama-server >/dev/null 2>&1; then
    echo 'llama-server is unavailable inside this guest' >&2; exit 1
 fi

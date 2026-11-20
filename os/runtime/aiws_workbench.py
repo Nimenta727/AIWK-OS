@@ -18,6 +18,7 @@ from aiws_toolplane import audit, catalog, invoke
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
+from aiws_model_registry import GuestModelRegistry
 from aiws_local_model import LocalPlanner, LocalModelError
 import subprocess
 
@@ -122,6 +123,7 @@ class Controller:
                 raise LocalModelError("Install a verified model inside the guest before enabling")
             protect_guest_workspace((Path.home()/".local/share/aiws").resolve(),
                                     weights.resolve(strict=True))
+            GuestModelRegistry(Path.home()/".local/share/aiws/models",self.workspace).verify()
         folder = Path.home()/".config/aiws"
         folder.mkdir(parents=True,mode=0o700,exist_ok=True)
         if folder.is_symlink() or not folder.resolve().is_relative_to(Path.home().resolve()):

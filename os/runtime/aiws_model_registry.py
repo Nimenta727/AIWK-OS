@@ -90,8 +90,9 @@ class GuestModelRegistry:
                 raise ModelArtifactError("Model file missing or symlinked")
         if active.stat().st_size != version.stat().st_size or _sha256(active) != manifest["sha256"] or _sha256(version) != manifest["sha256"]:
             raise ModelArtifactError("Guest model artifact SHA-256 does not match registry")
-        if active.open("rb").read(4) != b"GGUF":
-            raise ModelArtifactError("Model artifact is not GGUF")
+        with active.open("rb") as stream:
+            if stream.read(4) != b"GGUF":
+                raise ModelArtifactError("Model artifact is not GGUF")
         return {"modelId": MODEL_ID,"sha256":manifest["sha256"],"verified":True,
                 "weightsBytes":active.stat().st_size,"guestOnly":True,
                 "licenseDeclared":manifest.get("licenseDeclared","not-verified")}
@@ -163,9 +164,9 @@ class GuestModelRegistry:
             finally:
                 if os.path.exists(temp):
                     os.unlink(temp)
-        try:
-            previous=self._manifest()["sha256"]
-        except ModelArtifactError:
+        if (self.root/"registry.json").exists():
+            previous=self._manifest()["sha256"]  # reject corrupted manifests
+        else:
             previous=None
         return self._activate(expected_sha256,previous)
 
