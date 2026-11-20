@@ -33,3 +33,12 @@
 2. Test account-authorized external CLI processes without copying or exporting provider credentials.
 3. Add optional officially supported structured stream adapters and real stop/cancellation support, when permitted.
 4. Consider versioned signed Windows installer and upgrade strategy after functional acceptance.
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 09:50 +0800 — V0.6 native request-flow build verified**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **call flow windows ci verified**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)

@@ -25,3 +25,12 @@
 2. 评估将 MIT 许可的 T3 Code 前端以固定版本 fork 的方式真正迁移到仓库，保留其原始依赖与许可声明。
 3. 为 AIWS 原生流程和上游界面建设有文档支持的适配接口，并合并任务导航；不得复用未经授权的订阅 Token。
 4. 添加 Hyper-V 图形界面端到端测试，确保主题、缩放、登录和掉线处理可靠。
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 10:32 +08:00 — 上游原版前端容器 Windows CI 验收**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **upstream ui windows ci verified**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)

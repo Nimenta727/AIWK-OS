@@ -29,3 +29,12 @@
 2. 在 Hyper-V 测试 T3 CLI 已安装/未安装、端口占用、登陆和可视化聊天流程。
 3. 在独立分支评估 T3 Code 全栈源码 Fork 和 AIWS 授权适配器，不把未验证的 React 组件直接插进 WPF。
 4. 将 AIWS 调度、Token 追踪与成熟前端通过受支持的 API 连接；避免重复存储会话和重复调用模型。
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 10:38 +08:00 — 原版专业前端一键接入**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **professional frontend one click**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)
