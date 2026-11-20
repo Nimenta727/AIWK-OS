@@ -35,7 +35,7 @@ class AiwsOsContract(unittest.TestCase):
         self.assertIn("Guest root can alter", content)
         for key in ("kernel.kptr_restrict", "kernel.dmesg_restrict",
                     "kernel.yama.ptrace_scope", "fs.protected_hardlinks"):
-            self.assertRegex(content, rf"(?m)^{re.escape(key)}\\s*=")
+            self.assertRegex(content, rf"(?m)^{re.escape(key)}\s*=")
 
     def test_kernel_fragment_advertises_uncompiled_status(self):
         fragment = (ROOT / "os/kernel/aiws-kernel.fragment").read_text()
