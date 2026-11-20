@@ -13,18 +13,24 @@ import {ProjectExplorer} from './components/ProjectExplorer';
 import {ExecutionAtlas} from './components/ExecutionAtlas';
 import {PlanCenter} from './components/PlanCenter';
 import {MissionControl} from './components/MissionControl';
+import {InternalObservatory} from './components/InternalObservatory';
 import {UnifiedTaskPanel} from './components/UnifiedTaskPanel';
 import {T3Skeleton} from './components/T3Skeleton';
 import {T3StatusDot} from './components/T3StatusDot';
 import {sumMeasuredUsage} from './model/workflow.mjs';
 import {filterTaskList,shouldActivateShortcut} from './model/interaction.mjs';
 
-type Page = 'mission'|'overview'|'plans'|'atlas'|'flow'|'trace'|'project'|'tools'|'integrations'|'terminal'|'ledger';
-const nav=[{id:'mission',label:'AI 协作总控台',icon:LayoutDashboard},{id:'overview',label:'工作台概览',icon:Sparkles},{id:'plans',label:'AI 计划中心',icon:BookOpenCheck},{id:'atlas',label:'AI 调用与结构',icon:Layers3},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'project',label:'文件与 Git 变更',icon:Code2},{id:'tools',label:'Git 只读控制台',icon:GitCompare},{id:'terminal',label:'Windows 内置终端',icon:Terminal},{id:'ledger',label:'执行事件账本',icon:ListTodo},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
-const navigationGroups=[{title:'核心工作区',ids:['mission','plans','atlas','flow']},{title:'项目与证据',ids:['project','trace','ledger']},{title:'开发工具',ids:['terminal','tools','integrations','overview']}] as const;
+type Page = 'observatory'|'mission'|'overview'|'plans'|'atlas'|'flow'|'trace'|'project'|'tools'|'integrations'|'terminal'|'ledger';
+const nav=[{id:'observatory',label:'内部执行透视',icon:Activity},{id:'mission',label:'AI 协作总控台',icon:LayoutDashboard},{id:'overview',label:'工作台概览',icon:Sparkles},{id:'plans',label:'AI 计划中心',icon:BookOpenCheck},{id:'atlas',label:'AI 调用与结构',icon:Layers3},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'project',label:'文件与 Git 变更',icon:Code2},{id:'tools',label:'Git 只读控制台',icon:GitCompare},{id:'terminal',label:'Windows 内置终端',icon:Terminal},{id:'ledger',label:'执行事件账本',icon:ListTodo},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
+const navigationGroups=[{title:'核心工作区',ids:['mission','observatory','plans','atlas','flow']},{title:'项目与证据',ids:['project','trace','ledger']},{title:'开发工具',ids:['terminal','tools','integrations','overview']}] as const;
+const navEnglish:Record<Page,string>={observatory:'Internal Observatory',mission:'Mission Control',overview:'Overview',plans:'Plan Studio',atlas:'Execution Atlas',flow:'Workflow Graph',trace:'Request Trace',project:'Files & Git',tools:'Git Console',integrations:'Agents & Capabilities',terminal:'Windows Terminal',ledger:'Evidence Timeline'};
+const groupsEnglish=['Core workspace','Project & evidence','Developer tools'];
 function TitleLogo(){return <span className="brand-mark" aria-hidden="true"><Layers3 size={20} strokeWidth={2}/></span>}
 
 export default function App(){
+ const [language,setLanguage]=useState<'zh'|'en'>(()=>{try{return localStorage.getItem('aiws.ui.language')==='en'?'en':'zh';}catch{return 'zh';}});
+ const translate=(zh:string,en:string)=>language==='en'?en:zh;
+ useEffect(()=>{document.documentElement.lang=language==='en'?'en':'zh-CN';try{localStorage.setItem('aiws.ui.language',language);}catch{}},[language]);
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
  const [selectedTask,setSelectedTask]=useState<string|null>(null);
  const [selectedNode,setSelectedNode]=useState<string|null>(null);
@@ -144,30 +150,31 @@ export default function App(){
  },[showCreate,showHelp,inspectorOpen,closeCreate,openCreate]);
  const measured=task?sumMeasuredUsage(task):null;
  const hasInspector=page==='flow'&&Boolean(task);
- return <div className={`app-shell ${hasInspector?'has-inspector':''} ${page==='project'?'project-active':''} ${page==='atlas'?'atlas-active':''} ${page==='plans'?'plan-active':''} ${page==='mission'?'mission-active':''}`}>
+ return <div className={`app-shell ${hasInspector?'has-inspector':''} ${page==='project'?'project-active':''} ${page==='atlas'?'atlas-active':''} ${page==='plans'?'plan-active':''} ${page==='mission'?'mission-active':''} ${page==='observatory'?'observatory-active':''}`}>
    <aside className="sidebar">
      <div className="brand"><TitleLogo/><div className="brand-copy"><strong>AI Workstation</strong><small>COMMAND CENTER <span className="brand-version">/ 01</span></small></div></div>
      <div className="sidebar-scroll">
       {navigationGroups.map((group,index)=><section className="nav-group" key={group.title}>
-       <div className="sidebar-section"><span>{group.title}</span><small>0{index+1}</small></div>
-       <nav className="nav" aria-label={group.title}>{group.ids.map(id=>{
+       <div className="sidebar-section"><span>{language==='en'?groupsEnglish[index]:group.title}</span><small>0{index+1}</small></div>
+       <nav className="nav" aria-label={language==='en'?groupsEnglish[index]:group.title}>{group.ids.map(id=>{
         const item=nav.find(n=>n.id===id)!;
-        return <button type="button" key={id} title={item.label} aria-current={page===id?'page':undefined} className={`nav-link ${page===id?'active':''}`} onClick={()=>navigate(id)}><item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>{page===id&&<span className="nav-active-dot" aria-hidden="true"/>}</button>;
+        return <button type="button" key={id} title={language==='en'?navEnglish[id]:item.label} aria-current={page===id?'page':undefined} className={`nav-link ${page===id?'active':''}`} onClick={()=>navigate(id)}><item.icon size={17} strokeWidth={1.8}/><span>{language==='en'?navEnglish[id]:item.label}</span>{page===id&&<span className="nav-active-dot" aria-hidden="true"/>}</button>;
        })}</nav>
       </section>)}
       <section className="recent-section">
-       <div className="sidebar-section section-project"><span>最近任务</span><button type="button" className="icon-button new-task-inline" aria-label="新建任务" title="新建任务 Ctrl+N" onClick={openCreate} disabled={busy}><Plus size={16}/></button></div>
-       <label className="sidebar-search"><Search size={15}/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜索任务..." aria-label="搜索最近任务"/><kbd>⌘ K</kbd></label>
+       <div className="sidebar-section section-project"><span>{translate('最近任务','Recent tasks')}</span><button type="button" className="icon-button new-task-inline" aria-label="新建任务" title="新建任务 Ctrl+N" onClick={openCreate} disabled={busy}><Plus size={16}/></button></div>
+       <label className="sidebar-search"><Search size={15}/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder={translate('搜索任务...','Search tasks...')} aria-label="搜索最近任务"/><kbd>⌘ K</kbd></label>
        <div className="task-nav" role="list" aria-label="任务列表">{filteredTasks.length?filteredTasks.slice(0,50).map(t=><button type="button" key={t.id} className={`task-link ${selectedTask===t.id?'picked':''}`} onClick={()=>chooseTask(t.id)} title={t.title}><span className="task-glyph"><GitBranch size={13}/></span><span>{t.title}</span>{selectedTask===t.id&&<span className="task-selected" aria-hidden="true"/>}</button>):<div className="no-tasks">{search?'没有匹配的任务。':'还没有任务，点击 + 新建。'}</div>}</div>
       </section>
      </div>
      <div className="sidebar-bottom"><div className="system-line"><span className="system-pulse"/> LOCAL ENGINE <span>· 受控执行</span></div><div className="profile" aria-label="本地个人工作台"><span className="avatar">AI</span><span>个人工作台<small>Windows · 本地运行</small></span><Settings2 size={16}/></div></div>
    </aside>
-   <main className="main-view"><header className="topbar"><div className="breadcrumb"><span className="breadcrumb-home">WORKSPACE</span><ArrowRight size={13}/><strong>{nav.find(n=>n.id===page)?.label}</strong>{task&&<span className="breadcrumb-task">/ {task.title}</span>}</div><div className="top-actions"><span className="mode-label"><span className="mode-dot"/> LOCAL FIRST</span>
+   <main className="main-view"><header className="topbar"><div className="breadcrumb"><span className="breadcrumb-home">WORKSPACE</span><ArrowRight size={13}/><strong>{language==='en'?navEnglish[page]:nav.find(n=>n.id===page)?.label}</strong>{task&&<span className="breadcrumb-task">/ {task.title}</span>}</div><div className="top-actions"><span className="mode-label"><span className="mode-dot"/> LOCAL FIRST</span>
+      <button type="button" className="language-switch" onClick={()=>setLanguage(x=>x==='zh'?'en':'zh')} aria-label={language==='en'?'切换到中文':'Switch to English'} title="UI language / 界面语言"><span className={language==='zh'?'on':''}>中</span><span className={language==='en'?'on':''}>EN</span></button>
       {hasInspector&&<button type="button" className="icon-button inspector-toggle" aria-label={inspectorOpen?'关闭阶段详情':'打开阶段详情'} title="阶段详情" onClick={()=>setInspectorOpen(v=>!v)}>{inspectorOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}</button>}
       <button type="button" className="icon-button top-help" onClick={()=>{previousFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setShowHelp(true);}} aria-label="键盘快捷键与帮助" title="键盘快捷键"><Keyboard size={18}/></button>
       <button type="button" className={`icon-button top-refresh ${refreshing?'is-spinning':''}`} disabled={refreshing||busy} onClick={()=>void refreshClick()} aria-label="刷新本地任务" title="刷新本地状态"><RefreshCw size={18}/></button>
-      <button type="button" className="button dark small top-create" onClick={openCreate} disabled={busy}><Plus size={17}/> 新建任务</button></div></header>
+      <button type="button" className="button dark small top-create" onClick={openCreate} disabled={busy}><Plus size={17}/> {translate('新建任务','New task')}</button></div></header>
      {busy&&<div className="operation-strip" role="status"><span className="operation-spinner"/>正在执行已确认的本地操作，请勿重复提交…</div>}
      {error&&<div className="error-toast" role="alert"><AlertTriangle size={17}/><span>{error}</span><button type="button" onClick={()=>setError('')} aria-label="关闭错误信息"><X size={16}/></button></div>}
      {notice&&!error&&<div className="success-toast" role="status"><CheckCircle2 size={17}/><span>{notice}</span><button type="button" onClick={()=>setNotice('')} aria-label="关闭操作反馈"><X size={16}/></button></div>}
@@ -179,6 +186,7 @@ export default function App(){
          <div className="section-title"><span>当前工作流</span><button disabled={!task} onClick={()=>navigate('flow')}>查看流程 <ArrowRight size={14}/></button></div>
          {task?<button type="button" className="overview-task" onClick={()=>navigate('flow')}><div className="task-top"><span className="task-icon"><Code2 size={20}/></span><div><strong>{task.title}</strong><small>{task.workspace}</small></div><span className="subtle-chip">{task.completedCount}/{task.steps.length} 阶段</span></div><div className="step-mini">{task.steps.map((s,i)=><div key={s.id}><span className={`mini-number ${s.status==='Completed'?'done':''}`}>{i+1}</span><span>{s.title}</span>{i<task.steps.length-1&&<span className="mini-line"/>}</div>)}</div></button>:<div className="blank-state"><Sparkles size={25}/><strong>你的第一条工作流，从这里开始</strong><p>选择项目文件夹，AIWS 会为你准备轻量的 Codex + 人工验收流程。</p><button className="button dark" onClick={openCreate}>创建工作流</button></div>}
        </div>}
+       {page==='observatory'&&<InternalObservatory task={task} language={language} onOpenAtlas={id=>{setSelectedNode(id);navigate('atlas');}} onOpenPlan={()=>navigate('plans')} onOpenGit={()=>navigate('project')} onOpenStage={openStep}/>}
        {page==='mission'&&<MissionControl task={task} action={action} busy={busy} onOpenStep={openStep} onOpenPlans={()=>navigate('plans')} onOpenProject={()=>navigate('project')}/>}
        {page==='plans'&&<PlanCenter task={task} action={action} onRefresh={load} onOpenStep={openStep} onOpenAtlas={()=>setPage('atlas')}/>}
        {page==='atlas'&&<ExecutionAtlas task={task} preferredStageId={selectedNode}/>}
