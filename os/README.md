@@ -24,6 +24,10 @@
 
 [跨平台源码生成 / Cross-platform source authoring](../docs/AIWS_CROSS_PLATFORM_AUTHORING.md)：内置 MCP 的 platform.inspect/project.scaffold，可从 Linux 客户机识别/创建 Windows WPF、macOS SwiftUI 源码工程；不代表可以在 Linux 运行原生 Windows/macOS 应用。
 
+### 跨平台代码智能 / Code intelligence
+
+[只读索引与 MCP 接口](../docs/AIWS_CODE_INTELLIGENCE.md)：可查询 C#/Swift 定义候选、词法引用、MSBuild/SwiftPM 清单和 WPF/WinUI/SwiftUI API 线索；所有结果明确区分未经 Roslyn/SourceKit-LSP 验证的推断。
+
 ### 构建
 
 在 **Debian 13 amd64** 构建机/CI 容器内（需真实网络获取 Debian 软件包和 root/chroot 权限）：

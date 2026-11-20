@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from aiws_crossplatform import inspect_project, scaffold_project
+from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
 import time
 from urllib.parse import urlsplit
 
@@ -28,6 +29,10 @@ TOOL_SPECS = [
     ("browser.snapshot", "Headless Chromium DOM-text snapshot; disabled until exact origins are configured", {"url": "string"}),
     ("platform.inspect", "Recognize Windows/macOS/Swift project sources without building", {"path": "string"}),
     ("project.scaffold", "Create Windows WPF or macOS SwiftUI source template (opt-in; never overwrite)", {"name": "string", "template": "string"}),
+    ("code.symbols", "Read-only C#/Swift source symbol index; syntax-level candidates", {"path": "string", "query": "string"}),
+    ("code.references", "Find symbol definitions and unresolved cross-file identifier occurrences", {"symbol": "string", "path": "string"}),
+    ("code.dependencies", "Inspect MSBuild/NuGet, SwiftPM and XcodeGen declared dependencies without build", {"path": "string"}),
+    ("code.platformApis", "Find WPF/WinUI/interop and SwiftUI/AppKit/UIKit API usage evidence", {"path": "string"}),
 ]
 
 def catalog():
@@ -35,6 +40,7 @@ def catalog():
     for name, description, fields in TOOL_SPECS:
         properties = {key: {"type": value} for key, value in fields.items()}
         required = (["query"] if name == "code.search" else
+                    ["symbol"] if name == "code.references" else
                     list(fields) if name in {"file.read", "file.replace", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
@@ -303,6 +309,14 @@ def invoke(name, arguments):
         return inspect_project(root, arguments.get("path", "."), _path)
     if name == "project.scaffold":
         return scaffold_project(root, arguments)
+    if name == "code.symbols":
+        return code_symbols(root, arguments, _path)
+    if name == "code.references":
+        return code_references(root, arguments, _path)
+    if name == "code.dependencies":
+        return code_dependencies(root, arguments, _path)
+    if name == "code.platformApis":
+        return code_platform_apis(root, arguments, _path)
     raise AssertionError("Unreachable tool dispatch")
 
 def audit(name, arguments, ok):

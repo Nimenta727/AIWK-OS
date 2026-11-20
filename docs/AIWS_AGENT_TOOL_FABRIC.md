@@ -14,6 +14,10 @@
 
 扩展 `platform.inspect`（Windows/macOS/Swift 项目只读识别）和 `project.scaffold`（新建 Windows WPF 与 macOS SwiftUI/XcodeGen 模板，需 `AIWS_ALLOW_SCAFFOLD=1`，不覆盖已有目录），详情见 [专项文档](AIWS_CROSS_PLATFORM_AUTHORING.md)。这不是 Windows/macOS 的原生构建或仿真。
 
+## 跨平台代码智能索引 / Cross-platform code intelligence
+
+新增只读 MCP 工具 `code.symbols`、`code.references`、`code.dependencies`、`code.platformApis`，将 C#/Swift 的定义候选、跨文件词法引用、MSBuild/SwiftPM 依赖及平台 API 使用标记成证据对象。**尚无 Roslyn/SourceKit-LSP 语义校验**；详情见 [专项说明](AIWS_CODE_INTELLIGENCE.md)。
+
 ## 本次实装 / Implemented
 
 | Interface | Actual operation | Boundary |

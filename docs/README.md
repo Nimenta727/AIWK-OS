@@ -7,6 +7,7 @@
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
 ## AIWS OS / AI 虚拟机操作系统
+- [代码智能索引 / Cross-platform code intelligence](AIWS_CODE_INTELLIGENCE.md) — C#/Swift 符号、跨文件引用候选、MSBuild/SwiftPM 依赖与平台 API 证据
 - [Windows/macOS 跨平台源码 / Cross-platform authoring](AIWS_CROSS_PLATFORM_AUTHORING.md) — 在 Linux 客户机生成、阅读、编辑 Windows/macOS 源工程；无需专有 SDK
 - [AI 原生工具接口 / Agent tool fabric](AIWS_AGENT_TOOL_FABRIC.md) — MCP stdio、代码、浏览器、语言运行与隔离约束 / machine-callable guest tools
 - [OS 工程 / OS project](../os/README.md) — Debian Live 镜像、内置开发工具和宿主离线启动 / image build, bundled developer tools, offline-first host launch
