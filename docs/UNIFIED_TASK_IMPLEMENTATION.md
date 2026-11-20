@@ -62,7 +62,7 @@ Additive .NET smoke assertions include:
 - Context compiler is deterministic; preflight and copied prompt are identical; provenance is hash-referenced, not fabricated; old-result trimming still works.
 - Switching a Pending executor revokes approval, retains work-item identity, and a running executor cannot switch.
 - A fake local launch callback (does not contact providers) produces `local-intent` run metadata and completed-result artifact hashes, surviving restart.
-- Existing 38 Python tests and frontend Node tests remain; Windows CI compiles the WPF EXE and runs .NET smoke tests.
+- Existing 38 Python tests and frontend Node tests remain; Windows CI [#44717741460](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741460) **passed** React, WPF/.NET 10, .NET smoke tests and EXE publishing. Python/Windows checks [#44717741422](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741422) passed. Hyper-V GUI testing remains pending.
 
 **Unverified unless separately recorded:** Hyper-V GUI run, actual Claude/Codex account login, provider private internal calls, system-level sandboxing, full orchestration/retry, automatic plan extraction from a provider account, end-to-end model call/token savings percentages. Passing Windows CI is not equivalent to real VM GUI acceptance.
 

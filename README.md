@@ -1,5 +1,7 @@
 # AIWS — Unified Task Core · Context Compiler · Provider Adapters (V1.7.3)
 
+**Windows CI verified:** [Native Windows EXE #44717741460](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741460) and [Python/Windows regression #44717741422](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44717741422) passed. Hyper-V real-GUI verification is still pending. See [verification routine](docs/routine/2026-11-20_1820-unified-core-windows-ci-verified.md).
+
 The first three foundational phases of AIWS's unified Agent control plane are implemented: **one durable task**, explicitly linked Markdown plan hashes, stable per-stage work items and artifact references, a deterministic context compiler with provenance, and capability-aware switching between separately installed Claude Code/Codex CLIs. UI: **可视化工作流 → 统一任务档案 / 阶段检查器** and **AI 计划中心 → 绑定此计划版本**.
 
 **Windows permission Broker remains a future V1.8 milestone.** This V1.7.3 task foundation does not change that security roadmap.
