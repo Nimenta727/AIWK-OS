@@ -102,6 +102,8 @@ class GuestModelRegistry:
         active=self.root/"aiws-local.gguf"
         if version.is_symlink() or not version.is_file():
             raise ModelArtifactError("Requested version is missing")
+        if _sha256(version) != digest:
+            raise ModelArtifactError("Refuse to activate a corrupted guest model version")
         handle,temp=tempfile.mkstemp(dir=self.root,prefix=".activate-")
         os.close(handle)
         os.unlink(temp)

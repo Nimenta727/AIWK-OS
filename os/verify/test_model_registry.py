@@ -43,6 +43,16 @@ class GuestModelRegistryTests(unittest.TestCase):
         self.assertEqual(next_model["sha256"],second_sha)
         self.assertEqual(self.reg.rollback(self.digest)["sha256"],self.digest)
 
+    def test_corrupted_previous_model_cannot_be_reactivated(self):
+        self.reg.import_guest("model.gguf",self.digest,True)
+        self.weights.write_bytes(b"GGUF"+b"\x02"*2048)
+        latest=hashlib.sha256(self.weights.read_bytes()).hexdigest()
+        self.reg.import_guest("model.gguf",latest,True)
+        (self.root/"models/versions"/(self.digest+".gguf")).write_bytes(b"tampered")
+        with self.assertRaises(ModelArtifactError):
+            self.reg.rollback(self.digest)
+        self.assertEqual(self.reg.verify()["sha256"],latest)
+
     def test_modified_current_model_refuses_verification(self):
         self.reg.import_guest("model.gguf",self.digest,True)
         (self.root/"models/aiws-local.gguf").write_bytes(b"GGUF"+b"x"*2048)
