@@ -709,6 +709,21 @@ try
             && !redacted.Contains("SECRET_TASK_NAME") && !redacted.Contains(planRoot),
             "diagnostic export excludes task names, project paths and raw source content");
     }
+    var oneClickPath=Path.Combine(workspace,"single-action-approval");
+    using(var ctrl=new WorkstationController(oneClickPath))
+    {
+        var work=ctrl.CreateTask("atomic approval task",planRoot,"lean");
+        var stepId=work.Steps[0].Id;
+        var ticket=ctrl.ApproveAndQueueStage(work.Id,stepId,available);
+        Assert(work.Steps[0].ApprovalGranted &&
+            work.Unified.DispatchRequests.Single(x=>x.Id==ticket).State=="queued" &&
+            work.Steps[0].Status==StepStatus.Pending,
+            "atomic operator approval and queue does not launch an Agent");
+        Assert(ThrowsAny(()=>ctrl.ApproveAndQueueStage(work.Id,stepId,available)) &&
+            work.Unified.DispatchRequests.Count(x=>x.State=="queued")==1,
+            "duplicate atomic approval and queue rolls back without extra queued actions");
+        ctrl.CancelQueuedStage(work.Id,ticket);
+    }
     using(var reopened=new WorkstationController(schedulerData))
     {
         var work=reopened.GetTask(scheduledTaskId);
@@ -738,6 +753,21 @@ try
         var diagnostic=reopened.RedactedDiagnosticReport();
         Assert(!diagnostic.Contains("NEW_SECRET_GOAL") && !diagnostic.Contains("SECRET_TASK_NAME"),
             "health export never includes the live user goal or task title");
+    }
+    var oneClickPath=Path.Combine(workspace,"single-action-approval");
+    using(var ctrl=new WorkstationController(oneClickPath))
+    {
+        var work=ctrl.CreateTask("atomic approval task",planRoot,"lean");
+        var stepId=work.Steps[0].Id;
+        var ticket=ctrl.ApproveAndQueueStage(work.Id,stepId,available);
+        Assert(work.Steps[0].ApprovalGranted &&
+            work.Unified.DispatchRequests.Single(x=>x.Id==ticket).State=="queued" &&
+            work.Steps[0].Status==StepStatus.Pending,
+            "atomic operator approval and queue does not launch an Agent");
+        Assert(ThrowsAny(()=>ctrl.ApproveAndQueueStage(work.Id,stepId,available)) &&
+            work.Unified.DispatchRequests.Count(x=>x.State=="queued")==1,
+            "duplicate atomic approval and queue rolls back without extra queued actions");
+        ctrl.CancelQueuedStage(work.Id,ticket);
     }
     using(var reopened=new WorkstationController(schedulerData))
     {

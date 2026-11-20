@@ -151,6 +151,20 @@ public sealed class WorkstationController : IDisposable
         });
     }
 
+    /// <summary>One explicit operator decision: approve and enqueue atomically, but NEVER launch a provider.</summary>
+    public string ApproveAndQueueStage(string taskId,string stepId,IReadOnlyList<ProviderCapability>? providers = null)
+    {
+        string ticket="";
+        Change(taskId,task=>
+        {
+            WorkflowEngine.Approve(task,stepId);
+            ticket=AgentScheduler.Queue(task,stepId,providers ?? ProviderAdapterRegistry.Describe());
+            ExecutionLedger.Append(task,WorkflowEngine.Find(task,stepId),
+                "scheduler.stage.approved-queued",metadata:"single operator action; no CLI invoked");
+        });
+        return ticket;
+    }
+
     public string QueueStage(string taskId,string stepId,IReadOnlyList<ProviderCapability>? providers = null)
     {
         string ticket="";

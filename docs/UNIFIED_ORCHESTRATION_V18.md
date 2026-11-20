@@ -39,6 +39,7 @@ These are **local-only projections**: viewing the page never triggers provider c
 | --- | --- | --- |
 | Compute dispatch state | `scheduler.plan` | Read-only pure local projection |
 | Add to local queue | `scheduler.queue` | Persist fingerprint-only DispatchRequest; no model request |
+| Approve + enqueue in one atomic decision | `scheduler.prepare` | Saves stage approval and local ticket together; never invokes a provider |
 | Cancel ticket | `scheduler.cancel` | Mark pending ticket cancelled; no Git operation |
 | Concurrency policy | `scheduler.parallel` | Save suggested active stage count (1–4) |
 | Local runtime health | `diagnostics.health` | Read-only counts, backup present flag |
@@ -65,3 +66,7 @@ No new subscription/OAuth, arbitrary shell RPC, model API gateway, system elevat
 ## Source ownership
 
 All new scheduler, mission control and diagnostic code is AIWS-owned. Existing adapted T3 Code MIT presentation controls remain attributed at `third_party/t3code/NOTICE.md`; no Kandev AGPL source or upstream provider secrets have been imported.
+
+## UX enhancement: one action per deliberate decision
+
+The mission console combines stage approval with local enqueue as a single transactional `scheduler.prepare` action, then offers a separate **explicitly confirmed** CLI launch directly in the same panel. Approval does not automatically run the model; the external launch still passes the existing prompt budget and native Windows confirmation.

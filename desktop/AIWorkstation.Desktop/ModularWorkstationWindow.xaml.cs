@@ -97,6 +97,7 @@ public partial class ModularWorkstationWindow : Window
             {
                 "state" => Snapshot(),
                 "scheduler.plan" => _controller.SchedulerPlan(ReadField(payload,"taskId")),
+                "scheduler.prepare" => new {ticketId=_controller.ApproveAndQueueStage(ReadField(payload,"taskId"),ReadField(payload,"stepId"))},
                 "scheduler.queue" => new {ticketId=_controller.QueueStage(ReadField(payload,"taskId"),ReadField(payload,"stepId"))},
                 "scheduler.cancel" => CancelDispatch(payload),
                 "scheduler.parallel" => SetSchedulerParallel(payload),
@@ -180,7 +181,7 @@ public partial class ModularWorkstationWindow : Window
         "tasks.create" or "tasks.setPromptBudget" or "tasks.setBrief" or "plans.link" or
         "steps.approve" or "steps.complete" or "steps.retry" or "steps.startManual" or
         "steps.launch" or "steps.switchAgent" or "steps.add" or "steps.dependencies" or
-        "worktrees.create" or "scheduler.queue" or "scheduler.cancel" or "scheduler.parallel" or
+        "worktrees.create" or "scheduler.queue" or "scheduler.prepare" or "scheduler.cancel" or "scheduler.parallel" or
         "diagnostics.export" or "terminal.start" or "terminal.write" or "terminal.resize" or
         "terminal.close" or "tools.openShell";
 

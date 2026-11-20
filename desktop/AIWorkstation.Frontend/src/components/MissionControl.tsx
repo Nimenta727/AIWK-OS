@@ -60,8 +60,10 @@ export function MissionControl({task,action,onOpenStep,onOpenPlans,onOpenProject
       <div className="mission-stage-facts"><span>执行器 <strong>{selectedSlot.agent}</strong></span><span>依赖 <strong>{selectedSlot.dependencyCount}</strong></span><span>本地草稿 <strong>{selectedSlot.approxTokens?`约 ${selectedSlot.approxTokens} Token`:'不适用 / 未知'}</strong></span>
        <span>Git 证据 <strong>{selected.gitBefore?'已有开始检查点':'暂无完整开始证据'}</strong></span></div>
       {selectedSlot.status==='unavailable'&&selectedSlot.recommendedAgent&&<button className="button secondary" disabled={busy} onClick={()=>void execute('steps.switchAgent',{taskId:task.id,stepId:selected.id,agent:selectedSlot.recommendedAgent})}>切换至可用的 {selectedSlot.recommendedAgent==='Codex'?'Codex':'Claude Code'}（撤销原审批）</button>}
-      {selectedSlot.status==='approval'&&<button className="button secondary" disabled={busy} onClick={()=>void execute('steps.approve',{taskId:task.id,stepId:selected.id})}><ShieldCheck size={15}/>阶段审批</button>}
+      {selectedSlot.status==='approval'&&<button className="button secondary" disabled={busy} onClick={()=>void execute('scheduler.prepare',{taskId:task.id,stepId:selected.id})}><ShieldCheck size={15}/>审批并加入调度队列</button>}
       {selectedSlot.canQueue&&<button className="button dark" disabled={busy} onClick={()=>void execute('scheduler.queue',{taskId:task.id,stepId:selected.id})}><CheckCircle2 size={15}/>加入本地调度队列</button>}
+      {selectedSlot.isQueued&&selected.agent!=='Manual'&&<button className="button dark" disabled={busy} onClick={()=>void execute('steps.launch',{taskId:task.id,stepId:selected.id})}><TerminalSquare size={15}/>从总控台确认启动官方 CLI</button>}
+      {selectedSlot.isQueued&&selected.agent==='Manual'&&<button className="button dark" disabled={busy} onClick={()=>void execute('steps.startManual',{taskId:task.id,stepId:selected.id})}><CheckCircle2 size={15}/>开始人工验收阶段</button>}
       {selectedSlot.isQueued&&selectedSlot.ticketId&&<button className="button secondary" disabled={busy} onClick={()=>void execute('scheduler.cancel',{taskId:task.id,ticketId:selectedSlot.ticketId!})}>撤销排队（不影响 Git）</button>}
       <button className="button secondary" onClick={()=>onOpenStep(selected.id)}><TerminalSquare size={15}/>到阶段检查器确认启动或记录结果</button>
     </div>:<div className="project-empty">没有可用阶段。</div>}
