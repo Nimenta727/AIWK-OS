@@ -7,6 +7,7 @@
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
 ## AIWS OS / AI 虚拟机操作系统
+- [AIWS 小模型与本地推理 / Offline local assistant](AIWS_LOCAL_MODEL.md) — guest-only llama.cpp、模型权限、评测与 LoRA 准备
 - [AIWS OS 强制四项验收 / Four priority acceptance gates](AIWS_OS_PRIORITY_GATES.md) — P0 GUI、P0 Linux 统一任务/DAG、P1 NixOS 真正构建与启动、P1 guest-only 权限与恢复
 - [模块化系统重构 / Modular AI-native OS](AIWS_MODULAR_OS.md) — NixOS/Debian 镜像适配、共用 React、系统 Agent 和真实开机验证
 - [代码智能索引 / Cross-platform code intelligence](AIWS_CODE_INTELLIGENCE.md) — C#/Swift 符号、跨文件引用候选、MSBuild/SwiftPM 依赖与平台 API 证据

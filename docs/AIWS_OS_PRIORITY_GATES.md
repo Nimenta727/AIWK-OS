@@ -45,3 +45,13 @@ AI may manage **guest workspace and guest OS kernel sources**, subject to review
 - [ ] Model-free core usability and optional offline model; no network dependency by default
 
 **Do not substitute extra features for these milestones.**
+
+## Latest implementation after priority register (still gated)
+
+- **P0 GUI:** Debian LightDM's experimental offline profile now chooses an AIWS-only Xsession (Openbox is only minimal window management; Chromium launches in kiosk mode). An in-guest ChromeDriver test must visibly click files, inspect content, create/execute a SQLite task and check the disabled model status before reporting PASS. Real QEMU result is a separate acceptance and must be checked.
+- **P0 unified DAG:** os/runtime/aiws_tasks.py now persists guest tasks/stages/dependencies/approvals/audit chain in SQLite, and workbench HTTP/React UI exposes plan creation, explicit stage dispatch and evidence. Windows task model parity, interrupted adapter recovery and complete execution orchestration still need deeper validation.
+- **P1 NixOS:** declared adapter compiles/evaluates; full ISO build and GUI boot remain incomplete. NixOS still uses an XFCE session and has not switched to the new AIWS Shell.
+- **P1 guest permissions:** guest-only VM/marker/mount guards and read-only local model proposal validation implemented; full permission broker/resource limits/rollback not complete.
+- **Local 2B model:** optional guest-only llama.cpp service script, intent proposal API, dataset validation and offline LoRA training recipe committed. Neither pretrained weights nor LoRA adapters are bundled or trained; CPU/VRAM and tool accuracy in a real guest remain unmeasured. No host GPU passthrough.
+
+**Release status remains experimental. Do not mark P0 GUI passed before actual guest UI click evidence.**

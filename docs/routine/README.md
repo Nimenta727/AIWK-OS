@@ -20,3 +20,13 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 00:57 — P0/P1 强制验收清单与挂载检查 / Priority gates](2026-11-21_0057-host-boundary-p0-p1-acceptance.md)
 - [2026-11-21 01:01 — 客户机文件服务与哈希前置条件 / Guest file API](2026-11-21_0101-workbench-guest-file-api.md)
 - [2026-11-21 01:04 — Linux 工作台文件结构浏览 / Guest file UI](2026-11-21_0104-guest-files-visual-ui.md)
+
+- [2026-11-21 01:20 — 客体持久化 DAG 与审计 / Persistent task store](2026-11-21_0120-guest-tasks-dag-persistence.md)
+- [2026-11-21 01:25 — 本地模型结构化建议服务](2026-11-21_0125-local-model-offline-planner-gateway.md)
+- [2026-11-21 01:32 — 模型与 DAG 统一工作台 API](2026-11-21_0132-task-http-local-model-integration.md)
+- [2026-11-21 01:40 — DAG/审批与离线小模型界面](2026-11-21_0140-task-dag-local-model-ui.md)
+- [2026-11-21 01:50 — AIWS 默认系统 Shell 与 GUI 点击测试](2026-11-21_0150-aiws-kiosk-shell-gui-acceptance.md)
+- [2026-11-21 02:00 — 客体离线模型运行器](2026-11-21_0200-local-model-guest-service.md)
+- [2026-11-21 02:05 — 专用模型合成数据与离线评估](2026-11-21_0205-local-model-dataset-evaluation.md)
+- [2026-11-21 02:12 — Guest LoRA 训练配方](2026-11-21_0212-guest-offline-lora-training-recipe.md)
+- [2026-11-21 02:16 — 拒绝主机训练数据读取](2026-11-21_0216-lora-train-guest-data-guard.md)
