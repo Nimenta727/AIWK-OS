@@ -27,3 +27,12 @@
 2. Build a freeform DAG editor and event-based execution history, with a true integrated terminal where supported.
 3. Add isolated Git worktree tasks, permission review and native GUI automation adapters.
 4. Add installer signing and support for safe application updates.
+
+
+---
+
+## 历史归档双语概要 / Historical archival synopsis (added 2026-11-20)
+
+- **中文：** 本记录的历史主题为 **native wpf rebuild**。正文保留当时的变更、测试状态、已知限制和后续计划；这不是对当前版本的重新验收。
+- **English:** This dated record concerns **native wpf rebuild**. Its original changes, verification status, limitations and next steps are preserved; this archival summary is not a new acceptance claim.
+- [历史时间索引 / Historical timeline](README.md) · [当前版本 / Current release](../../README.md)
