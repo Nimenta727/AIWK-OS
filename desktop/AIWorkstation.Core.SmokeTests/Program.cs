@@ -354,5 +354,17 @@ try
 }
 finally
 {
+    // Git for Windows stores object files with the ReadOnly attribute. Remove only that
+    // attribute from test fixture files; otherwise Directory.Delete(recursive:true)
+    // throws UnauthorizedAccessException even when all assertions passed.
+    if (OperatingSystem.IsWindows() && Directory.Exists(workspace))
+    {
+        foreach (var path in Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories))
+        {
+            var attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.ReadOnly) != 0 && (attributes & FileAttributes.ReparsePoint) == 0)
+                File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        }
+    }
     Directory.Delete(workspace, true);
 }
