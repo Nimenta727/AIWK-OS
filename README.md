@@ -28,6 +28,16 @@ AIWS 是自己的 **WPF / .NET 10 Windows 桌面 EXE**，通过 WebView2 承载�
 | Windows 开发环境 | ConPTY 内置 PowerShell、原生 CLI 启动、Git 只读控制台、诊断 | Windows Worktree 不是 OS 沙箱；未完成 Hyper-V 实机安全验收 |
 | 视觉与交互 | AIWS Studio 桌面布局、重复提交/过期请求防护、主导航中英文切换 | 新透视页可双语切换；部分旧专业面板仍是中文 |
 
+### AIWS OS / 独立 AI 原生 Linux 系统（开发中）
+
+项目现在同时包含 Windows WPF 兼容工作台和独立 Linux 客户机操作系统工程。Linux 版复用同一份 React 工作台源码，接入普通用户权限的本地 Agent 工具队列、代码智能引擎、图形桌面和系统服务；不依赖 Windows EXE。
+
+- 系统底座不固定 Debian：Debian live-build 仍是第一套开机验证配方，新增 NixOS 26.05 声明式 ISO 配方。后续可为 mkosi、Fedora bootc 等开发独立 adapter。
+- 已提交 Linux 工作台服务、MCP 工具接口、C#/Swift 代码分析和 React OS 页面；现有 Windows 工作台保留原有运行路径。
+- 真正的 ISO 构建、虚拟机开机、XFCE/LightDM/Chromium/Agent 同时运行，必须以 image-and-boot CI 结果为证。自主模型 Agent、统一任务状态迁移、特权 Broker 和虚拟机隔离验收尚未完成。
+
+工程说明：[AIWS OS 模块化重构](docs/AIWS_MODULAR_OS.md)、[OS 工程](os/README.md)、[镜像与 QEMU 启动验证](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/aiws-os-image-boot.yml)。
+
 ### 安装 / Installation
 
 1. 打开 [GitHub Releases](https://github.com/Nimenta727/Windows-AI-Workstation/releases)，选择最新的 **预发布版** ZIP。若预发布流程尚未完成，请使用 [Windows Actions 构建产物](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/native-desktop.yml)。
@@ -92,6 +102,10 @@ dotnet build desktop\AIWorkstation.Desktop\AIWorkstation.Desktop.csproj --config
 | Context and token budgeting | Provenance-aware handoffs, estimated local budget warnings and duplicate-launch safeguards | Not a hard cap on provider-side usage or billing |
 | Windows tools | ConPTY terminal, Git read-only console and official CLI integration | Not an OS sandbox; Hyper-V ACL and terminal acceptance are pending |
 | UI and accessibility | Studio visual system and browser interaction tests | Primary shell and new observatory support Chinese/English; older specialist screens remain partly Chinese |
+
+### AIWS OS (experimental modular Linux guest)
+
+The repository now contains both the existing Windows WPF workstation and an independent Linux guest OS project. The Linux mode shares the SAME React source tree, backed by an unprivileged guest-local tool controller, MCP and code intelligence. Debian Live is the first boot-test adapter, while NixOS provides a declarative ISO adapter. Actual image/VM acceptance and autonomous Agent/privilege-broker integration are separate, incomplete milestones. See [modular OS design](docs/AIWS_MODULAR_OS.md).
 
 ### Install / Build
 

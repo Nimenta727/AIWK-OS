@@ -9,3 +9,9 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-20 22:26 — C#/Swift 跨平台代码智能索引 / Code intelligence MVP](2026-11-20_2226-code-intelligence-static-index.md)
 - [2026-11-20 22:32 — XAML 类型映射与 XML 安全 / XAML link and XML hardening](2026-11-20_2232-xaml-xml-hardening.md)
 - [2026-11-20 22:36 — CI 28/28 验证与后续计划 / Verified regression and next steps](2026-11-20_2236-code-intelligence-ci-verified.md)
+
+- [2026-11-20 23:01 — Linux 工作台服务 / Guest controller](2026-11-20_2301-os-workbench-controller.md)
+- [2026-11-20 23:08 — 共用 React Linux 模式 / Shared frontend](2026-11-20_2308-react-workbench-linux-mode.md)
+- [2026-11-20 23:17 — Debian GUI 与工作台系统集成](2026-11-20_2317-debian-desktop-workbench-guest-boot.md)
+- [2026-11-20 23:24 — NixOS 声明式系统配方](2026-11-20_2324-nixos-declarative-adapter.md)
+- [2026-11-20 23:29 — 真实 ISO 与 QEMU 启动 CI](2026-11-20_2329-os-real-image-qemu-boot-workflow.md)
