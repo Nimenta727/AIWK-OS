@@ -111,7 +111,7 @@ test('bilingual internal observatory uses local evidence and switches language',
  await mountMock(page);
  await page.getByRole('button',{name:'内部执行透视'}).click();
  await expect(page.getByRole('heading',{name:'内部执行透视'})).toBeVisible();
- await expect(page.getByText('五段执行证据链')).toBeVisible();
+ await expect(page.getByRole('tab',{name:'上下文来源'})).toBeVisible();
  await expect(page.getByText('阶段状态和 CLI 启动不代表远程模型请求；没有结构化官方日志时，真实 Token 用量未知。')).toBeVisible();
  await page.getByRole('tab',{name:'上下文来源'}).click();
  await page.getByRole('tab',{name:'执行事件'}).click();
