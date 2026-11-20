@@ -78,7 +78,7 @@ public static class CallFlowBuilder
         ArgumentNullException.ThrowIfNull(task);
         var lanes = new List<CallFlowLane>();
         var known = task.Steps.Where(x => x.Usage.IsMeasured).ToArray();
-        var duplicateEvents = task.RequestEvents.Count(x => x.Kind is "prompt.reused" or "prompt.duplicate_warning");
+        var duplicateEvents = task.RequestEvents.Count(x => x.Kind == "prompt.reused");
         foreach (var (step, index) in task.Steps.Select((step, index) => (step, index)))
         {
             var stepEvents = task.RequestEvents.Where(e => e.StageId == step.Id).ToArray();

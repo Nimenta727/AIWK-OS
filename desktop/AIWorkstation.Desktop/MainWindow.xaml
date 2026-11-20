@@ -329,6 +329,7 @@
         <!-- RIGHT: inspector -->
         <Border Grid.Column="2" Background="White" BorderBrush="{StaticResource Edge}" BorderThickness="1,0,0,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid>
                 <StackPanel x:Name="StepInspectorPanel" Margin="24,34,24,30">
                     <TextBlock Text="INSPECTOR" Style="{StaticResource SectionLabel}"/>
                     <TextBlock Text="阶段设置" FontFamily="Georgia" FontSize="24" Margin="0,12,0,7"/>
@@ -385,6 +386,7 @@
                     </Border>
                     <Button Content="打开此阶段的工作流设置" Click="TraceToStep_Click" Style="{StaticResource SoftButton}" Margin="0,9,0,0"/>
                 </StackPanel>
+                </Grid>
             </ScrollViewer>
         </Border>
     </Grid>

@@ -228,7 +228,8 @@ public partial class MainWindow : Window
         if (_activeStep.Agent != AgentKind.Manual && AgentTools.Locate(_activeStep.Agent == AgentKind.ClaudeCode ? "claude" : "codex") == null)
             throw new FileNotFoundException("当前 Agent 未安装。请在「Agent 与集成」中查看状态。");
         var plannedDraft = HandoffBuilder.Prepare(_activeTask, _activeStep);
-        if (plannedDraft.Fingerprint == _activeStep.LastPromptFingerprint)
+        if (plannedDraft.Fingerprint == _activeStep.LastPromptFingerprint &&
+            _activeTask.RequestEvents.Any(evt => evt.StageId == _activeStep.Id && evt.Kind == "cli.launched"))
         {
             var repeat = MessageBox.Show("当前交接指令与上次复制的内容相同。\n\n再次启动 Agent 可能产生重复的模型消耗。确定仍要继续吗？",
                 "重复上下文提醒", MessageBoxButton.YesNo, MessageBoxImage.Warning);
