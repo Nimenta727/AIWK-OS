@@ -36,6 +36,7 @@ class WorkbenchTests(unittest.TestCase):
         self.thread.join(timeout=3)
         self.server.server_close()
         self.server.application.pool.shutdown(wait=True, cancel_futures=True)
+        self.server.application.tasks.close()
         self.env.stop()
         self.temp.cleanup()
 
@@ -112,6 +113,34 @@ class WorkbenchTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertEqual(result["status"], "failed", result)
         self.assertEqual((self.root / "Example.cs").read_text(), text)
+
+    def test_persistent_task_dag_and_disabled_offline_model(self):
+        self.assertFalse(self.request("GET", "/api/v1/model/status")[1]["configured"])
+        token = self.request("GET", "/api/v1/session")[1]["csrf"]
+        hdr = {"X-AIWS-CSRF": token}
+        stage = {"key": "inspect", "label": "Inspect guest workspace",
+                 "tool": "workspace.tree", "arguments": {"path": "."}, "dependsOn": []}
+        status, task = self.request("POST", "/api/v1/tasks",
+                                    {"title": "Guest inventory", "goal": "Inspect",
+                                     "stages": [stage]}, hdr)
+        self.assertEqual(status, 202)
+        taskid = task["task"]["id"]
+        self.assertEqual(self.request("GET", "/api/v1/tasks")[1]["tasks"][0]["id"], taskid)
+        self.assertEqual(self.request("POST", "/api/v1/tasks/" + taskid +
+                                      "/stages/inspect/dispatch", {}, hdr)[0], 202)
+        value = None
+        for _ in range(100):
+            _, value = self.request("GET", "/api/v1/tasks/" + taskid)
+            if value["stages"][0]["state"] not in ("queued", "running"):
+                break
+            time.sleep(0.01)
+        self.assertEqual(value["stages"][0]["state"], "completed", value)
+        self.assertGreaterEqual(len(self.request("GET", "/api/v1/tasks/" +
+                                                taskid + "/audit")[1]["events"]), 3)
+        self.assertEqual(self.request("POST", "/api/v1/model/suggest",
+                                      {"instruction": "list guest files"}, hdr)[0], 400)
+        self.assertEqual(self.request("POST", "/api/v1/tasks/" + taskid +
+                                      "/stages/inspect/dispatch", {}, hdr)[0], 400)
 
     def test_async_result(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]

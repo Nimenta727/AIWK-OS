@@ -1,4 +1,4 @@
-"""AIWS OS guest-local read-only workbench service and tool task controller.
+"""AIWS OS guest-local workbench with persistent guest task/DAG control.
 
 An unprivileged single-user prototype; not an autonomous model or privileged broker.
 """
@@ -16,6 +16,8 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 from aiws_toolplane import audit, catalog, invoke
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
+from aiws_tasks import GuestTaskStore, TaskError
+from aiws_local_model import LocalPlanner, LocalModelError
 
 HOST = "127.0.0.1"
 PORT = 17640
@@ -36,17 +38,20 @@ class Controller:
         self.lock = threading.Lock()
         self.records = {}
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aiws-agent")
+        state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        self.tasks = GuestTaskStore(state_home / "aiws")
+        self.model = LocalPlanner()
 
     def health(self):
         return {"system": "AIWS OS", "mode": "linux-guest",
-                "agent": "local-tool-controller", "llmConnected": False,
+                "agent": "persistent-guest-dag", "llmConnected": self.model.status()["online"],
                 "agentPrivileged": False, "guestOnly": True,
                 "workspace": str(self.workspace),
                 "desktopInstalled": bool(shutil.which("xfce4-session")),
                 "displayManagerInstalled": bool(shutil.which("lightdm")),
                 "uiBundled": (self.ui / "index.html").is_file(),
-                "toolCount": len(EXPOSED),
-                "note": "No autonomous LLM inference, privileged broker or host VM access."}
+                "toolCount": len(EXPOSED), "tasksPersistent": True,
+                "note": "Optional offline LLM makes suggestions only; no guest privilege broker or host VM access."}
 
     def recent(self):
         with self.lock:
@@ -99,6 +104,37 @@ class Controller:
             self.records[identifier].update(
                 status=status, error=error, result=result, finishedAt=int(time.time()))
 
+
+    def create_plan(self, payload):
+        if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
+            raise TaskError("Expected title, goal and stages")
+        # Schema and guest-tool restrictions are independently revalidated
+        # when the stage executes. Model text never becomes a command.
+        return self.tasks.create(payload["title"], payload["goal"], payload["stages"])
+
+    def dispatch_stage(self, task_id, stage_key):
+        action = self.tasks.dispatch(task_id, stage_key)
+        self.pool.submit(self._run_stage, action)
+        return self.tasks.get(task_id)
+
+    def _run_stage(self, action):
+        taskid, key = action["task_id"], action["stage_key"]
+        try:
+            self.tasks.started(taskid, key)
+            tool, args = action["tool"], action["arguments"]
+            result = invoke(tool, args)
+            encoded = json.dumps(result, ensure_ascii=False)
+            if len(encoded) > 65536:
+                result = {"truncated": True, "preview": encoded[:32000]}
+            self.tasks.finished(taskid, key, result=result)
+            audit(tool, args, True)
+        except Exception as exc:
+            try:
+                self.tasks.finished(taskid, key, error=str(exc)[:240])
+            except TaskError:
+                pass
+            audit(action["tool"], action["arguments"], False)
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AIWS-Guest/0.2"
 
@@ -148,6 +184,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, result)
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/tasks":
+            return self.reply(200, {"tasks": app.tasks.list()})
+        if path.startswith("/api/v1/tasks/"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4:
+                try:
+                    return self.reply(200, app.tasks.get(parts[3]))
+                except TaskError as exc:
+                    return self.reply(404, {"error": str(exc)})
+            if len(parts) == 5 and parts[4] == "audit":
+                try:
+                    return self.reply(200, {"events": app.tasks.audit(parts[3])})
+                except TaskError as exc:
+                    return self.reply(404, {"error": str(exc)})
+        if path == "/api/v1/model/status":
+            return self.reply(200, app.model.status())
         if path == "/api/v1/health":
             return self.reply(200, app.health())
         if path == "/api/v1/session":
@@ -186,7 +238,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.check_host():
             return self.reply(403, {"error": "Invalid host"})
-        if urlsplit(self.path).path != "/api/v1/jobs":
+        path = urlsplit(self.path).path
+        route = path.strip("/").split("/")
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest") and not (
+                len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
+                and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
         origin = self.headers.get("Origin")
         expected = "http://" + HOST + ":" + str(self.server.server_port)
@@ -204,9 +260,27 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(413, {"error": "Request too large or empty"})
         try:
             payload = json.loads(self.rfile.read(length))
-            if not isinstance(payload, dict) or set(payload) != {"tool", "arguments"}:
-                raise ValueError("Expected tool and arguments")
-            result = self.server.application.submit(payload["tool"], payload["arguments"])
+            if not isinstance(payload, dict):
+                raise ValueError("Expected JSON object")
+            app = self.server.application
+            if path == "/api/v1/jobs":
+                if set(payload) != {"tool", "arguments"}:
+                    raise ValueError("Expected tool and arguments")
+                result = app.submit(payload["tool"], payload["arguments"])
+            elif path == "/api/v1/tasks":
+                result = app.create_plan(payload)
+            elif path == "/api/v1/model/suggest":
+                if set(payload) != {"instruction"}:
+                    raise ValueError("Expected instruction")
+                result = app.model.suggest(payload["instruction"])
+            elif route[6] == "approve":
+                if payload:
+                    raise ValueError("No arguments allowed for approval")
+                result = app.tasks.approve(route[3], route[5])
+            else:
+                if payload:
+                    raise ValueError("No arguments allowed for dispatch")
+                result = app.dispatch_stage(route[3], route[5])
         except (ValueError, KeyError, TypeError) as exc:
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)
@@ -250,6 +324,7 @@ def main():
     finally:
         server.server_close()
         server.application.pool.shutdown(wait=True, cancel_futures=True)
+        server.application.tasks.close()
 
 if __name__ == "__main__":
     main()
