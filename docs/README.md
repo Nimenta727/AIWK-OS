@@ -6,6 +6,10 @@
 >
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
+## AIWS OS / AI 虚拟机操作系统
+- [OS 工程 / OS project](../os/README.md) — Debian Live 镜像、内置开发工具和宿主离线启动 / image build, bundled developer tools, offline-first host launch
+- [OS 深度定制蓝图 / OS kernel & isolation blueprint](AIWS_OS_BLUEPRINT.md) — 内核选项、Agent 管理员权限、虚拟机外部安全边界 / kernel profile, privileged agents, external VM boundaries
+
 ## 当前版本 / Current release
 - [主 README / Main README](../README.md) — 双语安装、使用和安全说明 / bilingual installation, usage and safety
 - [发行说明 / Release notes](RELEASE_NOTES_V19.md) — 当前预览内容 / preview changes

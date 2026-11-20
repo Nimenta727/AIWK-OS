@@ -1,0 +1,27 @@
+name: AIWS OS static contract
+on:
+  push:
+    paths:
+      - 'os/**'
+      - 'docs/AIWS_OS_BLUEPRINT.md'
+      - '.github/workflows/aiws-os-static.yml'
+  pull_request:
+    paths:
+      - 'os/**'
+      - 'docs/AIWS_OS_BLUEPRINT.md'
+      - '.github/workflows/aiws-os-static.yml'
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          bash -n os/debian/build.sh
+          bash -n os/host/run-qemu-offline.sh
+          bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-system-status
+          bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-admin-session
+      - name: Static OS security contracts
+        run: python3 -m unittest discover -s os/verify -p 'test_*.py' -v

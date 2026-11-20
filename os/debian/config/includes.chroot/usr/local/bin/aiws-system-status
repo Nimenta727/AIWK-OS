@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Guest diagnostic only. No network calls, no privileged mutations, no host introspection guarantees.
+set -euo pipefail
+printf '%s\n' 'AIWS OS | Guest system status (not host security attestation)' '--------------------------------------------------------'
+printf 'Kernel: '
+uname -sr
+printf 'Virtualization: '
+if command -v systemd-detect-virt >/dev/null; then systemd-detect-virt --vm || true; else echo 'unknown'; fi
+printf 'Guest UID: %s (root only after interactive sudo)\n' "$(id -u)"
+printf 'Memory: '
+if [[ -r /proc/meminfo ]]; then grep -m 1 '^MemTotal:' /proc/meminfo; else echo 'unavailable'; fi
+printf '\n%s\n' 'Bundled development tools:'
+for name in firefox-esr geany git python3 node npm javac rustc cargo go cc clang cmake gdb; do
+  if command -v "$name" >/dev/null 2>&1; then printf '  + %-12s %s\n' "$name" "$(command -v "$name")"
+  else printf '  - %-12s missing\n' "$name"; fi
+done
+printf '\n%s\n' 'Guest kernel policy:'
+for key in kernel.kptr_restrict kernel.dmesg_restrict kernel.perf_event_paranoid fs.inotify.max_user_watches; do
+  printf '  %-35s %s\n' "$key" "$(sysctl -n "$key" 2>/dev/null || echo unavailable)"
+done
+printf '\n%s\n' 'Host isolation is NOT verifiable from this guest. Check hypervisor, host ACLs, networking and file sharing independently.'

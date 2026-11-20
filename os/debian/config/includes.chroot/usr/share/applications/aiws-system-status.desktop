@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AIWS Guest Status
+Name[zh_CN]=AIWS 客户机系统状态
+Comment=Local OS diagnostics (not an isolation attestation)
+Exec=/usr/local/bin/aiws-system-status
+Terminal=true
+Icon=utilities-system-monitor
+Categories=System;Development;

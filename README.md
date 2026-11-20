@@ -107,6 +107,17 @@ AIWS keeps prompts, task records and project files local unless the user explici
 
 Read the [documentation index](docs/README.md), [security guide](docs/SECURITY.md), [versioned release notes](docs/RELEASE_NOTES_V19.md), and [dated bilingual archival log index](docs/routine/README.md).
 
+
+## AIWS OS · 独立 AI 虚拟机操作系统 / Standalone AI guest OS (early bootstrap)
+
+> **区别于 Windows 桌面应用：** `os/` 是新建的 Debian 13 Live ISO 构建工程，不是 Windows WPF 的换皮版本。当前已提交镜像构建配置、预装图形开发工具、客户机内核/安全基线、离线优先的 KVM 启动脚本及静态验证；**尚未发布已验证可启动的 ISO，也尚未将原 WPF Agent 核心移植为 Linux 守护进程。**
+>
+> **Distinct product:** `os/` bootstraps a standalone Debian-based AI guest OS. It does not claim a tested boot image, a patched kernel, or a Linux port of the existing .NET/WPF agent host.
+
+[OS 工程与构建 / OS build](os/README.md) · [内核和隔离设计 / Kernel & isolation](docs/AIWS_OS_BLUEPRINT.md) · [变更记录 / Routine](docs/routine/2026-11-20_2130-aiws-os-guest-bootstrap.md)
+
+**权限模型 / Privilege model:** AI 可以在可丢弃的客户机中获得完整管理员操作能力，但宿主机磁盘、虚拟化控制接口、共享设备与凭据不属于客户机权限域。root 并不能替代虚拟机管理器的隔离；首次构建与 Hyper-V/KVM 实机安全验证尚待完成。
+
 ---
 
 **Status / 状态**：v1.9.0-preview.1 is a **preview**. Windows CI and release artifacts are tracked separately from real Hyper-V GUI and permission testing. The latter remains pending. This README describes supported behavior, not inaccessible provider internals.

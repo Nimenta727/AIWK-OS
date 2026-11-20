@@ -1,0 +1,49 @@
+# AIWS OS — independent AI virtual-machine operating system / 独立 AI 虚拟机操作系统
+
+**Stage / 阶段:** P0 build scaffold; NOT a tested or released operating system. The Windows WPF workstation remains a separate compatibility application.
+
+## 中文
+
+产品目标是可独立引导、深度定制的 **Linux Guest OS**。其桌面、浏览器、IDE、终端、Agent 编排、诊断与内核策略在系统镜像内组成统一环境，而不是在 Windows 桌面应用上再叠一个虚拟机 UI。
+
+首批工程以 **Debian 13 (trixie) amd64 + live-build + XFCE4** 为可复现基础：
+- `os/debian/build.sh`：使用 Debian live-build 从包仓库构建 ISO-hybrid Live 镜像。
+- `os/debian/config/package-lists/`：Firefox ESR、Geany、终端、Git、Python、Node.js、Java、Rust、Go、C/C++、调试和构建工具，来自 Debian 分发包；不引入未经授权的闭源二进制。
+- `os/debian/config/includes.chroot/etc/sysctl.d/`：客户机内核运行时安全/开发工具配置。客户机 root **可修改这些设置**，它们不是宿主机安全边界。
+- `aiws-system-status`：在客户机终端查看内核/虚拟化识别、编译工具和环境状态；不会自动启动或伪装已存在的 Agent。
+- `aiws-admin-session`：只能在客户机交互式终端确认后调用 sudo；提供完整客户机系统管理会话，无网页远程提权接口。
+- `os/host/run-qemu-offline.sh`：Linux KVM 宿主机离线启动实验用 ISO；默认**无网络、无共享目录、无主机设备直通**，拒绝以宿主机 root 运行。
+- `os/kernel/aiws-kernel.fragment`：未来专用内核包的目标选项，**还没有重编译或替换 Debian 内核**。
+- `os/verify/test_config.py`：静态安全契约和配置回归；不代替启动测试或逃逸攻防验证。
+
+### 构建
+
+在 **Debian 13 amd64** 构建机/CI 容器内（需真实网络获取 Debian 软件包和 root/chroot 权限）：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
+sudo ./os/debian/build.sh
+```
+
+输出是 `out/aiws-os/live-image-amd64.hybrid.iso`（以及 `.sha256`）。构建目录必须是新目录；脚本不会清除已有构建/用户工作区。**目前没有声称执行过此构建。**
+
+Linux KVM 宿主（普通账号拥有 /dev/kvm 访问权限）：
+
+```bash
+./os/host/run-qemu-offline.sh out/aiws-os/live-image-amd64.hybrid.iso
+```
+
+默认 ISO 只读，不接入现有宿主磁盘。断电将丢失 Live 会话更改。首次构建后应检查 UEFI/BIOS、声卡/显示/输入、中文 IME、内存、DNS、防火墙与隔离功能，收集完整记录。
+
+### 权限和许可证
+
+客户机可运行 root，但**不允许**把宿主 root、Hyper-V/KVM 管理 API、宿主文件夹或其他账户凭据交给客户机。浏览器永不获得宿主桥接权限。联网模式与可持久化虚拟磁盘需另行设计宿主侧访问控制及显式授权。不可把“已经配置客户机 sysctl”当成已隔离的证据。
+
+本阶段仅组合 Debian 官方源软件包，**没有**在 Git 仓库复制 Linux 内核、Firefox、IDE 或语言运行时。未来分发生成的 ISO 时必须随发行物提供相关 GPL/LGPL/MPL/Apache/BSD/MIT 许可证与源码提供义务；仓库根目录当前仍为 MIT，用户要求迁移 Apache-2.0 的事项需逐文件/贡献者确认，不能擅自为第三方代码改授权。
+
+## English
+
+This is a **standalone, bootable AI guest operating system project**, not a WPF theme. Phase P0 provides a Debian 13 Live image recipe, GUI browser/IDE/developer tools, guest-only system configuration, an interactive guest administrator entrypoint, and offline-by-default KVM test launcher. The existing Windows WebView2 bridge and Agent host have **not** yet been ported to Linux; packaging a full AIWS session and a reviewed guest execution broker are subsequent milestones. The kernel fragment is a *design target*, not a compiled custom kernel.
+
+Build with Debian 13 as above; validate with `python3 -m unittest discover -s os/verify`. See [kernel/isolation design](../docs/AIWS_OS_BLUEPRINT.md) and [routine log](../docs/routine/2026-11-20_2130-aiws-os-guest-bootstrap.md). Host-side security policy, VM escape testing, and actual ISO boot validation remain open requirements.

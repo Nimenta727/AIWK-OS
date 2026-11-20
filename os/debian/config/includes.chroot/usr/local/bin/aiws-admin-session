@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Explicit interactive guest-only administrator session. Never an HTTP or agent API.
+set -Eeuo pipefail
+if [[ ! -t 0 || ! -t 1 ]]; then
+  echo 'Interactive guest terminal required; remote/UI calls are not accepted.' >&2
+  exit 1
+fi
+if [[ "${EUID}" -eq 0 ]]; then
+  echo 'Already guest root. Avoid opening another nested shell.' >&2
+  exit 1
+fi
+if ! command -v systemd-detect-virt >/dev/null || ! systemd-detect-virt --vm --quiet; then
+  echo 'ERROR: cannot verify a virtual-machine guest; refusing privileged session.' >&2
+  exit 1
+fi
+printf '%s\n' 'This opens a FULL ROOT shell in the GUEST only.' \
+  'All guest data/security policy can be changed or destroyed.' \
+  'The VM MUST have no host folder/device/credential sharing.'
+read -r -p 'Type GUEST-ROOT to continue: ' response
+if [[ "$response" != 'GUEST-ROOT' ]]; then echo 'Cancelled.'; exit 1; fi
+exec sudo -i

@@ -1,0 +1,23 @@
+# AIWS OS custom-kernel DESIGN FRAGMENT (not yet compiled, merged or shipped).
+# Merge against a pinned, supported Debian kernel config via scripts/config + olddefconfig,
+# then package as a Debian .deb; run diffconfig and boot/rollback/security tests.
+# Preserve kernel GPL-2.0-only and corresponding-source obligations.
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_VIRTIO_NET=y
+CONFIG_VIRTIO_CONSOLE=y
+CONFIG_VIRTIO_RNG=y
+CONFIG_DRM_VIRTIO_GPU=m
+CONFIG_CGROUPS=y
+CONFIG_CGROUP_BPF=y
+CONFIG_NAMESPACES=y
+CONFIG_OVERLAY_FS=m
+CONFIG_SECURITY_APPARMOR=y
+CONFIG_SECURITY_LANDLOCK=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_AUDIT=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_BPF_JIT=y
+CONFIG_KVM_GUEST=y
