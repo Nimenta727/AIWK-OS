@@ -114,7 +114,7 @@ Read the [documentation index](docs/README.md), [security guide](docs/SECURITY.m
 >
 > **Distinct product:** `os/` bootstraps a standalone Debian-based AI guest OS. It does not claim a tested boot image, a patched kernel, or a Linux port of the existing .NET/WPF agent host.
 
-[AI 原生工具层 / Agent tool fabric](docs/AIWS_AGENT_TOOL_FABRIC.md) · [OS 工程与构建 / OS build](os/README.md) · [内核和隔离设计 / Kernel & isolation](docs/AIWS_OS_BLUEPRINT.md) · [变更记录 / Routine](docs/routine/2026-11-20_2130-aiws-os-guest-bootstrap.md)
+[Windows/macOS 源码编写 / Cross-platform authoring](docs/AIWS_CROSS_PLATFORM_AUTHORING.md) · [AI 原生工具层 / Agent tool fabric](docs/AIWS_AGENT_TOOL_FABRIC.md) · [OS 工程与构建 / OS build](os/README.md) · [内核和隔离设计 / Kernel & isolation](docs/AIWS_OS_BLUEPRINT.md) · [变更记录 / Routine](docs/routine/2026-11-20_2130-aiws-os-guest-bootstrap.md)
 
 **权限模型 / Privilege model:** AI 可以在可丢弃的客户机中获得完整管理员操作能力，但宿主机磁盘、虚拟化控制接口、共享设备与凭据不属于客户机权限域。root 并不能替代虚拟机管理器的隔离；首次构建与 Hyper-V/KVM 实机安全验证尚待完成。
 

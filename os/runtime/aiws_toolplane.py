@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from aiws_crossplatform import inspect_project, scaffold_project
 import time
 from urllib.parse import urlsplit
 
@@ -25,6 +26,8 @@ TOOL_SPECS = [
     ("runtime.test", "Execute a fixed language test command in the guest workspace; opt-in", {"language": "string"}),
     ("browser.local_text", "Extract text from an HTML document in the workspace", {"path": "string"}),
     ("browser.snapshot", "Headless Chromium DOM-text snapshot; disabled until exact origins are configured", {"url": "string"}),
+    ("platform.inspect", "Recognize Windows/macOS/Swift project sources without building", {"path": "string"}),
+    ("project.scaffold", "Create Windows WPF or macOS SwiftUI source template (opt-in; never overwrite)", {"name": "string", "template": "string"}),
 ]
 
 def catalog():
@@ -32,7 +35,7 @@ def catalog():
     for name, description, fields in TOOL_SPECS:
         properties = {key: {"type": value} for key, value in fields.items()}
         required = (["query"] if name == "code.search" else
-                    list(fields) if name in {"file.read", "file.replace", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
+                    list(fields) if name in {"file.read", "file.replace", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -288,7 +291,7 @@ def invoke(name, arguments):
         return _git(root, arguments)
     if name == "runtime.detect":
         return {"tools": {p: shutil.which(p) for p in
-                ("python3", "node", "npm", "javac", "rustc", "cargo", "go",
+                ("python3", "node", "npm", "dotnet", "swift", "sourcekit-lsp", "xcodegen", "javac", "rustc", "cargo", "go",
                  "cc", "clang", "cmake", "mvn", "git", "chromium", "chromedriver")}}
     if name == "runtime.test":
         return _runtime(root, arguments)
@@ -296,6 +299,10 @@ def invoke(name, arguments):
         return {"path": arguments["path"], "text": _extract(_text_file(_path(root, arguments["path"])))}
     if name == "browser.snapshot":
         return _browser(root, arguments)
+    if name == "platform.inspect":
+        return inspect_project(root, arguments.get("path", "."), _path)
+    if name == "project.scaffold":
+        return scaffold_project(root, arguments)
     raise AssertionError("Unreachable tool dispatch")
 
 def audit(name, arguments, ok):

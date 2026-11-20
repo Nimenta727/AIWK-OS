@@ -20,6 +20,10 @@
 
 本轮追加 [AIWS Tool Fabric](../docs/AIWS_AGENT_TOOL_FABRIC.md)：构建时安装客户机本地实验性 MCP stdio 工具端点 aiws-toolctl，支持限定工作区的代码、文件、Git、测试和受限制的无头 Chromium DOM 快照。真正的 Linux Agent 控制器与特权 Broker 尚未完成。
 
+### Windows/macOS 源码工程
+
+[跨平台源码生成 / Cross-platform source authoring](../docs/AIWS_CROSS_PLATFORM_AUTHORING.md)：内置 MCP 的 platform.inspect/project.scaffold，可从 Linux 客户机识别/创建 Windows WPF、macOS SwiftUI 源码工程；不代表可以在 Linux 运行原生 Windows/macOS 应用。
+
 ### 构建
 
 在 **Debian 13 amd64** 构建机/CI 容器内（需真实网络获取 Debian 软件包和 root/chroot 权限）：
