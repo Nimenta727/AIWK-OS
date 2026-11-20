@@ -117,6 +117,9 @@ try
         "stage change reporting never attributes edits to model or invents missing evidence");
     Assert(ProjectWorkspaceService.ParseCommitPaths("M\0src/a.cs\0R100\0old.cs\0new.cs\0").SequenceEqual(["src/a.cs", "new.cs"]),
         "committed-file parser handles NUL output including renamed paths");
+    Assert(ProjectWorkspaceService.ParseCommitRenames("R100\0old/src.cs\0new/src.cs\0M\0README.md\0").Single()
+        == new ProjectWorkspaceService.ObservedRename("old/src.cs", "new/src.cs"),
+        "explicit Git rename edges are parsed without path similarity guesses");
     if (AgentTools.Locate("git") is not null)
     {
         var repoDir = Path.Combine(workspace, "git-observation");
@@ -165,6 +168,70 @@ try
         Assert(committedReport.HeadChanged && committedReport.CommittedFiles.Contains("hello.cs")
             && committedReport.CommittedFiles.Contains("added.ts"),
             "committed paths are visible even after working tree becomes clean");
+        // V1.7: structural directory changes are captured, compared and attributed to stage evidence only.
+        Assert(clean.TreeCaptured && clean.Tree.Any(x => x.Path == "hello.cs" && !x.IsDirectory),
+            "V1.7 baseline captures path inventory without source bodies");
+        var worktask = WorkflowTemplates.DualAgent("structure test", repoDir);
+        var examinedStage = worktask.Steps[0];
+        examinedStage.GitBefore = clean;
+        examinedStage.GitAfter = committed;
+        var committedStructure = WorkspaceEvolutionService.InspectStageAsync(worktask, examinedStage).GetAwaiter().GetResult();
+        Assert(committedStructure.HasBefore && committedStructure.HasAfter && !committedStructure.Partial
+            && committedStructure.Entries.Any(x => x.Path == "added.ts" && x.Change == "added")
+            && committedStructure.Entries.Any(x => x.Path == "hello.cs" && x.Change == "modified"),
+            "committed Git changes remain visible in structural atlas after clean HEAD");
+        var historyPatch = GitWorkspaceService.InspectHistoricalFileAsync(repoDir, clean.Head, committed.Head, "hello.cs")
+            .GetAwaiter().GetResult();
+        Assert(historyPatch.Output.Contains("+class A { int count") && historyPatch.ExitCode == 0,
+            "committed file changes offer real read-only historical diff");
+        var module = Path.Combine(repoDir, "src", "engine");
+        Directory.CreateDirectory(module);
+        File.WriteAllText(Path.Combine(module, "legacy.cs"), "class Old {}\n");
+        Git(repoDir, "add", ".");
+        Git(repoDir, "commit", "-q", "-m", "initialize engine module");
+        var beforeStructure = ProjectWorkspaceService.CaptureAsync(repoDir).GetAwaiter().GetResult();
+        File.Delete(Path.Combine(module, "legacy.cs"));
+        Directory.Delete(module);
+        var newModule = Path.Combine(repoDir, "src", "agents");
+        Directory.CreateDirectory(newModule);
+        File.WriteAllText(Path.Combine(newModule, "agent.cs"), "class Agent {}\n");
+        var afterStructure = ProjectWorkspaceService.CaptureAsync(repoDir).GetAwaiter().GetResult();
+        examinedStage.GitBefore = beforeStructure;
+        examinedStage.GitAfter = afterStructure;
+        var structure = WorkspaceEvolutionService.InspectStageAsync(worktask, examinedStage).GetAwaiter().GetResult();
+        Assert(structure.Added == 1 && structure.Removed == 1 && structure.ChangedDirectories >= 2,
+            "atlas detects module directory additions and deletions independently of Git file changes");
+        Assert(structure.Entries.Any(x => x.Path == "src/agents/agent.cs" && x.Change == "added")
+            && structure.Entries.Any(x => x.Path == "src/engine/legacy.cs" && x.Change == "removed"),
+            "atlas file evidence supports expanding the before/after folder tree");
+        var linked = WorkspaceEvolutionService.FindRelatedStagesAsync(worktask,"src/agents/agent.cs").GetAwaiter().GetResult();
+        Assert(linked.Stages.Count == 1 && linked.Stages[0].StageId == examinedStage.Id,
+            "clicking a changed file locates its observed stage without claiming model authorship");
+        Assert(ThrowsAny(() => WorkspaceEvolutionService.FindRelatedStagesAsync(worktask, "../secret").GetAwaiter().GetResult()),
+            "reverse stage lookup rejects traversal");
+        var incomplete = new ProjectWorkspaceService.GitCheckpoint { Head = beforeStructure.Head };
+        var partialStart = new ProjectWorkspaceService.GitCheckpoint { Head = beforeStructure.Head,
+            TreeCaptured = true, TreePartial = true, Tree = [new("src", true)], Partial = true };
+        var partialTree = WorkspaceEvolutionService.Compare(worktask, examinedStage, partialStart, afterStructure,
+            ProjectWorkspaceService.Compare(examinedStage.Id, examinedStage.Title, partialStart, afterStructure));
+        Assert(partialTree.Partial && partialTree.Entries.Any(x => x.Path == "src/agents/agent.cs" && x.Change == "unknown"),
+            "truncated baseline cannot invent newly added files");
+        var legacyStructure = WorkspaceEvolutionService.Compare(worktask, examinedStage, incomplete, afterStructure,
+            ProjectWorkspaceService.Compare(examinedStage.Id, examinedStage.Title, incomplete, afterStructure));
+        Assert(legacyStructure.Partial && !legacyStructure.HasBefore
+            && legacyStructure.Entries.All(x => x.Change == "unknown"),
+            "legacy checkpoints never fabricate added paths or a complete structural diff");
+        repository.Save([worktask]);
+        Assert(repository.Load()[0].Steps[0].GitAfter?.TreeCaptured == true,
+            "new path inventory persists and is compatible with task JSON storage");
+        var previewEvidence = ContextInspector.Preview(worktask, examinedStage);
+        Assert(previewEvidence.Text.Contains("本阶段目标") && previewEvidence.ApproxTokens > 0
+            && previewEvidence.Parts.Any(x => x.Kind == "instructions")
+            && previewEvidence.Notice.Contains("本地"),
+            "local context inspector exposes only known handoff text and estimated usage");
+        Assert(ThrowsAny(() => GitWorkspaceService.InspectHistoricalFileAsync(repoDir,
+            beforeStructure.Head, afterStructure.Head, "../escape.cs").GetAwaiter().GetResult()),
+            "historical file diff blocks unsafe path");
         var changes = ProjectWorkspaceService.Compare("one", "stage", clean, changed);
         Assert(changes.Files.Count == 2 && !changes.Partial,
             "live stage comparison distinguishes two observed workspace changes");

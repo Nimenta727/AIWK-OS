@@ -1,4 +1,14 @@
-**V1.3–V1.6 首轮模块集成已完成 Windows CI 构建验证（2026-11-20）。** 包含 Git Worktree 隔离、ConPTY 内置终端、事件账本和可编辑 DAG；[Windows EXE 构建 #44696677670](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677670) 与 [回归测试 #44696677697](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44696677697) 均通过。**尚未完成 Hyper-V 实机 GUI 验收、自动多模型无人值守交接、逐 hunk 变更应用审批。** [范围与限制详见实施说明](docs/IMPLEMENTATION_V13_V16.md) 和 [路线图](docs/ROADMAP.md)。
+# AIWS V1.7 — AI 调用与项目结构双向可视化 / Execution Atlas
+
+**新增默认页面：AI 调用与结构。** 左侧展开任务、阶段、上下文和导入的模型/工具事件；右侧对比阶段修改前后的项目目录结构，点文件可看 Git Diff，并从文件反查关联阶段。读取本地文件与 Git 不会额外调用模型。查看本地交接草稿需要用户明确点击。
+
+- [V1.7 功能、真实证据边界、兼容性和验收](docs/EXECUTION_ATLAS_V17.md)
+- [V1.3–V2.0 路线图](docs/ROADMAP.md) · [每次修改的记录与下一步](docs/routine/)
+- **不能把阶段和 CLI 启动画成已发生的远程模型请求**：只有官方结构化日志导入后才显示相应 Token；没有数据就显示“未知”。Git 结构变化是两次快照的观察结果，不能直接证明文件作者。
+- 旧版任务只有 Git 状态而没有 V1.7 的目录结构检查点时，保持“证据不足”；新阶段开始/完成后才可建立结构前后对比。
+- 本项目发布的是 Windows 自包含 EXE + 相邻 `ui-dist/` 文件；Windows CI 和真实 Hyper-V GUI 测试是不同的验收门槛。
+
+---
 
 # AIWS V1.3–V1.6 — Worktree · Windows ConPTY · Execution Ledger · Multi-Agent DAG
 

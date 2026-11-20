@@ -59,6 +59,11 @@ public sealed class TaskRepository
                         throw new InvalidDataException("任务库含有缺失或重复的阶段标识，已拒绝加载。");
                     if ((step.GitBefore?.Files?.Count ?? 0) > 800 || (step.GitAfter?.Files?.Count ?? 0) > 800)
                         throw new InvalidDataException("Git 检查点条目超过安全上限。");
+                    if ((step.GitBefore?.Tree?.Count ?? 0) > 2500 || (step.GitAfter?.Tree?.Count ?? 0) > 2500)
+                        throw new InvalidDataException("结构检查点条目超过 2500 的采集上限。");
+                    if ((step.GitBefore?.Tree?.Any(x => x is null || !ProjectWorkspaceService.IsSafeRelativePath(x.Path)) ?? false)
+                        || (step.GitAfter?.Tree?.Any(x => x is null || !ProjectWorkspaceService.IsSafeRelativePath(x.Path)) ?? false))
+                        throw new InvalidDataException("结构检查点包含无效相对路径。");
                     if (step.DependsOn is null || step.RunId is null || step.WorktreePath is null)
                         throw new InvalidDataException("阶段新字段无效。");
                     if (!Enum.IsDefined(step.Agent) || !Enum.IsDefined(step.Status))

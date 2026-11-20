@@ -54,7 +54,22 @@ public static class GitWorkspaceService
         if (!IsHash(fromHead) || !IsHash(toHead))
             throw new ArgumentException("提交标识格式不合法。");
         return ExecuteAsync(workspace, "commit.files",
-            ["diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", fromHead, toHead, "--", "."], cancellationToken);
+            ["diff", "--no-ext-diff", "--no-textconv", "--find-renames=50%", "--name-status", "-z", fromHead, toHead, "--", "."], cancellationToken);
+    }
+
+    public static Task<Inspection> InspectHistoricalFileAsync(string workspace, string fromHead, string toHead,
+        string relative, CancellationToken cancellationToken = default)
+    {
+        ProjectWorkspaceService.RequireSafeFile(workspace, relative);
+        if (ProjectWorkspaceService.IsSensitiveName(relative))
+            throw new InvalidOperationException("敏感路径不展示已提交代码内容。");
+        static bool IsHash(string hash) => hash.Length is 40 or 64
+            && hash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+        if (!IsHash(fromHead) || !IsHash(toHead))
+            throw new ArgumentException("必须提供已核验的完整提交 SHA。");
+        return ExecuteAsync(workspace, "file.commit.diff",
+            ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3",
+             fromHead, toHead, "--", relative], cancellationToken);
     }
 
     private static async Task<Inspection> ExecuteAsync(string workspace, string view, IEnumerable<string> arguments, CancellationToken cancellationToken)

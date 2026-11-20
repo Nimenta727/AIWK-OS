@@ -14,18 +14,27 @@ public static class ProjectWorkspaceService
         IReadOnlyList<ProjectFile> Files, int ChangedCount, bool Truncated, IReadOnlyList<string> Notices);
     public sealed record FileReview(string Path, string Status, string Diff, bool Truncated, bool IsPreview, string Note);
     public sealed record GitObservedFile(string Path, string Status, string Signature);
+    public sealed record StructurePath(string Path, bool IsDirectory);
     public sealed class GitCheckpoint
     {
         public DateTimeOffset CapturedAt { get; set; } = DateTimeOffset.UtcNow;
         public string Head { get; set; } = "";
         public List<GitObservedFile> Files { get; set; } = [];
+        // V1.7: metadata-only path inventory; false on legacy V1.2/V1.6 JSON.
+        public List<StructurePath> Tree { get; set; } = [];
+        public bool TreeCaptured { get; set; }
+        public bool TreePartial { get; set; }
         public bool Partial { get; set; }
         public string Problem { get; set; } = "";
     }
     public sealed record ObservedChange(string Path, string Kind, string Before, string After);
+    public sealed record ObservedRename(string FromPath, string ToPath);
     public sealed record StageChangeReport(string StageId, string StageTitle, string FromHead, string ToHead,
         bool HeadChanged, IReadOnlyList<ObservedChange> Files, IReadOnlyList<string> CommittedFiles, bool Partial, string Notice,
-        DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt);
+        DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt)
+    {
+        public IReadOnlyList<ObservedRename> RenamedFiles { get; init; } = [];
+    }
 
     private const int MaxNodes = 2500;
     private const int MaxDepth = 10;
@@ -76,7 +85,7 @@ public static class ProjectWorkspaceService
                     continue;
                 }
                 var directory = attr.HasFlag(FileAttributes.Directory);
-                if (directory && SkippedDirectories.Contains(name)) continue;
+                if (name.Equals(".git", StringComparison.OrdinalIgnoreCase) || directory && SkippedDirectories.Contains(name)) continue;
                 var link = attr.HasFlag(FileAttributes.ReparsePoint);
                 var relative = Path.GetRelativePath(root, child).Replace('\\', '/');
                 if (!IsSafeRelativePath(relative)) continue;
@@ -137,7 +146,50 @@ public static class ProjectWorkspaceService
             snapshot.Problem = "Git 状态不可用（不是 Git 仓库、Git 未安装或读取失败）：" + ex.Message;
             snapshot.Partial = true;
         }
+        var (paths, incomplete) = CaptureTree(root, cancellationToken);
+        snapshot.Tree = paths;
+        snapshot.TreeCaptured = true;
+        snapshot.TreePartial = incomplete;
+        if (incomplete) snapshot.Partial = true;
         return snapshot;
+    }
+
+    /// <summary>Capture only names and directory flags; never file contents or link targets.</summary>
+    private static (List<StructurePath> Paths, bool Partial) CaptureTree(string root, CancellationToken ct)
+    {
+        var paths = new List<StructurePath>();
+        var pending = new Stack<(string Folder, int Depth)>();
+        pending.Push((root, 0));
+        bool partial = false;
+        while (pending.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var (folder, depth) = pending.Pop();
+            try
+            {
+                foreach (var child in Directory.EnumerateFileSystemEntries(folder))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (paths.Count >= MaxNodes) { partial = true; break; }
+                    var name = Path.GetFileName(child);
+                    var attr = File.GetAttributes(child);
+                    var dir = attr.HasFlag(FileAttributes.Directory);
+                    if (name.Equals(".git", StringComparison.OrdinalIgnoreCase) || dir && SkippedDirectories.Contains(name)) continue;
+                    if (attr.HasFlag(FileAttributes.ReparsePoint)) { partial = true; continue; }
+                    var relative = Path.GetRelativePath(root, child).Replace('\\', '/');
+                    if (!IsSafeRelativePath(relative)) { partial = true; continue; }
+                    paths.Add(new StructurePath(relative, dir));
+                    if (dir)
+                    {
+                        if (depth < MaxDepth) pending.Push((child, depth + 1));
+                        else partial = true;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { partial = true; }
+            if (paths.Count >= MaxNodes) break;
+        }
+        return (paths.OrderBy(x => x.Path, StringComparer.Ordinal).ToList(), partial);
     }
 
     /// <summary>Parse porcelain v1 -z. Rename/copy records carry an extra old path.</summary>
@@ -223,7 +275,7 @@ public static class ProjectWorkspaceService
             var inspection = await GitWorkspaceService.InspectCommitFilesAsync(workspace,
                 baseReport.FromHead, baseReport.ToHead, cancellationToken).ConfigureAwait(false);
             var paths = ParseCommitPaths(inspection.Output);
-            return baseReport with { CommittedFiles = paths,
+            return baseReport with { CommittedFiles = paths, RenamedFiles = ParseCommitRenames(inspection.Output),
                 Partial = baseReport.Partial || inspection.Truncated,
                 Notice = baseReport.Notice + (inspection.Truncated ? " 提交文件清单已截断。" : " 已追加实际提交涉及的文件路径。") };
         }
@@ -249,6 +301,29 @@ public static class ProjectWorkspaceService
             if (paths.Count >= 300) break;
         }
         return paths;
+    }
+
+    /// <summary>Only explicit Git rename/copy records are reported as path moves.</summary>
+    public static IReadOnlyList<ObservedRename> ParseCommitRenames(string output)
+    {
+        var fields = output.Split('\0');
+        var edges = new List<ObservedRename>();
+        for (int i = 0; i < fields.Length - 1;)
+        {
+            var state = fields[i++];
+            if (string.IsNullOrEmpty(state)) continue;
+            if (i >= fields.Length) break;
+            var from = fields[i++];
+            if (state.StartsWith('R') || state.StartsWith('C'))
+            {
+                if (i >= fields.Length) break;
+                var to = fields[i++];
+                if (state.StartsWith('R') && IsSafeRelativePath(from) && IsSafeRelativePath(to)
+                    && from != to && edges.Count < 300)
+                    edges.Add(new ObservedRename(from, to));
+            }
+        }
+        return edges;
     }
 
     public static string RequireSafeFile(string workspace, string relative)
@@ -279,7 +354,7 @@ public static class ProjectWorkspaceService
             && !segment.Equals(".git", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsSensitiveName(string path)
+    public static bool IsSensitiveName(string path)
     {
         var name = Path.GetFileName(path);
         return name.StartsWith(".env", StringComparison.OrdinalIgnoreCase)

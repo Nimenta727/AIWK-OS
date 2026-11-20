@@ -278,3 +278,7 @@ P0 是安全和稳定性门槛，不意味着必须把所有 P0 功能一次写�
 **维护规则：** 本文每个版本的条目都必须被对应的实际功能、测试、审核和发行证据更新；完成时将“计划”改成“已验证”并附 commit/CI/VM 证据。开发过程中每次 GitHub 变更必须在 docs/routine 留存日期、内容、验证结果和下一步。
 
 **English brief:** AIWS evolves from a Windows-native V1.2 prototype toward an auditable desktop AI workstation. Near-term: per-agent worktrees, reviewed Git changes, ConPTY terminal, event provenance, and supported multi-agent handoff. Longer-term: token evidence and context optimization, least-privilege Windows worker, local code graph, and a verified installer/upgrade process. Security, licensing, provider authentication limits, Windows CI and Hyper-V GUI validation are release gates.
+
+## V1.7 状态更新（2026-11-20）
+
+根据用户对“树状模型调用过程 + Token/上下文 + 大型文件目录结构变化 + 双向展开”的优先需求，V1.7 首先交付 **Execution Atlas**（见 [功能与局限](EXECUTION_ATLAS_V17.md)）。结构化调用树显示本地阶段与导入证据而非虚构的全部 CLI 内部模型请求；阶段前后目录结构快照支持展开对比与 Git 差异反查。原路线图 V1.7 的更深入 Token/上下文优化延后至后续迭代，仍需受支持的官方用量/请求接口。Windows CI 与 Hyper-V GUI 是独立验收门槛，未实测的部分不能标记稳定。

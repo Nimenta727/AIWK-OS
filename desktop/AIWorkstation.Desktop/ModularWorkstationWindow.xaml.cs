@@ -101,6 +101,13 @@ public partial class ModularWorkstationWindow : Window
                 "steps.dependencies" => UpdateDependencies(payload),
                 "worktrees.create" => await CreateWorktree(payload),
                 "ledger.timeline" => ExecutionLedger.Timeline(_controller.GetTask(ReadField(payload,"taskId"))),
+                "atlas.flow" => CallFlowBuilder.Build(_controller.GetTask(ReadField(payload,"taskId"))),
+                "atlas.context" => ContextInspector.Preview(
+                    _controller.GetTask(ReadField(payload,"taskId")),
+                    WorkflowEngine.Find(_controller.GetTask(ReadField(payload,"taskId")), ReadField(payload,"stepId"))),
+                "atlas.structure" => await AtlasStructure(payload),
+                "atlas.fileStages" => await AtlasRelatedStages(payload),
+                "atlas.fileDiff" => await AtlasFileDiff(payload),
                 "terminal.start" => OpenTerminal(payload),
                 "terminal.write" => WriteTerminal(payload),
                 "terminal.resize" => ResizeTerminal(payload),
@@ -126,7 +133,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.6.0-local-graph-conpty-ledger",
+        Version = "1.7.0-execution-atlas-structure-evidence",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -148,6 +155,48 @@ public partial class ModularWorkstationWindow : Window
 
     private object CreateTask(JsonElement payload) => _controller.CreateTask(
         ReadField(payload, "title"), ReadField(payload, "workspace"), ReadField(payload, "template"));
+
+    private async Task<object> AtlasStructure(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload, "taskId"));
+        var step = WorkflowEngine.Find(task, ReadField(payload, "stepId"));
+        return await WorkspaceEvolutionService.InspectStageAsync(task, step);
+    }
+
+    private async Task<object> AtlasRelatedStages(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload, "taskId"));
+        return await WorkspaceEvolutionService.FindRelatedStagesAsync(task, ReadField(payload, "path"));
+    }
+
+    private async Task<object> AtlasFileDiff(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload, "taskId"));
+        var step = WorkflowEngine.Find(task, ReadField(payload, "stepId"));
+        var path = ReadField(payload, "path");
+        var workspace = task.WorkspaceFor(step);
+        var current = await ProjectWorkspaceService.ReviewAsync(workspace, path);
+        if (ProjectWorkspaceService.IsSensitiveName(path) || current.IsPreview ||
+            !current.Diff.StartsWith("当前工作区无该文件的未提交 Git Diff", StringComparison.Ordinal))
+            return current;
+        var before = step.GitBefore?.Head;
+        var after = (step.Status == StepStatus.Running
+            ? (await ProjectWorkspaceService.CaptureAsync(workspace)).Head : step.GitAfter?.Head);
+        if (string.IsNullOrWhiteSpace(before) || string.IsNullOrWhiteSpace(after) || before == after)
+            return current;
+        try
+        {
+            var historical = await GitWorkspaceService.InspectHistoricalFileAsync(workspace, before, after, path);
+            if (historical.Output == "（无输出）") return current;
+            return new ProjectWorkspaceService.FileReview(path, current.Status, historical.Output,
+                historical.Truncated, false,
+                "已提交 HEAD 前后对比。仅展示本地 Git 证据，不推断哪个 Agent 是作者。");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or ArgumentException)
+        {
+            return current with {Note = current.Note + " 历史提交差异暂不可用。"};
+        }
+    }
 
     private async Task<object> StageChangeDetails(JsonElement payload)
     {

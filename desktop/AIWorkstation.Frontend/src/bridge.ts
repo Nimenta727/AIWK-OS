@@ -51,3 +51,15 @@ class WorkstationBridge {
   }
 }
 export const bridge=new WorkstationBridge();
+
+// V1.7 Execution Atlas: projections only. No model call is issued by these actions.
+export type FlowNode = {id:string;stepId:string;phase:string;title:string;subtitle:string;state:'Planned'|'Recorded'|'Imported'|'Unknown'|'Attention';detail:string;evidence:string;usageText:string;durationText:string;recordedAt:string|null};
+export type ProviderEvidence = {sequence:number;kind:string;toolCategory:string;input:number|null;output:number|null;cachedInput:number|null};
+export type FlowLane = {stepId:string;header:string;agent:string;state:string;nodes:FlowNode[];importedEvents:ProviderEvidence[]};
+export type AtlasFlow = {lanes:FlowLane[];importedStages:number;unknownUsageStages:number;importedInput:number;importedOutput:number;importedCachedInput:number;importedToolEvents:number|null};
+export type StructureEntry = {path:string;isDirectory:boolean;before:boolean;after:boolean;change:'added'|'removed'|'modified'|'touched'|'replaced'|'unchanged'|'unknown'|'moved-in'|'moved-out';evidence:string};
+export type StructureReport = {stageId:string;stageTitle:string;workspace:string;hasBefore:boolean;hasAfter:boolean;partial:boolean;notice:string;beforeAt:string|null;afterAt:string|null;entries:StructureEntry[];added:number;removed:number;modified:number;changedDirectories:number;committedFiles:string[];renamedFiles:{fromPath:string;toPath:string}[]};
+export type ContextPart = {kind:string;title:string;characters:number;source:string;included:boolean;evidence:string};
+export type ContextReport = {stageId:string;characters:number;originalCharacters:number;savedCharacters:number;approxTokens:number;fingerprint:string;truncated:boolean;text:string;parts:ContextPart[];notice:string};
+export type RelatedStage = {stageId:string;title:string;agent:string;workspace:string;evidence:string;partial:boolean};
+export type RelatedStageLookup = {stages:RelatedStage[];partial:boolean;notice:string};
