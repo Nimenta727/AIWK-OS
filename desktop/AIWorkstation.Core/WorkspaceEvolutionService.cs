@@ -36,7 +36,7 @@ public static class WorkspaceEvolutionService
             .Where(x => ProjectWorkspaceService.IsSafeRelativePath(x.Path))
             .ToDictionary(x => x.Path, x => x.IsDirectory, StringComparer.Ordinal);
         var changed = new HashSet<string>(evidence.Files.Select(x => x.Path), StringComparer.Ordinal);
-        changed.UnionWith(evidence.CommittedFiles, evidence.RenamedFiles);
+        changed.UnionWith(evidence.CommittedFiles);
         var knownGit = new HashSet<string>(changed.Where(ProjectWorkspaceService.IsSafeRelativePath), StringComparer.Ordinal);
         var entries = new List<StructureEntry>();
         var movedIn = evidence.RenamedFiles.ToDictionary(x => x.ToPath, x => x.FromPath, StringComparer.Ordinal);

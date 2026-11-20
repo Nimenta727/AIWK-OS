@@ -9,8 +9,8 @@ const phaseText:Record<string,string>={Routing:'执行器分配',Context:'上下
 const fmt=(value:number|null|undefined)=>value==null?'未知':value.toLocaleString('zh-CN');
 
 function StructureTreeRow({item,depth,mode,selected,onPick,expanded,toggle,query}:{item:TreeItem;depth:number;mode:TreeMode;selected:string;onPick:(path:string)=>void;expanded:Set<string>;toggle:(path:string)=>void;query:string}){
- if(query ? !matchesPath(item,query) : !isVisibleInMode(item,mode))return null;
- const children=item.children.filter(x=>query?matchesPath(x,query):isVisibleInMode(x,mode));
+ if(!isVisibleInMode(item,mode) || (query.trim() && !matchesPath(item,query)))return null;
+ const children=item.children.filter(x=>isVisibleInMode(x,mode) && (!query.trim() || matchesPath(x,query)));
  const opened=expanded.has(item.path);
  return <div className="atlas-tree-rowgroup">
   <div className={`atlas-tree-row ${selected===item.path?'selected':''}`} style={{paddingLeft:12+Math.min(depth,12)*16}}>
