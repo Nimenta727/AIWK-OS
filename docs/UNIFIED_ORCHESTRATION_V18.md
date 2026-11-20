@@ -70,3 +70,9 @@ All new scheduler, mission control and diagnostic code is AIWS-owned. Existing a
 ## UX enhancement: one action per deliberate decision
 
 The mission console combines stage approval with local enqueue as a single transactional `scheduler.prepare` action, then offers a separate **explicitly confirmed** CLI launch directly in the same panel. Approval does not automatically run the model; the external launch still passes the existing prompt budget and native Windows confirmation.
+
+## Verified Windows build and release evidence (2026-11-20)
+
+- Code commit: `cf94146da43e09cc9dc083ffd16f4bb1c29d6082`; [Native Windows CI #44729416838](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416838): **success**, Node 29/29, WPF/.NET core smoke, self-contained x64 EXE + offline UI packaged.
+- [Python/Windows checks #44729416839](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416839): **success**, 38 Python regressions.
+- Verified ZIP payload SHA256: `7d65f301b7ae33faaebe0eae5a1d2061104f8cadcdacca3e18c943c82629be0e`; EXE and `ui-dist/index.html` present. Real Hyper-V GUI / Windows ACL and signed distribution **not** verified.

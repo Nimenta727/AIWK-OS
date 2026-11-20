@@ -2,6 +2,10 @@
 
 ## 阶段 4–6 交付进度（2026-11-20，V1.8 预览版）
 
+**V1.8 第 4–6 阶段代码级验收更新（2026-11-20）：** 已通过 Windows Native CI [#44729416838](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416838) 与 Python/Windows 检查 [#44729416839](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416839)。可复核的实现包括 AIWS 调度票据、原子审批/排队、统一总控台、权限边界加固和脱敏诊断。完整 Windows OS 安全隔离、Hyper-V 实机、签名安装与正式 V2.0 尚未达标。
+
+
+
 **已实现的核心：** 自动计算 DAG 可执行阶段、需要审批的持久化调度票据、执行器能力检测与人工选择、统一 AI 协作总控台、Git/调用树双向入口、写操作串行化、只读超时/限流、脱敏诊断、Windows Hyper-V 包检查脚本。详情见 [UNIFIED_ORCHESTRATION_V18](UNIFIED_ORCHESTRATION_V18.md)。
 
 **尚未完成，不能称为正式第 6 阶段稳定发行：** 无人值守模型 API/官方 CLI 适配、可靠的后台进程队列与独立 Windows 权限 Broker、完整进程树取消、真实 Hyper-V GUI/ACL 验收、软件签名、安装器升级回滚、独立安全审计。现有调度队列不直接执行任何模型调用。下一步先验证 Windows CI 和 Hyper-V VM，再补系统级隔离与受支持的非交互执行。
