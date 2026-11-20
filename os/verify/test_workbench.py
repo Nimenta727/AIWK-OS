@@ -73,10 +73,45 @@ class WorkbenchTests(unittest.TestCase):
         h = {"X-AIWS-CSRF": csrf, "Origin": "https://attacker.invalid"}
         self.assertEqual(self.request("POST", "/api/v1/jobs", data, h)[0], 403)
         h = {"X-AIWS-CSRF": csrf}
-        for blocked in ("runtime.test", "file.replace", "project.scaffold", "browser.snapshot"):
+        for blocked in ("runtime.test", "project.scaffold", "browser.snapshot"):
             self.assertEqual(self.request("POST", "/api/v1/jobs",
                                           {"tool": blocked, "arguments": {}}, h)[0], 400)
         self.assertEqual(self.request("POST", "/api/v1/jobs", data, h)[0], 202)
+
+    def test_guest_files_listing_read_and_sha_write(self):
+        import hashlib
+        status, tree = self.request("GET", "/api/v1/workspace/tree")
+        self.assertEqual(status, 200)
+        self.assertIn("Example.cs", tree["files"])
+        status, file = self.request("GET", "/api/v1/workspace/file?path=Example.cs")
+        self.assertEqual(status, 200)
+        self.assertEqual(file["text"], "public class Example {}")
+        self.assertEqual(self.request("GET", "/api/v1/workspace/file?path=%2Fetc%2Fpasswd")[0], 403)
+        csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
+        text = "public class GuestOnly {}"
+        _, job = self.request("POST", "/api/v1/jobs", {"tool": "file.replace",
+             "arguments": {"path": "Example.cs", "text": text,
+                           "expectedSha256": file["sha256"]}}, {"X-AIWS-CSRF": csrf})
+        result = {}
+        for _ in range(100):
+            _, result = self.request("GET", "/api/v1/jobs/" + job["id"])
+            if result["status"] not in ("queued", "running"):
+                break
+            time.sleep(0.01)
+        self.assertEqual(result["status"], "completed", result)
+        self.assertEqual((self.root / "Example.cs").read_text(), text)
+        self.assertEqual(self.request("GET", "/api/v1/workspace/file?path=Example.cs")[1]["sha256"],
+                         hashlib.sha256(text.encode()).hexdigest())
+        _, stale = self.request("POST", "/api/v1/jobs", {"tool": "file.replace",
+             "arguments": {"path": "Example.cs", "text": "unauthorized collision",
+                           "expectedSha256": file["sha256"]}}, {"X-AIWS-CSRF": csrf})
+        for _ in range(100):
+            _, result = self.request("GET", "/api/v1/jobs/" + stale["id"])
+            if result["status"] not in ("queued", "running"):
+                break
+            time.sleep(0.01)
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual((self.root / "Example.cs").read_text(), text)
 
     def test_async_result(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]

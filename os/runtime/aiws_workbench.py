@@ -22,6 +22,8 @@ PORT = 17640
 READ_ONLY = frozenset({"workspace.tree", "file.read", "code.search", "git.inspect",
                        "runtime.detect", "browser.local_text", "platform.inspect",
                        "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
+GUEST_WRITES = frozenset({"file.replace"})
+EXPOSED = READ_ONLY | GUEST_WRITES
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
           ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon",
           ".woff2": "font/woff2"}
@@ -43,7 +45,7 @@ class Controller:
                 "desktopInstalled": bool(shutil.which("xfce4-session")),
                 "displayManagerInstalled": bool(shutil.which("lightdm")),
                 "uiBundled": (self.ui / "index.html").is_file(),
-                "toolCount": len(READ_ONLY),
+                "toolCount": len(EXPOSED),
                 "note": "No autonomous LLM inference, privileged broker or host VM access."}
 
     def recent(self):
@@ -57,7 +59,7 @@ class Controller:
 
     def submit(self, tool, args):
         spec = next((x["inputSchema"] for x in catalog() if x["name"] == tool), None)
-        if tool not in READ_ONLY or spec is None:
+        if tool not in EXPOSED or spec is None:
             raise ValueError("Tool is not exposed to the workbench")
         if not isinstance(args, dict) or any(k not in spec["properties"] for k in args):
             raise ValueError("Unknown tool arguments")
@@ -128,13 +130,31 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         app = self.server.application
         path = urlsplit(self.path).path
+        if path == "/api/v1/workspace/tree":
+            try:
+                result = invoke("workspace.tree", {"path": "."})
+                audit("workspace.tree", {"path": "."}, True)
+                return self.reply(200, result)
+            except (ValueError, OSError, PermissionError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/workspace/file":
+            from urllib.parse import parse_qs
+            paths = parse_qs(urlsplit(self.path).query).get("path", [])
+            if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
+                return self.reply(400, {"error": "One bounded guest-workspace path required"})
+            try:
+                result = invoke("file.read", {"path": paths[0]})
+                audit("file.read", {"path": paths[0]}, True)
+                return self.reply(200, result)
+            except (ValueError, OSError, PermissionError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/health":
             return self.reply(200, app.health())
         if path == "/api/v1/session":
             return self.reply(200, {"csrf": app.csrf, "mode": "linux-guest"})
         if path == "/api/v1/snapshot":
             return self.reply(200, {"health": app.health(), "jobs": app.recent(),
-                                    "capabilities": [x for x in catalog() if x["name"] in READ_ONLY]})
+                                    "capabilities": [x for x in catalog() if x["name"] in EXPOSED]})
         if path.startswith("/api/v1/jobs/"):
             job = app.job(path.removeprefix("/api/v1/jobs/"))
             return self.reply(200, job) if job else self.reply(404, {"error": "Unknown job"})
