@@ -104,7 +104,7 @@ try
         && !ProjectWorkspaceService.IsSafeRelativePath("C:/Windows/system.ini")
         && ProjectWorkspaceService.IsSafeRelativePath("src/nested/file.cs"),
         "project file paths exclude traversal, git internals and absolute paths");
-    Assert(ThrowsAny(() => ProjectWorkspaceService.RequireSafeFile(projectRoot, "../outside.txt")),
+    Assert(ThrowsAny(() => ProjectWorkspaceService.RequireSafeFile(workspace, "../outside.txt")),
         "file review rejects escaping the chosen workspace");
     var leftGit = new ProjectWorkspaceService.GitCheckpoint { Head = "1111111",
         Files = [new("src/a.cs", " M", "sha-one"), new("old.txt", "??", "old")] };
