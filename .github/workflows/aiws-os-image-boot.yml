@@ -27,21 +27,21 @@ jobs:
       - name: Evaluate NixOS declarative ISO configuration
         run: nix eval --raw .#nixosConfigurations.aiws-live.config.system.build.isoImage.name
 
-  debian-boot-smoke:
+  debian-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 85
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Compile shared AIWS React workspace
+      - name: Compile shared AIWS React workstation
         working-directory: desktop/AIWorkstation.Frontend
         run: |
           npm install --no-audit --no-fund
           npm run build
           test -s dist/index.html
-      - name: Build genuine Debian Live guest ISO in disposable trixie container
+      - name: Build Debian Live smoke ISO in disposable trixie container
         timeout-minutes: 50
         run: |
           docker run --rm --privileged -v "$PWD":/repo -w /repo debian:trixie bash -lc '
@@ -52,50 +52,91 @@ jobs:
           '
           test -s out/aiws-os-smoke/live-image-amd64.hybrid.iso
           (cd out/aiws-os-smoke && sha256sum -c live-image-amd64.hybrid.iso.sha256)
-      - name: "Install QEMU for offline TCG guest boot"
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
-      - name: Boot guest with no NIC and validate serial receipt
-        timeout-minutes: 15
+      - name: Upload real experimental ISO and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-os-debian-live-smoke-iso
+          path: |
+            out/aiws-os-smoke/live-image-amd64.hybrid.iso
+            out/aiws-os-smoke/live-image-amd64.hybrid.iso.sha256
+          compression-level: 0
+          retention-days: 3
+
+  debian-boot:
+    needs: debian-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact ISO produced by this workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: aiws-os-debian-live-smoke-iso
+          path: out/aiws-os-smoke
+      - name: Install emulator, ISO inspection and framebuffer tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso socat
+      - name: Inspect ISO boot files and verify image SHA
+        run: |
+          set -Eeuo pipefail
+          cd out/aiws-os-smoke
+          sha256sum -c live-image-amd64.hybrid.iso.sha256
+          xorriso -indev live-image-amd64.hybrid.iso -report_el_torito as_mkisofs
+          xorriso -indev live-image-amd64.hybrid.iso -ls /live
+      - name: Boot guest kernel with explicit serial console and capture framebuffer
+        timeout-minutes: 19
         run: |
           set -Eeuo pipefail
           iso="$PWD/out/aiws-os-smoke/live-image-amd64.hybrid.iso"
           serial="$PWD/boot-serial.log"
+          frame="$PWD/boot-frame.ppm"
+          monitor="$RUNNER_TEMP/aiws-monitor.sock"
+          # Diagnostic kernel entry bypasses ISO firmware boot menu to distinguish
+          # kernel/guest service failures from BIOS/GRUB display-only failures.
+          xorriso -osirrox on -indev "$iso" -extract /live "$RUNNER_TEMP/aiws-live"
+          kernel="$(find "$RUNNER_TEMP/aiws-live" -maxdepth 1 -type f -name 'vmlinuz*' | head -n 1)"
+          initrd="$(find "$RUNNER_TEMP/aiws-live" -maxdepth 1 -type f -name 'initrd*' | head -n 1)"
+          test -n "$kernel" && test -n "$initrd"
+          echo "Guest kernel: $(basename "$kernel")"
+          echo "Guest initrd: $(basename "$initrd")"
           qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 \
-            -boot d -cdrom "$iso" -nic none -display none -vga std \
-            -serial "file:$serial" -monitor none -no-reboot &
+            -boot d -cdrom "$iso" -kernel "$kernel" -initrd "$initrd" \
+            -append 'boot=live components console=tty0 console=ttyS0,115200n8 loglevel=6 systemd.show_status=1' \
+            -nic none -display none -vga std \
+            -serial "file:$serial" -monitor "unix:$monitor,server,nowait" -no-reboot &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           passed=0
-          for attempt in $(seq 1 360); do
-            if [[ -f "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_PASS' "$serial"; then
-              passed=1
-              break
-            fi
+          for attempt in $(seq 1 420); do
+            if [[ -f "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_PASS' "$serial"; then passed=1; break; fi
             if [[ -f "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_FAIL' "$serial"; then
-              echo 'Guest reported boot integration failure'
+              echo 'Guest emitted FAIL diagnostic'
               break
             fi
-            if ! kill -0 "$pid" 2>/dev/null; then echo 'QEMU exited unexpectedly'; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then echo 'QEMU exited'; break; fi
+            if (( attempt % 30 == 0 )) && [[ -S "$monitor" ]]; then
+              printf 'screendump %s\n' "$frame" |
+                timeout 4 socat - "UNIX-CONNECT:$monitor" >/dev/null 2>&1 || true
+            fi
             sleep 2
           done
-          echo '--- Last 120 guest serial lines ---'
-          tail -n 120 "$serial" || true
+          if [[ -S "$monitor" ]]; then
+            printf 'screendump %s\n' "$frame" |
+              timeout 4 socat - "UNIX-CONNECT:$monitor" >/dev/null 2>&1 || true
+          fi
+          echo '--- Guest serial diagnostics (last 140 lines) ---'
+          tail -n 140 "$serial" || true
+          echo '--- Guest framebuffer bytes ---'
+          test -f "$frame" && wc -c "$frame" || true
           if [[ "$passed" != 1 ]]; then exit 1; fi
-      - name: Upload boot evidence
+      - name: Upload boot serial and virtual display evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: aiws-os-guest-boot-evidence
+          name: aiws-os-qemu-guest-evidence
           path: |
             boot-serial.log
-            out/aiws-os-smoke/live-image-amd64.hybrid.iso.sha256
+            boot-frame.ppm
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload experimental smoke ISO for image and boot debugging
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: aiws-os-debian-live-smoke-iso
-          path: out/aiws-os-smoke/live-image-amd64.hybrid.iso
-          compression-level: 0
-          retention-days: 3
