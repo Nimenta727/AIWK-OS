@@ -1,6 +1,6 @@
 # V1.7 — AI 调用与项目结构双向可视化 / Execution Atlas
 
-**状态：源码第一版；Windows CI 及用户 Hyper-V GUI 验收必须分别记录。**
+**状态：Windows CI [44704423770](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44704423770) 已通过，EXE 与离线 UI 打包已核验；用户 Hyper-V GUI 验收尚未进行。**
 
 ## 产品目标与位置
 

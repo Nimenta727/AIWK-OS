@@ -6,7 +6,7 @@
 - [V1.3–V2.0 路线图](docs/ROADMAP.md) · [每次修改的记录与下一步](docs/routine/)
 - **不能把阶段和 CLI 启动画成已发生的远程模型请求**：只有官方结构化日志导入后才显示相应 Token；没有数据就显示“未知”。Git 结构变化是两次快照的观察结果，不能直接证明文件作者。
 - 旧版任务只有 Git 状态而没有 V1.7 的目录结构检查点时，保持“证据不足”；新阶段开始/完成后才可建立结构前后对比。
-- 本项目发布的是 Windows 自包含 EXE + 相邻 `ui-dist/` 文件；Windows CI 和真实 Hyper-V GUI 测试是不同的验收门槛。
+- **V1.7 Windows CI 已通过：** [Native EXE 构建 44704423770](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44704423770)，自包含 EXE 与相邻 `ui-dist/` 文件均已核验；用户实际 Hyper-V GUI 验收尚未完成。
 
 ---
 
