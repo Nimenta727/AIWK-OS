@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：原生 Windows 桌面重建、构建和交互限制。原有版本背景和测试结论保持原样；本导读不代表重新验证旧版本。
+>
+> English: Native Windows desktop rebuilding, packaging and limitations. Original version context and verification claims are preserved; this index note does not rerun historical tests.
+>
+> [文档导航 / Documentation](README.md) · [当前发行 / Current release](RELEASE_NOTES_V19.md) · [历史记录 / Routine](routine/README.md)
+
+---
+
 # Windows AI Workstation — desktop-native V0.4 reconstruction
 
 ## Product constraints

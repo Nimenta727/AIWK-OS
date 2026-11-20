@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：Git 工具和 Windows 能力权限。原有版本背景和测试结论保持原样；本导读不代表重新验证旧版本。
+>
+> English: Git developer tooling and Windows capability boundaries. Original version context and verification claims are preserved; this index note does not rerun historical tests.
+>
+> [文档导航 / Documentation](README.md) · [当前发行 / Current release](RELEASE_NOTES_V19.md) · [历史记录 / Routine](routine/README.md)
+
+---
+
 # AIWS V1.1: Git review, terminal and Windows capability modules
 
 ## Scope and implementation choice

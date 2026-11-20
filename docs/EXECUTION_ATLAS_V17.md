@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：执行证据与目录演化的双向视图。原有版本背景和测试结论保持原样；本导读不代表重新验证旧版本。
+>
+> English: Cross-linking execution evidence with project evolution. Original version context and verification claims are preserved; this index note does not rerun historical tests.
+>
+> [文档导航 / Documentation](README.md) · [当前发行 / Current release](RELEASE_NOTES_V19.md) · [历史记录 / Routine](routine/README.md)
+
+---
+
 # V1.7 — AI 调用与项目结构双向可视化 / Execution Atlas
 
 **状态：Windows CI [44704423770](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44704423770) 已通过，EXE 与离线 UI 打包已核验；用户 Hyper-V GUI 验收尚未进行。**

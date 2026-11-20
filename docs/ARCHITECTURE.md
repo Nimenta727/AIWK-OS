@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：架构演进和上游设计参考。原有版本背景和测试结论保持原样；本导读不代表重新验证旧版本。
+>
+> English: Architecture history and reviewed upstream designs. Original version context and verification claims are preserved; this index note does not rerun historical tests.
+>
+> [文档导航 / Documentation](README.md) · [当前发行 / Current release](RELEASE_NOTES_V19.md) · [历史记录 / Routine](routine/README.md)
+
+---
+
 # AIWS architecture and reviewed code bases
 
 Review date: **2026-11-19**. The official GitHub files below were read via GitHub repository access, not just marketing pages.

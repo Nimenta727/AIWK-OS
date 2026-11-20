@@ -1,0 +1,44 @@
+# Documentation / 文档总导航
+
+> v1.9.0-preview.1 · Engineering Preview. Historical documents retain their original claims; read the current README for active behavior.
+>
+> **中文：** 历史资料继续保留原始修改、验证和限制。此页面提供中英简介和新版发行入口。
+>
+> **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
+
+## 当前版本 / Current release
+- [主 README / Main README](../README.md) — 双语安装、使用和安全说明 / bilingual installation, usage and safety
+- [发行说明 / Release notes](RELEASE_NOTES_V19.md) — 当前预览内容 / preview changes
+- [发行检查 / Release checklist](RELEASE_CHECKLIST.md) — CI 与 Hyper-V 手动验收 / automated versus manual gates
+- [内部执行透视 / Internal Observatory](INTERNAL_OBSERVATORY_V19.md) — 调用证据、上下文和 Git 结构 / evidence-linked internal execution
+- [安全边界 / Security](SECURITY.md) — 权限与凭据 / permissions and credentials
+- [路线图 / Roadmap](ROADMAP.md) — 计划与未完成能力 / future work, not shipped claims
+
+## 设计与版本资料 / Versioned technical notes
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 架构与上游参考 / Architecture and upstream references
+- [DESKTOP_REBUILD.md](DESKTOP_REBUILD.md) — Windows 原生桌面 / Windows native desktop
+- [DEVELOPER_MODULES_V11.md](DEVELOPER_MODULES_V11.md) — Git 工具及权限 / Git tools and permissions
+- [EXECUTION_ATLAS_V17.md](EXECUTION_ATLAS_V17.md) — 执行调用与结构演化 / Execution and structural changes
+- [EXECUTION_BASE_REVIEW_V07.md](EXECUTION_BASE_REVIEW_V07.md) — 执行持久化与恢复 / Execution persistence and recovery
+- [IMPLEMENTATION_V13_V16.md](IMPLEMENTATION_V13_V16.md) — Worktree、ConPTY、事件账本、DAG / Worktrees, ConPTY, ledger, DAG
+- [MODULAR_RECOMPOSITION_V1.md](MODULAR_RECOMPOSITION_V1.md) — 独立前端模块重组 / Independent modular front-end
+- [PLAN_STUDIO_V171.md](PLAN_STUDIO_V171.md) — Markdown 计划中心 / Markdown Plan Studio
+- [PROFESSIONAL_FRONTENDS.md](PROFESSIONAL_FRONTENDS.md) — 旧上游整套前端方案 / Legacy hosted upstream UIs
+- [PROJECT_EVIDENCE_V12.md](PROJECT_EVIDENCE_V12.md) — Git 文件证据 / Project/Git evidence
+- [REQUEST_TRACE.md](REQUEST_TRACE.md) — 请求追踪与 Token / Request tracing and tokens
+- [ROADMAP.md](ROADMAP.md) — 产品规划 / Product roadmap
+- [SECURITY.md](SECURITY.md) — 安全边界 / Security boundaries
+- [TOKEN_EFFICIENCY_V172.md](TOKEN_EFFICIENCY_V172.md) — 上下文预算与消耗控制 / Context budgets and token optimization
+- [UI_STUDIO_V181.md](UI_STUDIO_V181.md) — Studio UI 与交互 / Studio UI and interaction tests
+- [UNIFIED_AGENT_CONTROL_PLANE.md](UNIFIED_AGENT_CONTROL_PLANE.md) — 统一 Agent 控制平面 / Unified agent control plane
+- [UNIFIED_ORCHESTRATION_V18.md](UNIFIED_ORCHESTRATION_V18.md) — 多 Agent 调度 / Agent orchestration
+- [UNIFIED_TASK_IMPLEMENTATION.md](UNIFIED_TASK_IMPLEMENTATION.md) — 统一任务与上下文编译 / Unified tasks and context compilation
+- [UPSTREAM_MIGRATION.md](UPSTREAM_MIGRATION.md) — 开源迁移与许可 / Upstream migration and licensing
+- [V03_OPERATIONS.md](V03_OPERATIONS.md) — 旧版 Python 原型 / Legacy Python operations
+
+## 历史记录 / Historical records
+[完整时间索引 / Complete chronology](routine/README.md) · [GitHub Actions](https://github.com/Nimenta727/Windows-AI-Workstation/actions)
+
+> 本次添加双语导读和索引，**不等于逐句完成所有历史资料全文翻译**。原始记录保持可审计。
+> 
+> Bilingual abstracts and links are supplied without claiming word-for-word translations of every historical page.
