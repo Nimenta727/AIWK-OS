@@ -278,12 +278,18 @@ def _xaml(path, raw):
     except ET.ParseError:
         return refs, apis
     for key, value in root.attrib.items():
-        if key.endswith("}Class") and re.fullmatch(r"[A-Za-z_][\\w.]*", value, re.ASCII):
+        if key.endswith("}Class") and re.fullmatch(r"[A-Za-z_][\w.]*", value, re.ASCII):
             short = value.rsplit(".", 1)[-1]
-            for m in re.finditer(r"\\bx:Class\\s*=\\s*[\"']"+re.escape(value)+r"[\"']", raw):
-                offset = raw.index(value, m.start(), m.end()) + len(value)-len(short)
-                refs.append({"name": short, "path": path, **_position(raw, offset),
-                             "language": "xaml", "sourceLine": raw.splitlines()[_position(raw, offset)["line"]-1].strip()[:180],
+            # We already verified the XML attribute; this is a source-position hint.
+            for marker in (f'x:Class="{value}"', f"x:Class='{value}'"):
+                start = raw.find(marker)
+                if start < 0:
+                    continue
+                offset = start + marker.index(value) + len(value) - len(short)
+                location = _position(raw, offset)
+                refs.append({"name": short, "path": path, **location,
+                             "language": "xaml",
+                             "sourceLine": raw.splitlines()[location["line"]-1].strip()[:180],
                              "confidence": "declarative-class-binding", "resolution": "candidate"})
                 break
     if "http://schemas.microsoft.com/winfx/2006/xaml/presentation" in raw:
