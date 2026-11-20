@@ -7,6 +7,7 @@
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
 ## AIWS OS / AI 虚拟机操作系统
+- [AI 原生工具接口 / Agent tool fabric](AIWS_AGENT_TOOL_FABRIC.md) — MCP stdio、代码、浏览器、语言运行与隔离约束 / machine-callable guest tools
 - [OS 工程 / OS project](../os/README.md) — Debian Live 镜像、内置开发工具和宿主离线启动 / image build, bundled developer tools, offline-first host launch
 - [OS 深度定制蓝图 / OS kernel & isolation blueprint](AIWS_OS_BLUEPRINT.md) — 内核选项、Agent 管理员权限、虚拟机外部安全边界 / kernel profile, privileged agents, external VM boundaries
 

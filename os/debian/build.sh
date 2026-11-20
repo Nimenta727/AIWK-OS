@@ -25,6 +25,9 @@ lb config --distribution trixie --architectures amd64 --binary-images iso-hybrid
   --debian-installer none --archive-areas main --linux-flavours amd64 \
   --bootappend-live "boot=live components quiet"
 cp -a -- "$repo/os/debian/config/." "$out/config/"
+mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
+cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-toolctl"
 echo "Building AIWS OS Live ISO using Debian package repositories..."
 lb build
 iso="$out/live-image-amd64.hybrid.iso"

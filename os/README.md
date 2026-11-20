@@ -16,6 +16,10 @@
 - `os/kernel/aiws-kernel.fragment`：未来专用内核包的目标选项，**还没有重编译或替换 Debian 内核**。
 - `os/verify/test_config.py`：静态安全契约和配置回归；不代替启动测试或逃逸攻防验证。
 
+### AI 原生工具 / AI-native tool interface
+
+本轮追加 [AIWS Tool Fabric](../docs/AIWS_AGENT_TOOL_FABRIC.md)：构建时安装客户机本地实验性 MCP stdio 工具端点 aiws-toolctl，支持限定工作区的代码、文件、Git、测试和受限制的无头 Chromium DOM 快照。真正的 Linux Agent 控制器与特权 Broker 尚未完成。
+
 ### 构建
 
 在 **Debian 13 amd64** 构建机/CI 容器内（需真实网络获取 Debian 软件包和 root/chroot 权限）：

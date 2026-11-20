@@ -10,6 +10,9 @@ xfce4-terminal
 thunar
 mousepad
 firefox-esr
+chromium
+chromium-driver
+python3-selenium
 geany
 fonts-noto-cjk
 fonts-noto-color-emoji
@@ -25,6 +28,7 @@ pipx
 nodejs
 npm
 openjdk-21-jdk
+maven
 rustc
 cargo
 golang-go
