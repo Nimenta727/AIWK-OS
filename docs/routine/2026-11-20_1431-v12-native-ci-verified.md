@@ -21,3 +21,12 @@
 2. Validate large workspaces, symlinks, binary files and permission failures as a non-admin Windows user.
 3. Implement Agent-isolated worktrees and instrumented tool events for stronger provenance.
 4. Add approval-gated per-hunk Git review and optional source-code navigation without automatic Token use.
+
+
+---
+
+## 双语历史编目 / Bilingual historical capsule (2026-11-20)
+
+- 中文：本次档案主题为 **2026-11-20 14:31 (+08:00) — V1.2 Windows native CI and artifact verified**，保留此前变更、测试结果、局限和当时的下一步计划。此追加说明不重新验证历史结论。
+- English: This dated record concerns **v12 native ci verified**. Its earlier changes, tests, caveats and next steps are preserved. This appended synopsis is not a new verification.
+- [历史时间线 / Log index](README.md) · [当前发行 / Current release](../../README.md)

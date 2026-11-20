@@ -29,3 +29,12 @@
 2. 优先建设每 Agent 的 Git Worktree 隔离和可审查 Git 变更证据。
 3. V1.4 设计应用内终端和进程生命周期，但执行前完成权限边界评审。
 4. 每次后续代码变更继续写入 docs/routine，并通过 Windows CI、实机验收分别确认。
+
+
+---
+
+## 双语历史编目 / Bilingual historical capsule (2026-11-20)
+
+- 中文：本次档案主题为 **2026-11-20 15:09 — V1.2 后续产品路线图归档**，保留此前变更、测试结果、局限和当时的下一步计划。此追加说明不重新验证历史结论。
+- English: This dated record concerns **full product roadmap**. Its earlier changes, tests, caveats and next steps are preserved. This appended synopsis is not a new verification.
+- [历史时间线 / Log index](README.md) · [当前发行 / Current release](../../README.md)

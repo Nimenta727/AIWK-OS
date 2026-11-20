@@ -18,3 +18,12 @@ ExecutionLedger.cs, TaskRepository.cs, WorkstationController.cs, ExecutionTimeli
 
 ## 下一步 / Next steps
 下一步对接支持的结构化 CLI 工具事件，补充事件导入幂等键与日志保留策略。
+
+
+---
+
+## 双语历史编目 / Bilingual historical capsule (2026-11-20)
+
+- 中文：本次档案主题为 **2026-11-20_1533 — V1.5 execution-event-ledger**，保留此前变更、测试结果、局限和当时的下一步计划。此追加说明不重新验证历史结论。
+- English: This dated record concerns **execution event ledger**. Its earlier changes, tests, caveats and next steps are preserved. This appended synopsis is not a new verification.
+- [历史时间线 / Log index](README.md) · [当前发行 / Current release](../../README.md)
