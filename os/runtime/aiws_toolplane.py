@@ -31,7 +31,8 @@ def catalog():
     tools = []
     for name, description, fields in TOOL_SPECS:
         properties = {key: {"type": value} for key, value in fields.items()}
-        required = list(fields) if name in {"file.read", "file.replace", "code.search", "browser.local_text", "browser.snapshot", "runtime.test"} else []
+        required = (["query"] if name == "code.search" else
+                    list(fields) if name in {"file.read", "file.replace", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
