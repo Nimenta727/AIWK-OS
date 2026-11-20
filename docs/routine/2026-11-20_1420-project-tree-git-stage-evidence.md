@@ -27,3 +27,12 @@
 2. Verify explorer/diff/stage ledger with a real repository in the target Hyper-V Windows 11 VM, including large worktrees, odd filenames, DPI and non-admin permissions.
 3. Add commit-by-commit provenance and isolated Worktree execution for stronger (but still conditional) attribution; later add approval-gated Git write actions and an application-internal terminal.
 4. Keep timestamped documentation in this folder for every subsequent GitHub modification.
+
+
+---
+
+## 双语历史编目 / Bilingual historical capsule (2026-11-20)
+
+- 中文：本次档案主题为 **2026-11-20 14:20 (+08:00) — Project tree, Git review and workflow-stage evidence**，保留此前变更、测试结果、局限和当时的下一步计划。此追加说明不重新验证历史结论。
+- English: This dated record concerns **project tree git stage evidence**. Its earlier changes, tests, caveats and next steps are preserved. This appended synopsis is not a new verification.
+- [历史时间线 / Log index](README.md) · [当前发行 / Current release](../../README.md)

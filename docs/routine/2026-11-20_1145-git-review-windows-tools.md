@@ -30,3 +30,12 @@ Add a first functional implementation of the developer tool center. Unlike the p
 2. Exercise Git/Diff display and PowerShell confirmation in an actual Hyper-V Windows VM.
 3. Implement an **actual in-app terminal** based on a constrained ConPTY worker rather than mislabeling a launcher as a terminal.
 4. Add file/hunk review, clear per-tool permission contracts, and explicit request-level audit trails.
+
+
+---
+
+## 双语历史编目 / Bilingual historical capsule (2026-11-20)
+
+- 中文：本次档案主题为 **2026-11-20 11:45 +0800 — V1.1 developer tools and Windows capability modules**，保留此前变更、测试结果、局限和当时的下一步计划。此追加说明不重新验证历史结论。
+- English: This dated record concerns **git review windows tools**. Its earlier changes, tests, caveats and next steps are preserved. This appended synopsis is not a new verification.
+- [历史时间线 / Log index](README.md) · [当前发行 / Current release](../../README.md)
