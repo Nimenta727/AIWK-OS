@@ -1,0 +1,24 @@
+.aiws-os{min-height:100vh;display:flex;background:#f7f8fa;color:#172337;font-family:Inter,"Noto Sans SC",system-ui,sans-serif}
+.aiws-os *{box-sizing:border-box}.aiws-os button,.aiws-os input,.aiws-os select{font:inherit}
+.aiws-os-sidebar{width:252px;flex-shrink:0;background:#111c30;color:#dce6f6;padding:24px 14px;display:flex;flex-direction:column}
+.aiws-os-brand{display:flex;gap:12px;align-items:center;padding:0 10px}.aiws-os-brand strong{display:block;font-size:20px}.aiws-os-brand small{display:block;font-size:9px;letter-spacing:.14em;color:#9aadc8;margin-top:5px}.aiws-os-mark{display:flex;background:#315bd0;border-radius:10px;padding:9px}
+.aiws-os-category{color:#8ea4c3;font-size:10px;letter-spacing:.07em;margin:35px 10px 13px}.aiws-os-sidebar nav{display:grid;gap:7px}
+.aiws-os-sidebar nav button{display:flex;align-items:center;gap:13px;text-align:left;background:transparent;border:0;padding:13px;border-radius:9px;color:#b9c9dd;cursor:pointer;font-size:13px}
+.aiws-os-sidebar nav button.active,.aiws-os-sidebar nav button:hover{background:#283c5b;color:#fff}
+.aiws-os-foot{margin-top:auto;border-top:1px solid #354258;font-size:11px;padding:16px 10px;color:#c0d1e7}.aiws-os-foot small{display:block;margin-top:6px;color:#8ca2bc}
+.aiws-os-body{flex:1;min-width:0}.aiws-os-top{height:64px;background:white;border-bottom:1px solid #e2e8f0;padding:0 32px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#67768d;gap:12px}
+.aiws-os-top strong{color:#263855}.aiws-os-top>div{display:flex;gap:8px}.aiws-os-top button{background:white;border:1px solid #dce3ed;border-radius:8px;padding:8px 11px;cursor:pointer;color:#2e4874}
+.aiws-os-content{max-width:1240px;margin:0 auto;padding:42px min(5vw,55px)}.aiws-os-heading small{font-size:11px;letter-spacing:.14em;font-weight:750;color:#5272cb}
+.aiws-os-heading h1{font-size:29px;margin:11px 0 9px;line-height:1.25}.aiws-os-heading p{font-size:13px;color:#63768e;margin:0 0 28px;line-height:1.7}
+.aiws-os-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.aiws-os-grid section,.aiws-os-card{background:white;border:1px solid #e5eaf1;border-radius:13px;padding:25px;box-shadow:0 3px 16px rgba(28,54,88,.035);min-width:0}
+.aiws-os-grid svg{color:#4774ca}.aiws-os-grid h2,.aiws-os-card h2{font-size:15px;margin:13px 0;color:#263751}
+.aiws-os-grid section>strong{display:block;font-size:23px;font-weight:750;color:#253653}.aiws-os-grid section>strong.aiws-os-path{font-size:14px;overflow-wrap:anywhere}
+.aiws-os-grid p,.aiws-os-card p{font-size:13px;line-height:1.7;color:#63738a}.aiws-os-grid .aiws-os-wide{grid-column:1/-1}
+.aiws-os-primary{border:0;border-radius:9px;background:#315ecf;color:white;padding:11px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:650;margin-top:9px}.aiws-os-primary:disabled{opacity:.5;cursor:not-allowed}
+.aiws-os-card label{display:grid;gap:8px;margin:20px 0;font-size:13px;font-weight:600;color:#314564}.aiws-os-card input,.aiws-os-card select{border:1px solid #d6deea;background:#fff;border-radius:8px;padding:12px;min-width:0;width:100%;color:#213653}
+.aiws-os-error{background:#ffeff0;color:#8d2936;border:1px solid #f5b8bf;padding:13px;border-radius:9px;margin-bottom:17px;font-size:13px}
+.aiws-os-muted{color:#74839a!important}.aiws-os-task{display:flex;width:100%;justify-content:space-between;text-align:left;background:transparent;border:0;border-bottom:1px solid #edf1f5;padding:14px 5px;cursor:pointer;color:#2b4165;font-size:13px}
+.aiws-os-task strong{text-transform:uppercase;font-size:11px}.aiws-os-stack{display:grid;gap:17px}.aiws-os-result{background:#101b2e;color:#d6e8f8;border-radius:10px;padding:17px;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;max-height:480px;font-size:12px;line-height:1.5}
+.aiws-os-card dl{display:grid;grid-template-columns:170px 1fr;gap:15px;font-size:13px}.aiws-os-card dt{color:#71819a}.aiws-os-card dd{margin:0;color:#203654}
+.aiws-os button:focus-visible,.aiws-os input:focus-visible,.aiws-os select:focus-visible{outline:3px solid #769aef;outline-offset:2px}
+@media(max-width:800px){.aiws-os{flex-direction:column}.aiws-os-sidebar{width:100%;padding:13px;gap:8px}.aiws-os-category,.aiws-os-foot{display:none}.aiws-os-sidebar nav{display:flex;overflow:auto}.aiws-os-sidebar nav button{flex-shrink:0}.aiws-os-top{padding:0 14px}.aiws-os-content{padding:28px 16px}.aiws-os-grid{grid-template-columns:1fr}.aiws-os-heading h1{font-size:23px}}
