@@ -2,7 +2,7 @@ import {ArrowRight, GitBranch, LockKeyhole} from 'lucide-react';
 import type {WorkTask} from '../bridge';
 import {graphLayers,agentName,readyStageIds} from '../model/workflow.mjs';
 export function DagCanvas({task,selected,onPick}:{task:WorkTask;selected:string|null;onPick:(id:string)=>void}){
- const layers=graphLayers(task);const ready=new Set(readyStageIds(task));
+ const layers=graphLayers(task) as WorkTask['steps'][];const ready=new Set(readyStageIds(task));
  return <div className="dag-layers" role="group" aria-label="可视化多 Agent DAG 依赖流程">
   {layers.map((layer,index)=><div key={index} className="dag-layer"><div className="dag-column-label">阶段 {index+1}</div>
    {layer.map(s=><button className={`dag-stage ${selected===s.id?'selected':''}`} key={s.id} onClick={()=>onPick(s.id)}>

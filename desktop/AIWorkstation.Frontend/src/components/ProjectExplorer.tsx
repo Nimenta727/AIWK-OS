@@ -35,7 +35,7 @@ export function ProjectExplorer({task}:{task:WorkTask|null}) {
   const refresh=useCallback(async()=>{
     if(!task)return;
     setBusy(true);setError('');
-    try { const value=await bridge.call<ProjectOverview>('project.overview',{taskId:task.id,stepId});setOverview(value); }
+    try { const value=await bridge.call<ProjectOverview>('project.overview',{taskId:task.id,stepId:stageId});setOverview(value); }
     catch(ex){setError(ex instanceof Error?ex.message:String(ex));}
     finally{setBusy(false);}
   },[task?.id,stageId]);
@@ -44,7 +44,7 @@ export function ProjectExplorer({task}:{task:WorkTask|null}) {
   const openFile=async(path:string)=>{
     if(!task)return;
     setFile(path);setReview(null);setError('');
-    try {setReview(await bridge.call<FileReview>('project.review',{taskId:task.id,stepId,path}));}
+    try {setReview(await bridge.call<FileReview>('project.review',{taskId:task.id,stepId:stageId,path}));}
     catch(ex){setError(ex instanceof Error?ex.message:String(ex));}
   };
   const examineStage=useCallback(async()=>{
