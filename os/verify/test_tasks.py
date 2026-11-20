@@ -55,6 +55,15 @@ class TaskStoreTests(unittest.TestCase):
                             for x in self.store.audit(taskid)))
         self.assertEqual(len(self.store.list()), 1)
 
+    def test_missing_audit_record_fails_even_if_local_hashes_match(self):
+        doc=self.store.create("Inspect","",[stage("first")])
+        tid=doc["task"]["id"]
+        self.store.dispatch(tid,"first")
+        self.store.db.execute("DELETE FROM audit WHERE action='task.created'")
+        self.assertFalse(self.store.verify_audit()["valid"])
+        with self.assertRaises(TaskError):
+            self.store.started(tid,"first")
+
     def test_service_and_kernel_plan_validation(self):
         doc=self.store.create("Guest service","",[
             stage("inspect",tool="service.inspect",args={"service":"aiws-workbench.service"}),

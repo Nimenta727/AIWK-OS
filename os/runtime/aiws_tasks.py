@@ -104,9 +104,13 @@ class GuestTaskStore:
                     digest=hashlib.sha256(payload.encode("utf-8")).hexdigest()
                 except (TypeError, ValueError):
                     return {"valid":False,"events":count,"lastHash":previous}
+                if row["seq"] != count + 1:
+                    return {"valid":False,"events":count,"lastHash":previous}
                 if row["previous_hash"] != previous or row["entry_hash"] != digest:
                     return {"valid":False,"events":count,"lastHash":previous}
                 previous, count = digest, count + 1
+            if count == 0 and self.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] != 0:
+                return {"valid":False,"events":count,"lastHash":previous}
             return {"valid":True,"events":count,"lastHash":previous}
 
     def _check_audit(self):

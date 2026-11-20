@@ -41,7 +41,16 @@ class Controller:
         self.lock = threading.Lock()
         self.records = {}
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aiws-agent")
-        state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))).expanduser()
+        if singleton:
+            # The production guest state DB must never live on a host/shared
+            # mount, even if XDG_STATE_HOME has been overridden.
+            home = Path.home().resolve(strict=True)
+            if not state_home.is_absolute() or state_home.is_symlink() or not (
+                    state_home.resolve(strict=False).is_relative_to(home)):
+                raise PermissionError("AIWS state directory must live inside the guest user's home")
+            state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+            protect_guest_workspace(state_home.resolve(strict=True))
         self.tasks = GuestTaskStore(state_home / "aiws", singleton=singleton)
         self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()

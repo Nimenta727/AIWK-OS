@@ -106,6 +106,20 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
+ const createOfflinePlan=async()=>{
+  if(!csrf||busy||!model?.online||!instruction.trim())return;
+  setBusy(true);setError('');
+  try{
+   // The model proposes ONE read-only tool. The server persists a pending,
+   // audited DAG but never executes it without a separate user action.
+   const item=await request<TaskDetail>('/model/plan',{
+    method:'POST',headers,body:JSON.stringify({instruction})
+   });
+   await update();
+   await open(item.task.id);
+  }catch(e){setError(String(e));}
+  finally{setBusy(false);}
+ };
  const addProposal=()=>{
   if(!proposal)return;
   setTitle(instruction.slice(0,100));
@@ -135,6 +149,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
      placeholder={tr('例如：查看项目中的 C# 文件结构','e.g. Inspect my guest C# project layout')}/></label>
    <button type="button" className="aiws-os-primary" disabled={!model?.online||!csrf||busy||!instruction.trim()}
     onClick={()=>void suggest()}><BrainCircuit size={16}/>{tr('生成本地工具建议','Suggest a local tool')}</button>
+   <button type="button" disabled={!model?.online||!csrf||busy||!instruction.trim()}
+    onClick={()=>void createOfflinePlan()}>{tr('生成并保存待审核任务','Create a pending audited task')}</button>
    {proposal&&<div className="aiws-os-proposal">
     <strong>{proposal.tool}</strong><p>{proposal.reason}</p>
     <pre>{JSON.stringify(proposal.arguments,null,2)}</pre>
