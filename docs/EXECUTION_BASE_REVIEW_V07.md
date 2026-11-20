@@ -41,7 +41,7 @@ The order of external side effects matters. Once the CLI is started, a subsequen
 ## Validation
 
 - Legacy Python regression suite: `python -m unittest discover -s tests -v` — **38 passed locally**.
-- Native `.NET` smoke tests: expanded to cover lease contention, corruption recovery, launch ordering, interrupted state, one-shot approval, and token validation. **Windows CI result is the authority for compilation and smoke tests**; don't claim a successful EXE build before the corresponding Actions run has completed.
+- Native `.NET` smoke tests: expanded to cover lease contention, corruption recovery, launch ordering, interrupted state, one-shot approval, and token validation. **Windows CI verified**: [Actions run 44657658528](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528) completed successfully (WPF compile, native smoke, x64 EXE publish).
 - No test in this repository proves the ability to introspect Claude/Codex private model requests or guarantees an actual token cap.
 
 ## Remaining risks / deferred decisions

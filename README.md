@@ -2,7 +2,7 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.7 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+> **V0.7 status:** native WPF/.NET compiled and Windows CI [verified successfully](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528), including core smoke tests and x64 single-file EXE publish. This is a prototype, not a finished or audited operating system agent.
 
 ## V0.7 — execution base stabilization (code-review driven)
 
