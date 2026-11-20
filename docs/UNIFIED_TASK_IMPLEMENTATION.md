@@ -1,3 +1,13 @@
+> **双语导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：统一任务工件、上下文编译与模型适配器。保留历史正文及原始测试/风险描述，不能据此宣称现版已通过新的 Hyper-V 运行验收。
+>
+> English: Unified task artifacts, context compilation and provider adapters. The historical narrative and original test/risk statements remain intact; this is not evidence of fresh Hyper-V acceptance.
+>
+> [总索引 / Docs index](README.md) · [当前发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # AIWS V1.7.3 — Unified Task Core, Context Compiler, Provider Adapters
 
 Date: 2026-11-20. Scope: **the first three phases** of the unified Agent architecture. This implements a local Windows task control plane; it does **not** implement autonomous cross-provider scheduling or a provider token proxy.
