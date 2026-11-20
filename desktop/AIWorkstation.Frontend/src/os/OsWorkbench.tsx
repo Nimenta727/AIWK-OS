@@ -2,18 +2,21 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Activity,BrainCircuit,Code2,FolderTree,Layers3,Play,RefreshCw,ShieldCheck} from 'lucide-react';
 import './OsWorkbench.css';
 import GuestFiles from './GuestFiles';
+import GuestTaskStudio from './GuestTaskStudio';
 
 type Tool={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;desktopInstalled:boolean;displayManagerInstalled:boolean;uiBundled:boolean};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type Page='overview'|'files'|'code'|'tasks'|'system';
+type Page='overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
 const MENU:{id:Page;zh:string;en:string;icon:typeof Activity}[]=[
  {id:'overview',zh:'操作系统工作台',en:'OS Workbench',icon:Layers3},
  {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
  {id:'code',zh:'跨平台代码智能',en:'Code Intelligence',icon:Code2},
  {id:'tasks',zh:'Agent 任务证据',en:'Agent Tasks',icon:BrainCircuit},
+ {id:'plans',zh:'持久任务与 DAG',en:'Persistent DAG',icon:Layers3},
+ {id:'local',zh:'本地 AI 助手',en:'Local AI Assistant',icon:BrainCircuit},
  {id:'system',zh:'系统与安全',en:'System & Security',icon:ShieldCheck}
 ];
 
@@ -98,6 +101,8 @@ export default function OsWorkbench(){
         page==='files'?tr('AI 工作区文件管理','AI-managed guest files'):
         page==='code'?tr('跨平台代码智能引擎','Cross-platform code intelligence'):
         page==='tasks'?tr('Agent 任务与执行证据','Agent tasks and execution evidence'):
+        page==='plans'?tr('持久任务与 DAG 审计','Persistent tasks and DAG audit'):
+        page==='local'?tr('本地小模型与离线规划','Local model and offline planning'):
         tr('系统服务与安全边界','System services and security')}</h1>
       <p>{tr('通过同一套工作台调度 Linux 能力；所有执行结果都可查看。','Call guest-native capabilities from one workbench and inspect every result.')}</p>
      </div>
@@ -131,6 +136,7 @@ export default function OsWorkbench(){
        {job.error&&<div className="aiws-os-error">{job.error}</div>}
        {job.result!==null&&<pre className="aiws-os-result">{JSON.stringify(job.result,null,2)}</pre>}</section>}
      </div>}
+     {(page==='plans'||page==='local')&&<GuestTaskStudio csrf={csrf} english={language==='en'} capabilities={tools} focus={page==='local'?'model':'tasks'}/>}
      {page==='system'&&<section className="aiws-os-card"><h2>{tr('客户机状态','Guest status')}</h2>
       <dl><dt>Desktop</dt><dd>{String(health?.desktopInstalled??false)}</dd>
        <dt>Display manager</dt><dd>{String(health?.displayManagerInstalled??false)}</dd>

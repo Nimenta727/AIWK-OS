@@ -40,3 +40,20 @@
 .aiws-os-file-actions button.aiws-os-primary{margin:0;background:#315ecf;color:#fff}
 .aiws-os-file-empty{text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;flex:1;color:#91a1b5;min-height:220px;padding:25px}
 @media(max-width:780px){.aiws-os-files-grid{grid-template-columns:1fr}.aiws-os-file-list{max-height:260px}}
+
+.aiws-os-studio-title{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.aiws-os-studio-title h2{display:flex;align-items:center;gap:9px}
+.aiws-os-studio-title span{font:600 10px/1.6 ui-monospace,monospace;color:#557093;letter-spacing:.03em}
+.aiws-os-studio-title button,.aiws-os-studio-actions button,.aiws-os-stage-status button,.aiws-os-proposal button{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #d4dce8;border-radius:8px;padding:9px 12px;cursor:pointer;color:#24466e}
+.aiws-os-studio-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 0}
+.aiws-os-studio-actions button.aiws-os-primary,.aiws-os-stage-status button.aiws-os-primary{background:#315ecf;color:#fff}
+.aiws-os-stage-draft{border:1px solid #e1e7ef;border-radius:11px;padding:15px;margin:14px 0;background:#f9fbff}
+.aiws-os-stage-draft .aiws-os-studio-title{font-size:12px;color:#345076}
+.aiws-os-stage-draft label{margin:11px 0}
+.aiws-os-studio .aiws-os-task span{display:inline-flex;align-items:center;gap:8px}
+.aiws-os-stage-status{padding:15px;margin:12px 0;border:1px solid #e1e7ef;border-radius:10px}
+.aiws-os-stage-status>div{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.aiws-os-stage-status>div strong{font-size:13px}.aiws-os-stage-status>div span{font-size:10px;color:#597294;font-weight:700}
+.aiws-os-stage-status .aiws-os-result{max-height:220px}
+.aiws-os-proposal{border:1px solid #dce5f5;border-radius:10px;padding:16px;background:#f8faff;margin-top:18px}
+.aiws-os-proposal pre{overflow:auto;font-size:12px;color:#354867}
