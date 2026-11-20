@@ -33,7 +33,7 @@ ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
           ".woff2": "font/woff2"}
 
 class Controller:
-    def __init__(self, workspace, ui):
+    def __init__(self, workspace, ui, singleton=False):
         self.workspace = Path(workspace)
         self.ui = Path(ui)
         self.csrf = secrets.token_urlsafe(32)
@@ -41,7 +41,7 @@ class Controller:
         self.records = {}
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aiws-agent")
         state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
-        self.tasks = GuestTaskStore(state_home / "aiws")
+        self.tasks = GuestTaskStore(state_home / "aiws", singleton=singleton)
         self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
 
@@ -234,6 +234,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, result)
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/audit/verify":
+            return self.reply(200, app.tasks.verify_audit())
         if path == "/api/v1/tasks":
             return self.reply(200, {"tasks": app.tasks.list()})
         if path.startswith("/api/v1/tasks/"):
@@ -357,13 +359,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)
 
-def make_server(workspace, ui, port=PORT):
+def make_server(workspace, ui, port=PORT, singleton=False):
     root = Path(workspace).resolve(strict=True)
     if not root.is_dir() or root in (Path("/"), Path.home()):
         raise ValueError("Dedicated workspace required")
     server = ThreadingHTTPServer((HOST, port), Handler)
     server.daemon_threads = True
-    server.application = Controller(root, ui)
+    server.application = Controller(root, ui, singleton=singleton)
     return server
 
 def main():
@@ -389,7 +391,7 @@ def main():
         print(json.dumps({"workspace": str(workspace), "uiBundled": (ui / "index.html").is_file(),
                           "toolCount": len(READ_ONLY)}))
         return
-    server = make_server(workspace, ui, args.port)
+    server = make_server(workspace, ui, args.port, singleton=True)
     print("AIWS guest workbench http://" + HOST + ":" + str(server.server_port), flush=True)
     try:
         server.serve_forever(poll_interval=0.2)

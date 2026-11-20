@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "runtime"))
 from aiws_tasks import GuestTaskStore, TaskError
@@ -69,6 +70,40 @@ class TaskStoreTests(unittest.TestCase):
           ("kernel.abandon",{"candidateId":"bad"})]:
             with self.assertRaises((TaskError,ValueError)):
                 self.store.create("Rejected","",[stage("s",tool=tool,args=args)])
+
+    def test_guest_restart_needs_new_write_approval(self):
+        doc=self.store.create("Restart model","",[stage("restart",tool="service.restart",
+            args={"service":"aiws-local-model.service"})])
+        tid=doc["task"]["id"]
+        self.store.approve(tid,"restart")
+        self.store.dispatch(tid,"restart")
+        self.store.started(tid,"restart")
+        self.store.close()
+        self.store=GuestTaskStore(self.folder)
+        self.assertEqual(self.store.get(tid)["stages"][0]["state"],"interrupted")
+        self.assertEqual(self.store.get(tid)["stages"][0]["approval"],0)
+        with self.assertRaises(TaskError):
+            self.store.dispatch(tid,"restart")
+        self.store.approve(tid,"restart")
+        self.assertTrue(self.store.dispatch(tid,"restart")["approvalGranted"])
+
+    def test_audit_redaction_and_corruption_block_execution(self):
+        raw="SECRET_GUEST_PROJECT_FILE_CONTENT"
+        doc=self.store.create("Edit guest","",[stage("write",tool="file.replace",
+            args={"path":"sample.txt","text":raw,"expectedSha256":""})])
+        tid=doc["task"]["id"]
+        self.assertNotIn(raw,json.dumps(self.store.audit(tid)))
+        self.assertTrue(self.store.verify_audit()["valid"])
+        self.store.db.execute("UPDATE audit SET details='{}' WHERE task_id=?",(tid,))
+        self.assertFalse(self.store.verify_audit()["valid"])
+        with self.assertRaises(TaskError):
+            self.store.approve(tid,"write")
+        self.store.close()
+        with self.assertRaises(TaskError):
+            GuestTaskStore(self.folder)
+        for suffix in ("tasks.sqlite3","tasks.sqlite3-wal","tasks.sqlite3-shm"):
+            (self.folder/suffix).unlink(missing_ok=True)
+        self.store=GuestTaskStore(self.folder)
 
     def test_restart_marks_queued_and_running_interrupted(self):
         doc = self.store.create("Recover", "", [stage("first")])

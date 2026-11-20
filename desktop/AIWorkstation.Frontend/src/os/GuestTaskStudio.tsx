@@ -187,7 +187,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     <p>{s.tool}{s.dependsOn.length?' ← '+s.dependsOn.join(', '):''}</p>
     {s.error&&<p className="aiws-os-error">{s.error}</p>}
     {s.result!==null&&<pre className="aiws-os-result">{JSON.stringify(s.result,null,2)}</pre>}
-    {s.state==='pending'&&s.approval===0?
+    {(s.state==='pending'||s.state==='interrupted')&&s.approval===0?
       <button type="button" disabled={busy} onClick={()=>void command(s,'approve')}><ShieldCheck size={15}/>{tr('批准客体写操作','Approve guest write')}</button>:
       (s.state==='pending'||s.state==='interrupted')?
        <button type="button" className="aiws-os-primary" disabled={busy} onClick={()=>void command(s,'dispatch')}>

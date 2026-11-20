@@ -30,11 +30,23 @@ def encode(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 class GuestTaskStore:
-    def __init__(self, folder):
+    def __init__(self, folder, singleton=False):
         self.folder = Path(folder)
         if not self.folder.is_absolute() or self.folder.is_symlink():
             raise TaskError("Guest task state must be an absolute, non-symlink directory")
         self.folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self._lock_fd = None
+        if singleton:
+            # Linux guest only: a second controller must not recover live work.
+            import fcntl
+            lockpath = self.folder / "controller.lock"
+            fd = os.open(lockpath, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                os.close(fd)
+                raise TaskError("Guest task controller is already owned") from exc
+            self._lock_fd = fd
         if self.folder.is_symlink() or self.folder.stat().st_mode & 0o077:
             raise TaskError("Guest state directory must be mode 0700")
         database = self.folder / "tasks.sqlite3"
@@ -69,11 +81,37 @@ class GuestTaskStore:
         CREATE INDEX IF NOT EXISTS task_audit_idx ON audit(task_id,seq);
         """)
         os.chmod(database, 0o600)
+        if not self.verify_audit()["valid"]:
+            raise TaskError("Guest audit chain integrity failure")
         self._recover_interrupted()
 
     def close(self):
         with self.lock:
             self.db.close()
+            if self._lock_fd is not None:
+                os.close(self._lock_fd)
+                self._lock_fd = None
+
+    def verify_audit(self):
+        """Check the entire local hash chain; not a guest-root tamper proof."""
+        with self.lock:
+            previous, count = "GENESIS", 0
+            for row in self.db.execute("SELECT * FROM audit ORDER BY seq").fetchall():
+                try:
+                    details=json.loads(row["details"])
+                    payload=encode([row["task_id"],row["stage_id"],row["action"],
+                                    details,previous,row["created_at"]])
+                    digest=hashlib.sha256(payload.encode("utf-8")).hexdigest()
+                except (TypeError, ValueError):
+                    return {"valid":False,"events":count,"lastHash":previous}
+                if row["previous_hash"] != previous or row["entry_hash"] != digest:
+                    return {"valid":False,"events":count,"lastHash":previous}
+                previous, count = digest, count + 1
+            return {"valid":True,"events":count,"lastHash":previous}
+
+    def _check_audit(self):
+        if not self.verify_audit()["valid"]:
+            raise TaskError("Guest audit corruption; scheduling blocked")
 
     def _event(self, task_id, stage_id, action, details):
         timestamp = int(time.time())
@@ -90,11 +128,12 @@ class GuestTaskStore:
     def _recover_interrupted(self):
         with self.lock:
             rows = self.db.execute(
-                "SELECT task_id,id FROM stages WHERE state IN ('queued','running')").fetchall()
+                "SELECT task_id,id,tool FROM stages WHERE state IN ('queued','running')").fetchall()
             for row in rows:
-                self.db.execute("UPDATE stages SET state='interrupted',"
-                                "error='Previous guest process stopped; manual retry required' WHERE id=?",
-                                (row["id"],))
+                self.db.execute(
+                    "UPDATE stages SET state='interrupted',approval=?,"
+                    "error='Guest restart; explicit review required' WHERE id=?",
+                    (0 if row["tool"] in WRITE_TOOLS else 1,row["id"]))
                 self._event(row["task_id"], row["id"], "stage.interrupted",
                             {"reason": "guest restart"})
 
@@ -156,6 +195,7 @@ class GuestTaskStore:
         self.validate_plan(stages)
         identifier, now = uuid4().hex, int(time.time())
         with self.lock:
+            self._check_audit()
             self.db.execute("BEGIN IMMEDIATE")
             try:
                 self.db.execute(
@@ -170,7 +210,11 @@ class GuestTaskStore:
                          stage["tool"], encode(stage["arguments"]), encode(stage["dependsOn"]),
                          "pending", approval, now, ordinal))
                 self._event(identifier, None, "task.created",
-                            {"title": title, "plan": stages})
+                            {"title": title, "stages": [
+                                {"key": s["key"], "tool": s["tool"],
+                                 "dependsOn": s["dependsOn"], "argsSha256":
+                                  hashlib.sha256(encode(s["arguments"]).encode("utf-8")).hexdigest()}
+                                for s in stages]})
                 self.db.execute("COMMIT")
             except Exception:
                 self.db.execute("ROLLBACK")
@@ -209,6 +253,7 @@ class GuestTaskStore:
             raise TaskError("Invalid model provenance")
         self.get(task_id)
         with self.lock:
+            self._check_audit()
             self._event(task_id, None, "model.proposed",
                         {"model": model_name,
                          "promptSha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
@@ -233,8 +278,9 @@ class GuestTaskStore:
 
     def approve(self, task_id, stage_key):
         with self.lock:
+            self._check_audit()
             row = self._row(task_id, stage_key)
-            if row["state"] != "pending" or row["tool"] not in WRITE_TOOLS:
+            if row["state"] not in ("pending", "interrupted") or row["tool"] not in WRITE_TOOLS:
                 raise TaskError("Only pending guest-write stages require approval")
             self.db.execute("UPDATE stages SET approval=1 WHERE id=?", (row["id"],))
             self._event(task_id, row["id"], "stage.approved",
@@ -243,6 +289,7 @@ class GuestTaskStore:
 
     def dispatch(self, task_id, stage_key):
         with self.lock:
+            self._check_audit()
             row = self._row(task_id, stage_key)
             if row["state"] not in ("pending", "interrupted"):
                 raise TaskError("Stage already queued/running/completed; cannot double dispatch")
@@ -261,6 +308,7 @@ class GuestTaskStore:
 
     def started(self, task_id, stage_key):
         with self.lock:
+            self._check_audit()
             row = self._row(task_id, stage_key)
             if row["state"] != "queued":
                 raise TaskError("Expected queued stage")
@@ -269,6 +317,7 @@ class GuestTaskStore:
 
     def finished(self, task_id, stage_key, result=None, error=None):
         with self.lock:
+            self._check_audit()
             row = self._row(task_id, stage_key)
             if row["state"] != "running":
                 raise TaskError("Expected running stage")
