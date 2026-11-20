@@ -99,6 +99,16 @@ public partial class ModularWorkstationWindow : Window
                 "steps.launch" => await StepActionAsync(payload, "launch"),
                 "steps.preflight" => _controller.Preflight(ReadField(payload,"taskId"), ReadField(payload,"stepId")),
                 "tasks.setPromptBudget" => SetPromptBudget(payload),
+                "tasks.setBrief" => SetTaskBrief(payload),
+                "plans.link" => await LinkPlan(payload),
+                "steps.switchAgent" => SwitchAgent(payload),
+                "providers.capabilities" => ProviderAdapterRegistry.Describe(),
+                "context.bundle" => ContextCompiler.Summary(
+                    _controller.GetTask(ReadField(payload,"taskId")),
+                    WorkflowEngine.Find(_controller.GetTask(ReadField(payload,"taskId")), ReadField(payload,"stepId"))),
+                "context.bundle.preview" => ContextInspector.Preview(
+                    _controller.GetTask(ReadField(payload,"taskId")),
+                    WorkflowEngine.Find(_controller.GetTask(ReadField(payload,"taskId")), ReadField(payload,"stepId"))),
                 "steps.add" => AddStep(payload),
                 "steps.dependencies" => UpdateDependencies(payload),
                 "worktrees.create" => await CreateWorktree(payload),
@@ -137,7 +147,8 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.7.2-context-budget-preflight",
+        Version = "1.7.3-unified-task-handoff-adapters",
+        Providers = ProviderAdapterRegistry.Describe(),
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -150,6 +161,27 @@ public partial class ModularWorkstationWindow : Window
             "Windows CLI 继承当前用户权限；工作目录检查不是沙箱。"
         }
     };
+
+    private object SetTaskBrief(JsonElement payload)
+    {
+        _controller.SetTaskBrief(ReadField(payload,"taskId"),ReadField(payload,"goal"),ReadField(payload,"acceptanceCriteria"));
+        return new {success=true};
+    }
+
+    private async Task<object> LinkPlan(JsonElement payload)
+    {
+        var added=await _controller.LinkPlanAsync(ReadField(payload,"taskId"),ReadField(payload,"path"));
+        return new {linked=added};
+    }
+
+    private object SwitchAgent(JsonElement payload)
+    {
+        var choice=ReadField(payload,"agent");
+        if (!Enum.TryParse<AgentKind>(choice,false,out var selected) || !Enum.IsDefined(selected))
+            throw new ArgumentException("不支持的 Agent 执行器。");
+        _controller.SwitchAgent(ReadField(payload,"taskId"),ReadField(payload,"stepId"),selected);
+        return new {success=true};
+    }
 
     private object SetPromptBudget(JsonElement payload)
     {

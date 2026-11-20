@@ -1,8 +1,9 @@
 import {useEffect,useState} from 'react';
 import { CheckCircle2, ClipboardCheck, Play, RotateCcw, ShieldAlert } from 'lucide-react';
-import {bridge,type PromptBudgetAssessment,type WorkTask,type WorkStep} from '../bridge';
+import {bridge,type PromptBudgetAssessment,type ProviderCapability,type WorkTask,type WorkStep} from '../bridge';
+import {ContextBundlePanel} from './ContextBundlePanel';
 import {agentName} from '../model/workflow.mjs';
-export function TaskInspector({task,step,action,busy}:{task:WorkTask;step:WorkStep|null;action:(name:string,params?:Record<string,unknown>)=>void;busy:boolean}){
+export function TaskInspector({task,step,providers,action,busy}:{task:WorkTask;step:WorkStep|null;providers:ProviderCapability[];action:(name:string,params?:Record<string,unknown>)=>void;busy:boolean}){
   const [result,setResult]=useState('');
   const [preflight,setPreflight]=useState<PromptBudgetAssessment|null>(null);
   const [preflightError,setPreflightError]=useState('');
@@ -23,6 +24,10 @@ export function TaskInspector({task,step,action,busy}:{task:WorkTask;step:WorkSt
   const pending=step.status==='Pending', running=step.status==='Running';
   return <div className="inspector-body">
     <div className="overline">阶段检查器</div><h2>{step.title}</h2><div className="pill-row"><span className="pill">{agentName(step.agent)}</span><span className="pill muted">{step.status}</span></div>
+    {pending&&<div className="field"><label>当前执行器 · 可在启动前切换</label><select className="unified-provider-select" value={step.agent} disabled={busy} onChange={e=>action('steps.switchAgent',{taskId:task.id,stepId:step.id,agent:e.target.value})}>
+      {providers.map(p=><option key={p.id} value={p.agent}>{p.name}{p.available?'':' · 本机未安装'}</option>)}</select>
+      <p className="supporting">{providers.find(p=>p.agent===step.agent)?.notice||'使用本地官方 CLI；模型内部请求不可假定已观测。'} 切换会撤销此前的阶段审批。</p>
+    </div>}
     <div className="divider"/><div className="field"><label>依赖与隔离</label><p className="supporting">{step.dependsOn?.length?`依赖 ${step.dependsOn.length} 个已完成阶段`:'无显式依赖（旧流程默认串行）'}<br/>{step.worktreePath?`Worktree：${step.worktreePath}`:'尚未创建阶段独立 Worktree'}</p></div>
     {pending&&!step.worktreePath&&<button className="button secondary full" disabled={busy} onClick={()=>action('worktrees.create',{taskId:task.id,stepId:step.id})}>创建阶段隔离 Git Worktree</button>}
     <div className="divider"/><div className="field"><label>任务目标</label><p className="instructions">{step.instructions}</p></div>
@@ -36,6 +41,7 @@ export function TaskInspector({task,step,action,busy}:{task:WorkTask;step:WorkSt
         onClick={()=>action('tasks.setPromptBudget',{taskId:task.id,warningTokens,stopTokens})}>保存预算</button></div>
       <small>AIWS 仅限制复制给 CLI 的本地草稿；外部 CLI 的隐含提示词、工具调用和实际计费不受此阈值约束。</small>
     </div></>}
+    <ContextBundlePanel task={task} step={step}/>
     <div className="field"><label>安全审批</label><p className="supporting">{step.requiresApproval?step.approvalGranted?'已为此阶段一次性批准':'需要批准后才可启动':'无需额外审批，但启动外部 CLI 仍需明确确认'}</p></div>
     {pending&&step.requiresApproval&&!step.approvalGranted&&<button className="button secondary full" disabled={busy} onClick={()=>action('steps.approve',{taskId:task.id,stepId:step.id})}><ClipboardCheck size={16}/> 批准该阶段</button>}
     {pending&&step.agent==='Manual'&&<button className="button secondary full" disabled={busy||(step.requiresApproval&&!step.approvalGranted)} onClick={()=>action('steps.startManual',{taskId:task.id,stepId:step.id})}><Play size={16}/> 开始人工阶段</button>}

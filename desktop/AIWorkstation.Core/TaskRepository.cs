@@ -70,6 +70,7 @@ public sealed class TaskRepository
                         throw new InvalidDataException("任务库含有未知的 Agent 或阶段状态。");
                 }
                 ContextBudgetPolicy.Validate(task.PromptWarningTokens, task.PromptStopTokens);
+                UnifiedTaskCore.Reconcile(task);
                 WorkflowGraph.Validate(task);
             }
             return tasks;
@@ -85,6 +86,7 @@ public sealed class TaskRepository
         ArgumentNullException.ThrowIfNull(tasks);
         if (!File.Exists(_file) && HasBackup)
             throw new InvalidDataException("主任务库缺失且存在备份。请先执行显式恢复操作。");
+        foreach (var task in tasks) UnifiedTaskCore.Reconcile(task);
         var folder = Path.GetDirectoryName(_file)!;
         Directory.CreateDirectory(folder);
         var temp = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";

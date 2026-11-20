@@ -1,3 +1,13 @@
+# AIWS — Unified Task Core · Context Compiler · Provider Adapters (V1.7.3)
+
+The first three foundational phases of AIWS's unified Agent control plane are implemented: **one durable task**, explicitly linked Markdown plan hashes, stable per-stage work items and artifact references, a deterministic context compiler with provenance, and capability-aware switching between separately installed Claude Code/Codex CLIs. UI: **可视化工作流 → 统一任务档案 / 阶段检查器** and **AI 计划中心 → 绑定此计划版本**.
+
+**Windows permission Broker remains a future V1.8 milestone.** This V1.7.3 task foundation does not change that security roadmap.
+
+**No autonomous model routing is claimed.** Interactive CLI launch still requires Windows confirmation; an AIWS-local launch record does not prove a model request, and approximate handoff size is not provider token billing. See [implementation/acceptance notes](docs/UNIFIED_TASK_IMPLEMENTATION.md) and [change log](docs/routine/2026-11-20_1810-unified-task-context-provider.md). Windows CI and the real Hyper-V GUI test must be tracked independently.
+
+---
+
 # AIWS V1.7.2 — Token-aware local handoff preflight
 
 > **产品核心：统一 Agent 任务控制平面，而非多模型聊天启动器。** 任务、计划、上下文、模型切换、Git 变更和调用证据必须共享同一套状态。详见 [统一 Agent 控制平面设计](docs/UNIFIED_AGENT_CONTROL_PLANE.md)（设计目标，非已完成自动调度）。

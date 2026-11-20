@@ -129,3 +129,16 @@
 .budget-settings{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:10px;margin-bottom:8px}
 .budget-settings label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-foreground,#666)}
 .budget-settings input{max-width:86px;padding:5px 7px;border:1px solid var(--border,#ddd);border-radius:6px;background:transparent;color:inherit}
+
+/* Unified task control plane: information-first, no upstream UI shell */
+.unified-task-panel{padding:18px 20px;border:1px solid var(--line,#e5ded7);border-radius:14px;background:var(--surface,#fff);margin-bottom:16px}
+.unified-task-head{display:flex;gap:16px;justify-content:space-between;align-items:flex-start}
+.unified-task-head h2{font-size:18px;margin:2px 0 5px}.unified-task-head p{font-size:12px;color:var(--muted,#79716d);margin:0}
+.unified-stats{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0 10px}.unified-stats span{display:flex;align-items:center;gap:5px;font-size:12px;padding:6px 9px;background:#f7f5f1;border-radius:8px}
+.unified-edit{display:grid;gap:12px;margin:14px 0}.unified-edit label{display:grid;gap:6px;font-size:12px;font-weight:600}.unified-edit textarea{width:100%;border:1px solid #ded8d1;border-radius:8px;padding:9px;background:#fff;color:inherit;font:inherit;resize:vertical}
+.unified-summary{display:grid;gap:9px;margin:10px 0}.unified-summary strong,.unified-plan-refs strong{font-size:12px}.unified-summary p{margin:4px 0;font-size:13px;white-space:pre-wrap;line-height:1.5}
+.unified-plan-refs{display:grid;gap:5px;font-size:11px}.unified-plan-refs>span{display:flex;align-items:center;gap:6px;word-break:break-word}.unified-plan-refs small{color:#817c77}
+.unified-evidence{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11px;color:#847b73}
+.unified-provider-select{width:100%;background:#fff;border:1px solid #ddd4c9;border-radius:7px;color:inherit;padding:7px;margin:4px 0}
+.handoff-bundle{border-top:1px solid #ede7df;padding-top:10px;margin-top:10px}.handoff-bundle label{display:flex;align-items:center;gap:6px}.handoff-sources{display:grid;gap:5px;margin:7px 0;max-height:165px;overflow:auto}.handoff-sources div{display:flex;align-items:center;gap:5px;font-size:11px}.handoff-sources span{word-break:break-all;flex:1}.handoff-sources small{color:#857a70}.handoff-preview{font-size:11px;white-space:pre-wrap;overflow:auto;max-height:260px;padding:10px;border-radius:8px;background:#f6f3ee;margin:9px 0}.handoff-bundle small{display:flex;gap:5px;color:#847b73;line-height:1.5;margin-top:8px}
+.unified-plan-link{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8f4ef;border:1px solid #e7ded3;border-radius:8px;padding:10px;margin:8px 0}.unified-plan-link span{display:flex;gap:6px;align-items:center;font-size:12px}

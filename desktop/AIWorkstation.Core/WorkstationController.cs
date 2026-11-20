@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace AIWorkstation.Core;
 
 /// <summary>
@@ -76,6 +78,54 @@ public sealed class WorkstationController : IDisposable
             task.PromptStopTokens = stopTokens;
             ExecutionLedger.Append(task, null, "context.budget.updated",
                 metadata: $"warning={warningTokens}; stop={stopTokens}; estimates-only");
+        });
+    }
+
+    /// <summary>Update durable task intent without sending it to any provider.</summary>
+    public void SetTaskBrief(string taskId, string goal, string acceptanceCriteria)
+    {
+        goal = goal?.Trim() ?? "";
+        acceptanceCriteria = acceptanceCriteria?.Trim() ?? "";
+        if (goal.Length is < 1 or > 6000 || acceptanceCriteria.Length > 6000)
+            throw new ArgumentException("任务目标须为 1–6000 字符，验收条件最多 6000 字符。");
+        Change(taskId, task =>
+        {
+            if (task.Steps.Any(x => x.Status == StepStatus.Running))
+                throw new InvalidOperationException("执行期间不能修改任务总目标；请先完成或中断阶段。");
+            task.Unified.Goal = goal;
+            task.Unified.AcceptanceCriteria = acceptanceCriteria;
+            ExecutionLedger.Append(task, null, "task.brief.updated", metadata: "AIWS-owned task goal and acceptance");
+        });
+    }
+
+    /// <summary>Link only a verified, local, workspace-relative plan SHA. No plan text duplication.</summary>
+    public async Task<bool> LinkPlanAsync(string taskId, string relativePath)
+    {
+        var task = GetTask(taskId);
+        var document = await PlanWorkspaceService.ReadAsync(task.Workspace, relativePath).ConfigureAwait(false);
+        var added = false;
+        Change(taskId, current =>
+        {
+            added = UnifiedTaskCore.AttachPlan(current, document);
+            if (added) ExecutionLedger.Append(current, null, "plan.revision.linked", metadata: "plan metadata only");
+        });
+        return added;
+    }
+
+    /// <summary>Change the executor without cloning the task, plan or work history.</summary>
+    public void SwitchAgent(string taskId, string stepId, AgentKind agent)
+    {
+        Change(taskId, task =>
+        {
+            var step = WorkflowEngine.Find(task, stepId);
+            ProviderAdapterRegistry.EnsureSwitchable(task, step, agent);
+            if (step.Agent == agent) return;
+            step.Agent = agent;
+            if (agent != AgentKind.Manual) step.RequiresApproval = true;
+            step.ApprovalGranted = false; // Previous approval never applies to a different provider.
+            step.LastPromptFingerprint = "";
+            ExecutionLedger.Append(task, step, "stage.provider.switched",
+                metadata: $"adapter={ProviderAdapterRegistry.IdFor(agent)}; pending-only");
         });
     }
 
@@ -230,21 +280,23 @@ public sealed class WorkstationController : IDisposable
         EnsureHealthy();
         var task = GetTask(taskId);
         // Snapshot before mutation: persistence failure cannot leave a phantom status in memory.
-        var stepSnapshots = task.Steps.Select(s => (s, s.Status, s.ApprovalGranted, s.Result, s.StartedAt, s.CompletedAt, s.GitBefore, s.GitAfter)).ToList();
+        var stepSnapshots = task.Steps.Select(s => (s, s.Agent, s.RequiresApproval, s.Status, s.ApprovalGranted, s.Result, s.StartedAt, s.CompletedAt, s.GitBefore, s.GitAfter)).ToList();
         var oldEvents = task.RequestEvents.ToList();
         var oldLedger = task.ExecutionRecords.ToList();
         var oldDependencies=task.Steps.Select(x=>(x,x.DependsOn.ToList(),x.WorktreePath,x.WorktreeBaseline,x.RunId)).ToArray();
         var oldStepCount=task.Steps.Count;
         var oldWarningTokens = task.PromptWarningTokens;
         var oldStopTokens = task.PromptStopTokens;
-        try { act(task); Save(); }
+        var oldUnified = JsonSerializer.Deserialize<UnifiedTaskState>(JsonSerializer.Serialize(task.Unified))!;
+        try { act(task); UnifiedTaskCore.Reconcile(task); Save(); }
         catch
         {
             task.PromptWarningTokens = oldWarningTokens;
             task.PromptStopTokens = oldStopTokens;
-            foreach (var (s,status,approved,result,start,completed,before,after) in stepSnapshots)
+            task.Unified = oldUnified;
+            foreach (var (s,agent,requiresApproval,status,approved,result,start,completed,before,after) in stepSnapshots)
             {
-                s.Status = status; s.ApprovalGranted = approved; s.Result = result;
+                s.Agent = agent; s.RequiresApproval = requiresApproval; s.Status = status; s.ApprovalGranted = approved; s.Result = result;
                 s.StartedAt = start; s.CompletedAt = completed; s.GitBefore = before; s.GitAfter = after;
             }
             foreach(var (s,deps,path,baseline,runId) in oldDependencies)

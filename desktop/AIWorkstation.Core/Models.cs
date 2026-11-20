@@ -42,6 +42,8 @@ public sealed class WorkTask
     public int PromptWarningTokens { get; set; } = ContextBudgetPolicy.DefaultWarningTokens;
     public int PromptStopTokens { get; set; } = ContextBudgetPolicy.DefaultStopTokens;
     public List<WorkflowStep> Steps { get; set; } = [];
+    // Additive V1 control plane: old tasks are migrated without replacing Steps.
+    public UnifiedTaskState Unified { get; set; } = new();
     public List<ExecutionRecord> ExecutionRecords { get; set; } = [];
     public string WorkspaceFor(WorkflowStep step) => string.IsNullOrWhiteSpace(step.WorktreePath) ? Workspace : step.WorktreePath;
     public List<RequestTraceEvent> RequestEvents { get; set; } = [];

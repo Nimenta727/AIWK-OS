@@ -11,32 +11,14 @@ public static class ContextInspector
 
     public static ContextReport Preview(WorkTask task, WorkflowStep step)
     {
-        var handoff = HandoffBuilder.Prepare(task, step);
-        var index = task.Steps.IndexOf(step);
-        if (index < 0) throw new ArgumentException("未知阶段。");
-        var history = (task.GraphMode ? task.Steps.Where(x => step.DependsOn.Contains(x.Id)) :
-            task.Steps.Take(index)).Where(x => x.Status == StepStatus.Completed).ToList();
-        var parts = new List<ContextPart>
-        {
-            new("metadata", "阶段标题与执行器", task.Title.Length + step.Title.Length + AgentLabel.Name(step.Agent).Length,
-                "AIWS 工作流配置", true, "本地可见；仅字符统计"),
-            new("instructions", "当前阶段原始指令", step.Instructions.Length,
-                "用户指定的阶段指令", true, "不静默截断当前指令")
-        };
-        var included = history.TakeLast(2).ToList();
-        var already = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var previous in included)
-        {
-            var result = previous.Result.Trim();
-            var unique = already.Add(result);
-            parts.Add(new ContextPart("handoff", previous.Title, unique ? Math.Min(result.Length, 1200) : 0,
-                "已完成阶段的人工记录结果", unique, unique ? result.Length > 1200 ? "超过 1200 字符，已截断" : "已引用" : "重复结果被省略"));
-        }
-        if (history.Count > 2)
-            parts.Add(new ContextPart("omitted", "早期阶段结果", 0, "已完成阶段历史", false,
-                $"另外 {history.Count - 2} 个早期阶段未加入交接"));
-        parts.Add(new ContextPart("policy", "本地执行边界", 0, "AIWS 固定提示规范", true,
-            "不可自动推送或访问未授权目录；字符已计入预览总数"));
+        var bundle = ContextCompiler.Compile(task, step);
+        var parts = bundle.Manifest.Select(entry => new ContextPart(
+            entry.Kind, entry.Reference, entry.Characters, "AIWS 本地工件清单",
+            entry.Included, entry.Evidence)).ToList();
+        parts.Add(new ContextPart("policy", "本地执行边界", 0,
+            "AIWS 固定执行规范", true, "不授予额外 Windows 权限"));
+        var handoff = new PreparedHandoff(bundle.Prompt, bundle.OriginalCharacters,
+            bundle.SentCharacters, bundle.ApproxTokens, bundle.Fingerprint);
         const int maxPreview = 24_000;
         bool truncated = handoff.Text.Length > maxPreview;
         return new ContextReport(step.Id, handoff.SentCharacters, handoff.OriginalCharacters,

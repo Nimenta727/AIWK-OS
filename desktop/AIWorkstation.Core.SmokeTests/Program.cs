@@ -584,6 +584,96 @@ try
         Console.WriteLine("SKIP: OS did not permit creating a symbolic-link fixture.");
     }
 
+    // Unified control plane phases 1-3: durable task intent, deterministic context,
+    // provider capabilities and switching without re-creating the user's work.
+    var providers = ProviderAdapterRegistry.Describe(tool => tool == "codex");
+    Assert(providers.Count == 3 && providers.Single(p => p.Id == "codex-cli").Available
+        && !providers.Single(p => p.Id == "claude-cli").Available
+        && providers.All(p => !p.SupportsUnattended && !p.CanObserveInternalRequests),
+        "provider adapters disclose real capabilities without inventing unattended or internal request support");
+    Assert(ThrowsAny(() => ProviderAdapterRegistry.IdFor((AgentKind)12345)),
+        "invalid provider selection cannot silently fall back to Codex");
+    var unifiedDir = Path.Combine(workspace,"unified-task-data");
+    string savedTaskId;
+    using (var control = new WorkstationController(unifiedDir))
+    {
+        var unified = control.CreateTask("跨 Agent 任务", planRoot, "lean");
+        savedTaskId = unified.Id;
+        Assert(unified.Unified.WorkItems.Count == unified.Steps.Count
+            && unified.Unified.WorkItems.All(x=>x.Id==x.StageId),
+            "unified work items are projections with stable stage IDs, not separate workflow authorities");
+        control.SetTaskBrief(unified.Id,"重构项目组件","测试通过，Diff 可审查");
+        var planFirst=control.LinkPlanAsync(unified.Id,"docs/ROADMAP.md").GetAwaiter().GetResult();
+        var planDuplicate=control.LinkPlanAsync(unified.Id,"docs/ROADMAP.md").GetAwaiter().GetResult();
+        Assert(planFirst && !planDuplicate && unified.Unified.Plans.Count==1,
+            "verified plan revision is linked once without copying its contents");
+        var firstStep=unified.Steps[0];
+        control.Approve(unified.Id,firstStep.Id);
+        control.SwitchAgent(unified.Id,firstStep.Id,AgentKind.ClaudeCode);
+        Assert(firstStep.Agent==AgentKind.ClaudeCode && !firstStep.ApprovalGranted
+            && unified.Unified.WorkItems.Single(x=>x.Id==firstStep.Id).Agent==AgentKind.ClaudeCode,
+            "switching provider preserves the work item and revokes previous approval");
+        var compiled=ContextCompiler.Compile(unified,firstStep);
+        var sameDraft=HandoffBuilder.Prepare(unified,firstStep);
+        Assert(compiled.AdapterId=="claude-cli" && compiled.Prompt.Contains("重构项目组件")
+            && compiled.Prompt.Contains("验收条件") && compiled.Prompt.Contains("docs/ROADMAP.md")
+            && compiled.Manifest.Any(x=>x.Kind=="plan-ref") && compiled.Prompt==sameDraft.Text
+            && compiled.Fingerprint==sameDraft.Fingerprint,
+            "context compiler builds one deterministic, source-labelled handoff for preflight and launch");
+        Assert(!compiled.Prompt.Contains("# 实施计划") && compiled.Manifest.All(x=>x.ContentHash.Length==64),
+            "handoff references plan hashes without reading and resending the whole Markdown plan");
+        var summary=ContextCompiler.Summary(unified,firstStep);
+        Assert(summary is not null && !summary.ToString()!.Contains("重构项目组件"),
+            "safe handoff summary does not expose full prompt text");
+        control.Approve(unified.Id,firstStep.Id);
+        var copied=string.Empty;
+        var invoked=false;
+        control.Launch(unified.Id,firstStep.Id, text=>copied=text, (agent,root)=>
+        {
+            invoked=agent==AgentKind.ClaudeCode && root==planRoot;
+        });
+        Assert(invoked && copied==compiled.Prompt && firstStep.RunId.Length>0
+            && unified.Unified.AgentRuns.Any(r=>r.Id==firstStep.RunId && r.Evidence=="local-intent"),
+            "official CLI launch intent records adapter/run metadata without asserting a model request");
+        Assert(ThrowsAny(()=>control.SwitchAgent(unified.Id,firstStep.Id,AgentKind.Codex)),
+            "running provider cannot change and invalidate execution provenance");
+        control.Complete(unified.Id,firstStep.Id,"实现并验证了核心工件");
+        Assert(unified.Unified.Artifacts.Any(a=>a.Kind=="stage-result" && a.StageId==firstStep.Id
+            && a.ContentHash==UnifiedTaskCore.HashText(firstStep.Result))
+            && unified.Unified.AgentRuns.Single(r=>r.Id==firstStep.RunId).Status==StepStatus.Completed,
+            "completed stage has immutable hashed artifact pointer and durable run status");
+        var next=unified.Steps[1];
+        var manualBundle=ContextCompiler.Compile(unified,next);
+        Assert(manualBundle.Manifest.Any(x=>x.Kind=="stage-result" && x.Included)
+            && manualBundle.Prompt.Contains("实现并验证了核心工件"),
+            "handoff into manual review reuses confirmed work instead of cloning conversation history");
+    }
+    using (var reopened = new WorkstationController(unifiedDir))
+    {
+        var persisted=reopened.GetTask(savedTaskId);
+        Assert(persisted.Unified.Goal=="重构项目组件" && persisted.Unified.Plans.Count==1
+            && persisted.Unified.Artifacts.Count>=2 && persisted.Unified.AgentRuns.Count==1,
+            "unified goal, plan revisions, artifacts and adapter run IDs survive restart");
+        Assert(!File.ReadAllText(Path.Combine(unifiedDir,"tasks.json")).Contains("# 实施计划"),
+            "local task database stores plan hashes rather than the imported plan body");
+    }
+    // Backward compatibility: an old JSON task lacking 'Unified' can still be read,
+    // reconciled, saved and reloaded without changing existing IDs.
+    var legacyPath=Path.Combine(workspace,"legacy-unified-migration.json");
+    var legacyRepo=new TaskRepository(legacyPath);
+    var legacy=WorkflowTemplates.Lean("旧版任务", planRoot);
+    legacyRepo.Save([legacy]);
+    var oldTree=System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(legacyPath))!;
+    oldTree.AsArray()[0]!.AsObject().Remove("Unified");
+    File.WriteAllText(legacyPath,oldTree.ToJsonString());
+    var upgraded=legacyRepo.Load().Single();
+    Assert(upgraded.Unified.SchemaVersion==1 && upgraded.Unified.WorkItems.Select(x=>x.StageId)
+            .SequenceEqual(legacy.Steps.Select(x=>x.Id)),
+        "legacy JSON migrates to unified metadata while preserving pre-existing stage IDs");
+    legacyRepo.Save([upgraded]);
+    Assert(legacyRepo.Load().Single().Unified.WorkItems.Count==2,
+        "migration remains valid under atomic backup and round-trip JSON validation");
+
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

@@ -8,8 +8,16 @@ export type FileReview = {path:string;status:string;diff:string;truncated:boolea
 export type StageChangeReport = {stageId:string;stageTitle:string;fromHead:string;toHead:string;headChanged:boolean;files:{path:string;kind:string;before:string;after:string}[];committedFiles:string[];partial:boolean;notice:string;startedAt:string|null;completedAt:string|null};
 export type ExecutionRecord = {id:string;stageId:string;runId:string;kind:string;source:string;evidence:'observed'|'imported'|'inferred'|'unknown';at:string;metadata:string};
 export type WorkStep = { dependsOn:string[];worktreePath:string;worktreeBaseline:string;runId:string;  gitBefore:GitCheckpoint|null;gitAfter:GitCheckpoint|null; id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
-export type WorkTask = { id:string; title:string; workspace:string; graphMode:boolean; promptWarningTokens:number; promptStopTokens:number; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
-export type Snapshot = { version:string; tasks:WorkTask[]; agents:Record<string,boolean>; limitations:string[] };
+export type PlanRevision = {id:string;relativePath:string;sha256:string;linkedAt:string};
+export type UnifiedWorkItem = {id:string;stageId:string;title:string;status:WorkStep['status'];agent:WorkStep['agent'];dependsOn:string[]};
+export type TaskArtifactRef = {id:string;kind:'plan'|'stage-result';stageId:string;reference:string;contentHash:string;recordedAt:string};
+export type AgentRunRecord = {id:string;stageId:string;agent:WorkStep['agent'];adapterId:string;status:WorkStep['status'];evidence:string;startedAt:string|null;completedAt:string|null};
+export type UnifiedTaskState = {schemaVersion:number;goal:string;acceptanceCriteria:string;plans:PlanRevision[];workItems:UnifiedWorkItem[];artifacts:TaskArtifactRef[];agentRuns:AgentRunRecord[]};
+export type ProviderCapability = {id:string;name:string;agent:WorkStep['agent'];toolName:string;available:boolean;requiresUserLaunch:boolean;supportsUnattended:boolean;supportsLocalWorktree:boolean;canImportStructuredUsage:boolean;canObserveInternalRequests:boolean;notice:string};
+export type ContextManifestEntry = {kind:string;reference:string;contentHash:string;characters:number;included:boolean;evidence:string};
+export type HandoffSummary = {version:number;taskId:string;stageId:string;adapterId:string;fingerprint:string;approxTokens:number;sentCharacters:number;savedCharacters:number;manifest:ContextManifestEntry[];evidenceNotice:string};
+export type WorkTask = { unified:UnifiedTaskState; id:string; title:string; workspace:string; graphMode:boolean; promptWarningTokens:number; promptStopTokens:number; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
+export type Snapshot = { version:string; tasks:WorkTask[]; providers:ProviderCapability[]; agents:Record<string,boolean>; limitations:string[] };
 type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void };
 type Message = {id:number;action:string;payload:Record<string,unknown>};
 declare global { interface Window { chrome?:{webview?:{postMessage:(x:string)=>void;addEventListener:(name:string,fn:(event:MessageEvent)=>void)=>void}} } }
