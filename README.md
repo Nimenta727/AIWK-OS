@@ -4,6 +4,8 @@ The AIWS-owned Windows `.exe` now connects **workflow stages** to a **local proj
 
 Build the standalone Windows EXE by running `scripts/Build-NativeDesktop.ps1` on Windows with .NET 10 and Node.js 22; distribute `WindowsAIWorkstation.exe` together with its `ui-dist/` directory. See [V1.2 project evidence spec](docs/PROJECT_EVIDENCE_V12.md) and [change routine](docs/routine/2026-11-20_1420-project-tree-git-stage-evidence.md). The existing Git-only tool console, workflow, approval and execution components remain intact.
 
+**Windows CI verified (2026-11-20):** React build, WPF/.NET core tests and self-contained EXE publishing passed: [Native Windows Desktop EXE run 44688011400](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44688011400). Hyper-V guest GUI testing is **not** yet complete; see [verification routine](docs/routine/2026-11-20_1431-v12-native-ci-verified.md).
+
 ---
 
 # AIWS V1.0 — source-level modular Windows workstation
