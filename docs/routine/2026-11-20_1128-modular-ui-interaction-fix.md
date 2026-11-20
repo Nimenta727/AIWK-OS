@@ -14,3 +14,12 @@
 1. Add contract tests for every allowlisted bridge operation and UI event.
 2. Extract additional dependency-isolated MIT UI modules with provenance and tests.
 3. Move process execution to a least-privilege Windows worker instead of the desktop UI process.
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 11:28 +0800 — Modular desktop workflow interaction regression fix**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **modular ui interaction fix**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)

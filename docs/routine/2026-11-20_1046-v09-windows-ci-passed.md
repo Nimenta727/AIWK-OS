@@ -26,3 +26,12 @@
 2. 针对 T3 Code 的 MIT 开源全栈构建创建独立实验分支，评估源码级 Fork，避免在主分支直接引入庞大且不兼容的 React 依赖。
 3. 利用受支持的接口连接 AIWS 工作流、审批、请求追踪，合并导航体验，避免再次重复生成模型请求。
 4. 维持上游许可证声明、固定依赖版本和 Windows CI 自动检查。
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 10:46 +08:00 — V0.9 专业前端 Windows CI 验收**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **v09 windows ci passed**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)

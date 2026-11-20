@@ -27,3 +27,12 @@
 2. Split the Windows worker out of UI process and add versioned bridge contracts.
 3. Source-port isolated terminal/diff interactions from compatible MIT upstream modules.
 4. Validate inside the user's Hyper-V guest before considering unattended use.
+
+
+---
+
+## 双语历史摘要 / Historical summary · 2026-11-20
+
+- 中文：本条记录关于 **2026-11-20 11:10 +0800 — Modular AIWS V1.0 source recomposition**，保留原始日期、修改和验证结论；归档摘要不意味着现版重新验收。
+- English: This historical change record covers **source module recomposition**. Original dates, modifications and verification claims remain intact; no current release acceptance is implied.
+- [历史索引 / Timeline](README.md) · [最新 README / Current README](../../README.md)
