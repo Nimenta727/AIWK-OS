@@ -13,6 +13,7 @@ export function MissionControl({task,action,onOpenStep,onOpenPlans,onOpenProject
  const [atlasOpen,setAtlasOpen]=useState(false);
  const [stageId,setStageId]=useState('');
  const [parallel,setParallel]=useState(1);
+ const [exportBusy,setExportBusy]=useState(false);
  const stats=useMemo(()=>missionTotals(task),[task]);
  useEffect(()=>{setPlan(null);setStageId('');setAtlasOpen(false);},[task?.id]);
  useEffect(()=>{
@@ -29,11 +30,11 @@ export function MissionControl({task,action,onOpenStep,onOpenPlans,onOpenProject
  const execute=async(name:string,payload:Record<string,unknown>)=>{
   setError('');try{await action(name,payload);setRefresh(v=>v+1);}catch(e){setError(String(e));}
  };
- const exportHealth=async()=>{setError('');try{await bridge.call('diagnostics.export');}catch(e){setError(String(e));}};
+ const exportHealth=async()=>{if(exportBusy)return;setExportBusy(true);setError('');try{await bridge.call('diagnostics.export');}catch(e){setError(String(e));}finally{setExportBusy(false);}};
  return <div className="mission-page">
   <div className="page-heading"><div><div className="eyebrow">MISSION CONTROL / ONE TASK, MANY AGENTS</div><h1>AI 协作总控台</h1>
    <p>一条任务统一计划、Agent 调度、上下文、Git 变化与本地审计；排队与查看不会调用模型。</p></div>
-   <button className="button secondary small" onClick={()=>setRefresh(x=>x+1)}><RefreshCcw size={15}/>刷新本地状态</button></div>
+   <button className="button secondary small" disabled={busy} onClick={()=>setRefresh(x=>x+1)}><RefreshCcw size={15}/>刷新本地状态</button></div>
   {!task?<div className="blank-state"><GitBranch size={24}/>先从左侧选择任务，或者新建一个协作任务。</div>:<>
   <div className="mission-metrics">
    <div><small>完成进度</small><strong>{stats.done}/{stats.total}</strong><span>已确认阶段</span></div>
@@ -71,7 +72,7 @@ export function MissionControl({task,action,onOpenStep,onOpenPlans,onOpenProject
     <div className="mission-diagnostics"><h3>本机可靠性检查</h3><div><Clock3 size={15}/>运行中 {health?.runningStages??'—'}，中断待核查 {health?.interruptedStages??'—'}</div>
      <div><ShieldAlert size={15}/>备份 {health?.backupAvailable?'存在':'尚未创建 / 无历史版本'}</div>
      <p>{health?.releaseNotice||'正在读取本地诊断。'}</p>
-     <button className="button secondary small" onClick={()=>void exportHealth()}>导出脱敏诊断 JSON</button></div>
+     <button className="button secondary small" disabled={exportBusy} onClick={()=>void exportHealth()}>{exportBusy?'正在导出…':'导出脱敏诊断 JSON'}</button></div>
    </section>
   </div>
   {atlasOpen&&<div className="mission-atlas"><ExecutionAtlas task={task} preferredStageId={stageId}/></div>}

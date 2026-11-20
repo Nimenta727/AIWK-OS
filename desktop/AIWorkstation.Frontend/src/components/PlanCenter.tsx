@@ -14,7 +14,7 @@ function Meter({value,unknown=false}:{value:number;unknown?:boolean}){
  </div>;
 }
 
-export function PlanCenter({task,onRefresh,onOpenStep,onOpenAtlas}:{task:WorkTask|null;onRefresh:()=>Promise<void>;onOpenStep:(id:string)=>void;onOpenAtlas:()=>void}){
+export function PlanCenter({task,onRefresh,onOpenStep,onOpenAtlas,action}:{task:WorkTask|null;onRefresh:()=>Promise<void>;onOpenStep:(id:string)=>void;onOpenAtlas:()=>void;action:(name:string,payload:Record<string,unknown>)=>Promise<void>}){
  const [scopeStep,setScopeStep]=useState('');
  const [catalog,setCatalog]=useState<PlanCatalog|null>(null);
  const [path,setPath]=useState('');
@@ -111,7 +111,7 @@ export function PlanCenter({task,onRefresh,onOpenStep,onOpenAtlas}:{task:WorkTas
       })}</div>
       <div className="plan-footer-note"><Info size={14}/>阶段进度来自本地审批与状态更新；打开阶段可继续查看 Agent 执行、Token、上下文和代码变化。</div>
     </div>:!document?<div className="plan-loading"><Activity size={21}/>读取本地计划文档…</div>:<>
-      {!scopeStep&&<div className="unified-plan-link"><span><BookOpen size={14}/> {task.unified.plans.some(p=>p.relativePath===document.path&&p.sha256===document.sha256)?'此版本已绑定到统一任务':'将当前计划版本绑定到 AIWS 统一任务，供跨 Agent 交接按需引用（不传送全文）'}</span><button className="button secondary small" disabled={busy||task.unified.plans.some(p=>p.relativePath===document.path&&p.sha256===document.sha256)} onClick={()=>{setBusy(true);setError('');void bridge.call('plans.link',{taskId:task.id,path:document.path}).then(onRefresh).catch(e=>setError(String(e))).finally(()=>setBusy(false));}}>绑定此计划版本</button></div>}
+      {!scopeStep&&<div className="unified-plan-link"><span><BookOpen size={14}/> {task.unified.plans.some(p=>p.relativePath===document.path&&p.sha256===document.sha256)?'此版本已绑定到统一任务':'将当前计划版本绑定到 AIWS 统一任务，供跨 Agent 交接按需引用（不传送全文）'}</span><button className="button secondary small" disabled={busy||task.unified.plans.some(p=>p.relativePath===document.path&&p.sha256===document.sha256)} onClick={()=>{setBusy(true);setError('');void action('plans.link',{taskId:task.id,path:document.path}).finally(()=>setBusy(false));}}>绑定此计划版本</button></div>}
       <div className="plan-document-kpis"><span>{outline?.sections.length||0} 个章节</span><span>{outline?.tracked||0} 个清单项</span><span>{outline?.done||0} 项原文已勾选</span><span>文档进度 {outline?.progress!=null?`${outline.progress}%`:'未知（无勾选项）'}</span></div>
       <Meter value={outline?.progress||0} unknown={outline?.progress==null}/>
       {outline?.clipped&&<div className="plan-library-note">计划过长，仅展示前 5,000 行和限量章节/清单。原始文件没有修改。</div>}

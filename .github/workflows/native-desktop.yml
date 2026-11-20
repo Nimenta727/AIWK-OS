@@ -30,6 +30,7 @@ jobs:
           npm test
           npm run build
           if (-not (Test-Path 'dist/index.html')) { throw 'Frontend build missing' }
+          npm run test:ui
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:

@@ -1,3 +1,4 @@
+import {timeoutMessage} from './model/interaction.mjs';
 export type DispatchSlot={stageId:string;title:string;adapterId:string;agent:string;status:string;reason:string;dependencyCount:number;approxTokens:number;canQueue:boolean;needsApproval:boolean;isQueued:boolean;ticketId:string|null;recommendedAgent:WorkStep['agent']|null};
 export type DispatchPlan={taskId:string;mode:string;maxRecommendedActive:number;activeStages:number;completedStages:number;readyStages:number;queuedStages:number;nextStageId:string|null;evidenceNotice:string;stages:DispatchSlot[]};
 export type HealthSnapshot={version:string;inspectedAt:string;tasks:number;runningStages:number;interruptedStages:number;pendingApprovals:number;queuedStages:number;importedUsageStages:number;unknownUsageStages:number;backupAvailable:boolean;securityNotice:string;releaseNotice:string};
@@ -59,9 +60,12 @@ class WorkstationBridge {
     const request:Message={id,action,payload};
     return new Promise<T>((resolve,reject)=>{
       const op:Pending={resolve:resolve as (x:unknown)=>void,reject};
-      // Only a known read operation times out: write/launch operations must never be retried implicitly.
-      if(['state','scheduler.plan','diagnostics.health','atlas.flow','context.bundle','providers.capabilities'].includes(action))
-        op.timer=setTimeout(()=>{if(this.pending.delete(id))reject(new Error('本地只读请求超时；未执行任何自动重试。'));},30000);
+      // Every operation must have a bounded UI wait. Writes are NEVER retried;
+      // if the native host was waiting for a confirmation dialog, its outcome
+      // may be unknown on timeout. Warn the user to verify before acting again.
+      const readOnly = /^(state|scheduler\.plan|diagnostics\.health|atlas\.|context\.|providers\.|plans\.(list|read)|project\.|tools\.(gitInspect|capabilities)|ledger\.timeline|steps\.preflight)$/.test(action);
+      const deadline = readOnly ? 45_000 : 180_000;
+      op.timer=setTimeout(()=>{if(this.pending.delete(id))reject(new Error(timeoutMessage(action,readOnly)));},deadline);
       this.pending.set(id,op);
       try{host.postMessage(JSON.stringify(request));}
       catch(ex){if(op.timer)clearTimeout(op.timer);this.pending.delete(id);reject(ex instanceof Error?ex:new Error(String(ex)));}

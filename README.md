@@ -1,3 +1,12 @@
+# AIWS V1.8.1 — Studio frontend / 视觉与交互可靠性优化
+
+本次迭代重构了 Windows 桌面 UI：深色专业侧栏、暖白工作区、清晰的卡片层次、可搜索任务、键盘快捷键、可访问弹窗、仅在流程页显示的阶段检查器，以及统一的本地操作反馈。修复防重复提交、过期状态响应、计划绑定与终端快速输入的桥接压力；全部工作仍在本地，不增加模型请求。**真实 Hyper-V GUI 与 WebView2 行为须独立验收。**
+
+- [完整 UI/交互设计与验证边界](docs/UI_STUDIO_V181.md)
+- [本轮开发日志与后续安排](docs/routine/2026-11-20_2003-studio-frontend-interaction-hardening.md)
+
+---
+
 # AIWS V1.8 preview — Agent 调度、统一总控台、可靠性加固
 
 **V1.8 Windows CI 已验证（2026-11-20）**：Node 前端 29/29、.NET 核心 smoke、WPF 编译、自包含 EXE 和离线 UI 打包全部通过。[原生 Windows CI #44729416838](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416838) · [Python/Windows 检查 #44729416839](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44729416839)。**Hyper-V GUI、独立权限 Broker、代码签名与无人值守 Agent 执行尚未验收。**
