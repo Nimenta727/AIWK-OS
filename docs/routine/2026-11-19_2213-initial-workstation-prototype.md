@@ -33,3 +33,12 @@
 3. Confirm CLI login/entitlements and prompt handoff; test path isolation and rollback.
 4. Evaluate supported T3/OpenClaw APIs before writing production adapters.
 5. Add Windows GUI broker only after per-action approvals and constrained Windows account testing.
+
+
+---
+
+## 历史归档双语概要 / Historical archival synopsis (added 2026-11-20)
+
+- **中文：** 本记录的历史主题为 **initial workstation prototype**。正文保留当时的变更、测试状态、已知限制和后续计划；这不是对当前版本的重新验收。
+- **English:** This dated record concerns **initial workstation prototype**. Its original changes, verification status, limitations and next steps are preserved; this archival summary is not a new acceptance claim.
+- [历史时间索引 / Historical timeline](README.md) · [当前版本 / Current release](../../README.md)

@@ -37,3 +37,12 @@
 3. Install Claude Code and Codex through official distributors, log in interactively, and test task handoff.
 4. Verify T3 Code and OpenClaw compatibility using published APIs only; add an isolated adapter where supported.
 5. Implement durable task queue, cancellation, per-action approvals, and Windows GUI tooling with integration tests.
+
+
+---
+
+## 历史归档双语概要 / Historical archival synopsis (added 2026-11-20)
+
+- **中文：** 本记录的历史主题为 **github publication hardening**。正文保留当时的变更、测试状态、已知限制和后续计划；这不是对当前版本的重新验收。
+- **English:** This dated record concerns **github publication hardening**. Its original changes, verification status, limitations and next steps are preserved; this archival summary is not a new acceptance claim.
+- [历史时间索引 / Historical timeline](README.md) · [当前版本 / Current release](../../README.md)
