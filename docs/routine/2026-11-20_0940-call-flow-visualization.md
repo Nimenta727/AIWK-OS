@@ -38,3 +38,12 @@
 2. Validate the interactive canvas and external CLI launch in a disposable Hyper-V Windows 11 VM.
 3. Add optional officially supported streaming adapters that expose real tool/turn events, without third-party subscription token proxying.
 4. Add per-task configurable context budgets, explicit operator approval and tested execution stop controls where supported.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 09:40 +0800 — Native request call-flow visualization (V0.6)。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **visualization**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)

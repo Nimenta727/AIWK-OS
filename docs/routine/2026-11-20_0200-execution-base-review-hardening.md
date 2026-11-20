@@ -26,3 +26,12 @@ Audited V0.6 native WPF core (task persistence, approval lifecycle, CLI launch, 
 2. Test startup recovery, dual-instance lock and CLI preflight on the actual Hyper-V guest.
 3. Migrate UI events toward MVVM, implement supported provider event adapters, and add Windows ACL/sandbox enforcement before any unattended agent actions.
 4. Evaluate a transactional SQLite task store after backup/recovery semantics are stable.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 02:00 UTC — Native execution base stabilization after code review。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **hardening**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)

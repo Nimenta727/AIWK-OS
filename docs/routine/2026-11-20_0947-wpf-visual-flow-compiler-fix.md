@@ -24,3 +24,12 @@
 1. Push fix, verify WPF compile, core tests and EXE artifact in GitHub Actions.
 2. Open the binary in a test Hyper-V guest to check scrolling, node inspection and import usability.
 3. Add supported provider event streaming where available, without claiming arbitrary subscription API access.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 09:47 +0800 — Fix WPF inspector layout for V0.6 call-flow。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **fix**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)

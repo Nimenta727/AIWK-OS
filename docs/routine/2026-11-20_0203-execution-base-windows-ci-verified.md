@@ -28,3 +28,12 @@ Follow-up verification record for the V0.7 code-review repair commit `cefed22591
 2. Prioritize a truly policy-enforced Windows tool broker and explicit process/session lifecycle tracking before unattended operation.
 3. Move WPF handlers into testable MVVM use-case services and evaluate transactional SQLite migration with explicit versioned backup/rollback.
 4. Expand provider event adapters only where officially supported; do not bypass subscription authentication boundaries.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 02:03 UTC — V0.7 Windows native execution-base verification。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **verified**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)
