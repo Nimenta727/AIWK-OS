@@ -160,10 +160,10 @@ public static class CallFlowBuilder
                 : "阶段历时未知";
             nodes.Add(new CallFlowNode(
                 $"{step.Id}:handoff", step.Id, FlowPhase.Handoff, "结果与交接",
-                finished ? "用户已核实完成" : step.Status == StepStatus.Failed ? "已失败" : "等待结果回填",
-                finished ? FlowState.Recorded : step.Status == StepStatus.Failed ? FlowState.Attention : FlowState.Planned,
+                finished ? "用户已核实完成" : step.Status == StepStatus.Failed ? "已失败" : step.Status == StepStatus.Interrupted ? "执行中断，需核验" : "等待结果回填",
+                finished ? FlowState.Recorded : step.Status is StepStatus.Failed or StepStatus.Interrupted ? FlowState.Attention : FlowState.Planned,
                 finished ? "本地记录了用户确认的阶段结果，下一阶段会按精简上下文规则使用它。此事件不是官方模型完成信号。" :
-                "本阶段还没有经过用户确认的最终结果；下一阶段不会把未完成结果视为已验证内容。",
+                "本阶段未确认完成。若工作台重启导致中断，应先核实外部 CLI 的实际结果，再决定是否重新执行。",
                 endedEvent == null ? "暂无阶段结束事件" : $"本地事件 {endedEvent.Kind} · {endedEvent.At:yyyy-MM-dd HH:mm:ss}",
                 "不额外调用模型", duration, endedEvent?.At));
             lanes.Add(new CallFlowLane(step.Id, $"{index + 1:D2}  ·  {step.Title}", AgentLabel.Name(step.Agent), stageState, nodes,

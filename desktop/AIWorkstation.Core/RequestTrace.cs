@@ -84,7 +84,8 @@ public static class RequestTrace
                     if (!TryUsage(codexUsage, out var i, out var c, out var o)) continue;
                     if (format is "claude") throw new InvalidDataException("不能混用两个提供商的日志。");
                     format = "codex";
-                    checked { input += i; cached += c; output += o; }
+                    try { checked { input += i; cached += c; output += o; } }
+                    catch (OverflowException ex) { throw new InvalidDataException("用量统计溢出，拒绝导入异常日志。", ex); }
                     usageEvents++;
                     AddEvent("codex.turn.completed", usedInput: i, usedOutput: o, usedCache: c);
                 }
@@ -129,16 +130,33 @@ public static class RequestTrace
     private static bool TryUsage(JsonElement node, out long input, out long cached, out long output)
     {
         input = cached = output = 0;
+        const long MaxPerEvent = 1_000_000_000_000L; // Reject forged, overflow-prone logs.
         if (!TryNonnegative(node, "input_tokens", out input) || !TryNonnegative(node, "output_tokens", out output)) return false;
-        if (node.TryGetProperty("cached_input_tokens", out var direct) && direct.TryGetInt64(out var directValue) && directValue >= 0) cached = directValue;
-        else if (node.TryGetProperty("input_tokens_details", out var details) && details.ValueKind == JsonValueKind.Object && TryNonnegative(details, "cached_tokens", out var nested)) cached = nested;
-        else if (node.TryGetProperty("cache_read_input_tokens", out var claudeCache) && claudeCache.TryGetInt64(out var cv) && cv >= 0) cached = cv;
-        // Claude's usage.input_tokens excludes cache read/write tokens. Normalize total input to
-        // include those categories, unlike Codex where cached tokens are already included.
-        if (node.TryGetProperty("cache_read_input_tokens", out var cacheRead) && cacheRead.TryGetInt64(out var read) && read >= 0)
+        if (input > MaxPerEvent || output > MaxPerEvent) return false;
+        bool isClaude = node.TryGetProperty("cache_read_input_tokens", out _)
+            || node.TryGetProperty("cache_creation_input_tokens", out _);
+        if (isClaude)
         {
-            long created = TryNonnegative(node, "cache_creation_input_tokens", out var create) ? create : 0;
-            checked { input += read + created; }
+            if (node.TryGetProperty("cache_read_input_tokens", out _) && !TryNonnegative(node, "cache_read_input_tokens", out cached)) return false;
+            long created = 0;
+            if (node.TryGetProperty("cache_creation_input_tokens", out _) && !TryNonnegative(node, "cache_creation_input_tokens", out created)) return false;
+            if (cached > MaxPerEvent || created > MaxPerEvent) return false;
+            if (input > MaxPerEvent - cached || input + cached > MaxPerEvent - created) return false;
+            // Claude input_tokens excludes both read and creation cache categories.
+            input += cached + created;
+        }
+        else
+        {
+            if (node.TryGetProperty("cached_input_tokens", out _))
+            {
+                if (!TryNonnegative(node, "cached_input_tokens", out cached)) return false;
+            }
+            else if (node.TryGetProperty("input_tokens_details", out var details) && details.ValueKind == JsonValueKind.Object
+                && details.TryGetProperty("cached_tokens", out _))
+            {
+                if (!TryNonnegative(details, "cached_tokens", out cached)) return false;
+            }
+            if (cached > input) return false; // Codex cached input is included in input.
         }
         return true;
     }

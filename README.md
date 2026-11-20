@@ -2,7 +2,13 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.6 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+> **V0.7 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+
+## V0.7 — execution base stabilization (code-review driven)
+
+The Windows WPF product now uses exclusive local writer leasing, validated/atomic task-store replacement with explicit backup recovery, fail-safe stage preparation, one-time approvals, restart-safe Interrupted states, stricter workspace/PATH checks and sanity checking for imported usage. The UI still launches separately installed official CLI applications (no bundled credentials, no implied model request telemetry). **Windows compilation and Hyper-V GUI validation must be tracked separately.**
+
+See [V0.7 engineering review, evidence and remaining risks](docs/EXECUTION_BASE_REVIEW_V07.md).
 
 ## V0.6 — 可视化 AI 请求调用链
 

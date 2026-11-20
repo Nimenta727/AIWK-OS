@@ -1,9 +1,15 @@
+using System.Text.Json;
 using AIWorkstation.Core;
 
 static void Assert(bool condition, string label)
 {
     if (!condition) throw new Exception("FAILED: " + label);
     Console.WriteLine("PASS: " + label);
+}
+static bool ThrowsAny(Action action)
+{
+    try { action(); return false; }
+    catch (Exception) { return true; }
 }
 static bool Throws(Action action)
 {
@@ -102,6 +108,81 @@ try
     var reloadGraph = CallFlowBuilder.Build(repository.Load()[0]);
     Assert(reloadGraph.Lanes[1].Nodes[2].State == FlowState.Recorded && reloadGraph.ImportedTokens == graph.ImportedTokens && reloadGraph.Lanes[1].ImportedEvents.Count == 4,
         "request flow survives local restart without storing original provider logs");
+    // V0.7: single writer lease rejects duplicate application instances.
+    var leaseDirectory = Path.Combine(workspace, "lease");
+    using (WorkspaceLease.Acquire(leaseDirectory))
+        Assert(ThrowsAny(() => WorkspaceLease.Acquire(leaseDirectory)), "exclusive workspace lease prevents concurrent writers");
+    using (WorkspaceLease.Acquire(leaseDirectory))
+        Assert(true, "workspace lease is released after disposal");
+
+    // Atomic persistence: do not overwrite an invalid primary or silently use .bak.
+    var recoveryFile = Path.Combine(workspace, "recovery.json");
+    var recoveryRepo = new TaskRepository(recoveryFile);
+    recoveryRepo.Save([WorkflowTemplates.Research("snapshot one", workspace)]);
+    recoveryRepo.Save([WorkflowTemplates.Research("snapshot two", workspace)]);
+    Assert(recoveryRepo.HasBackup && recoveryRepo.Load()[0].Title == "snapshot two", "validated primary and backup exist");
+    File.WriteAllText(recoveryFile, "{invalid json");
+    Assert(Throws(() => recoveryRepo.Load()), "corrupted primary is not treated as an empty database");
+    Assert(Throws(() => recoveryRepo.Save([])), "save refuses to clobber corrupted primary and backup");
+    var badPath = recoveryRepo.RestoreBackup();
+    Assert(File.Exists(badPath) && File.ReadAllText(badPath).Contains("invalid json"), "explicit recovery preserves corrupt evidence");
+    Assert(recoveryRepo.Load()[0].Title == "snapshot one" && recoveryRepo.HasBackup, "explicit recovery restores validated previous snapshot");
+    File.Delete(recoveryFile);
+    Assert(Throws(() => recoveryRepo.Load()) && Throws(() => recoveryRepo.Save([])), "missing primary plus backup refuses silent fresh start");
+    recoveryRepo.RestoreBackup();
+
+    var corruptIdsFile = Path.Combine(workspace, "duplicates.json");
+    var duplicate = WorkflowTemplates.Research("dupe", workspace);
+    File.WriteAllText(corruptIdsFile, JsonSerializer.Serialize(new[] { duplicate, duplicate })); // valid JSON, invalid domain identities
+    Assert(Throws(() => new TaskRepository(corruptIdsFile).Load()), "duplicate task identities rejected on load");
+
+    // Clipboard or disk failure must not create a phantom active stage.
+    var gatedTask = WorkflowTemplates.DualAgent("guarded", workspace);
+    var stage = gatedTask.Steps[0];
+    var plan = HandoffBuilder.Prepare(gatedTask, stage);
+    Assert(ThrowsAny(() => StageLaunchCoordinator.PrepareAndStart(gatedTask, stage, plan,
+        _ => throw new IOException("clipboard busy"), () => { })) && stage.Status == StepStatus.Pending,
+        "clipboard failure leaves stage Pending");
+    Assert(ThrowsAny(() => StageLaunchCoordinator.PrepareAndStart(gatedTask, stage, plan,
+        _ => { }, () => throw new IOException("disk full"))) && stage.Status == StepStatus.Pending
+        && gatedTask.RequestEvents.Count == 0 && stage.LastPromptFingerprint == "",
+        "durability failure rolls back in-memory running state and transient events");
+    StageLaunchCoordinator.PrepareAndStart(gatedTask, stage, plan, _ => { }, () => { });
+    Assert(stage.Status == StepStatus.Running && gatedTask.RequestEvents.Any(e => e.Kind == "stage.started"),
+        "durable launch intent is distinct from an actual model request");
+    Assert(WorkflowEngine.MarkInterrupted(gatedTask) == 1 && stage.Status == StepStatus.Interrupted,
+        "startup recovery marks running stage Interrupted without automatic retry");
+    Assert(Throws(() => WorkflowEngine.Start(gatedTask, stage.Id)), "interrupted stage cannot be restarted implicitly");
+    WorkflowEngine.Retry(gatedTask, stage.Id);
+    Assert(stage.Status == StepStatus.Pending && !stage.ApprovalGranted, "interrupted stage requires explicit retry");
+
+    var gateTask = WorkflowTemplates.DualAgent("approval", workspace);
+    WorkflowEngine.Start(gateTask, gateTask.Steps[0].Id);
+    WorkflowEngine.Complete(gateTask, gateTask.Steps[0].Id, "ok");
+    WorkflowEngine.Approve(gateTask, gateTask.Steps[1].Id);
+    WorkflowEngine.Start(gateTask, gateTask.Steps[1].Id);
+    Assert(!gateTask.Steps[1].ApprovalGranted, "one-shot approval is consumed on start");
+
+    var impossibleUsage = "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20,\"cached_input_tokens\":300}}";
+    Assert(Throws(() => RequestTrace.Import(gateTask, gateTask.Steps[1], impossibleUsage)),
+        "invalid cached-token > input-token telemetry rejected");
+    var hugeUsage = "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":9223372036854775807,\"output_tokens\":1}}";
+    Assert(Throws(() => RequestTrace.Import(gateTask, gateTask.Steps[1], hugeUsage)),
+        "unreasonable token magnitudes are rejected without false totals");
+    if (OperatingSystem.IsWindows())
+        Assert(Throws(() => WorkspaceGuard.RequireTrustedDirectory(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),
+            "entire user home is not allowed as a workspace");
+    // On operating systems where symlink creation is permitted, validate traversal protection.
+    var symlink = Path.Combine(workspace, "linked-workspace");
+    try
+    {
+        Directory.CreateSymbolicLink(symlink, workspace);
+        Assert(Throws(() => WorkspaceGuard.RequireTrustedDirectory(symlink)), "workspace reparse links are rejected");
+        Directory.Delete(symlink);
+    }
+    catch (UnauthorizedAccessException) { Console.WriteLine("SKIP: symlink creation needs privileges"); }
+    catch (IOException) { Console.WriteLine("SKIP: symlink creation unavailable"); }
+
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

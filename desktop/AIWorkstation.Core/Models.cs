@@ -1,7 +1,7 @@
 namespace AIWorkstation.Core;
 
 public enum AgentKind { ClaudeCode, Codex, Manual }
-public enum StepStatus { Pending, Running, Completed, Failed }
+public enum StepStatus { Pending, Running, Completed, Failed, Interrupted }
 
 public sealed class WorkflowStep
 {
@@ -48,6 +48,7 @@ public static class AgentLabel
         StepStatus.Pending => "待开始",
         StepStatus.Running => "执行中",
         StepStatus.Completed => "已完成",
+        StepStatus.Interrupted => "执行中断 · 需人工核验",
         _ => "失败 · 可重试"
     };
 }

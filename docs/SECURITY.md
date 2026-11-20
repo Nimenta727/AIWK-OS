@@ -50,3 +50,13 @@
 ## Provider policies
 
 Use the current official documentation before automating provider access. Anthropic's legal guidance says subscription OAuth is intended for normal native Claude apps and prohibits developers from routing third-party requests through subscription credentials. Codex `exec` is documented for scripting but its exact authentication mode, rate limits, and Windows sandbox behavior depend on the installed version.
+
+## V0.7 desktop execution-base protections
+
+- Native desktop uses `WorkspaceLease` to exclude a second writer against `%LOCALAPPDATA%\WindowsAIWorkstation`.
+- The primary task JSON is parsed/validated before replacement. Corrupt or missing primary with a backup is **not** treated as an empty task list. Restoring `.bak` is an explicit user decision; a forensic copy of the bad original is retained.
+- CLI launch preconditions are evaluated before clipboard preparation and durable stage intent. A clipboard or pre-launch persistence failure must not start an agent. Existing running work is marked Interrupted upon restart and never automatically retried.
+- Workspace roots, user home, OS/appdata directories, network paths and directory links are rejected for CLI launch. **This is NOT a security sandbox**: the official CLI inherits its Windows account permissions.
+- Task snapshots and backups can contain user prompt/result text. Restrict access to the Windows profile and remove stale backups according to your local retention policy.
+
+Detailed review: [EXECUTION_BASE_REVIEW_V07.md](EXECUTION_BASE_REVIEW_V07.md).

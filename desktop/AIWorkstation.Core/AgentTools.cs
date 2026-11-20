@@ -13,9 +13,12 @@ public static class AgentTools
             throw new ArgumentException("仅支持固定白名单中的官方工具。", nameof(name));
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {
-            if (string.IsNullOrWhiteSpace(directory) || directory.Trim() is "." or "..") continue;
+            var raw = directory.Trim().Trim('"');
+            // Relative PATH entries are resolved against the process working directory
+            // and can accidentally execute lookalike scripts from an untrusted checkout.
+            if (string.IsNullOrWhiteSpace(raw) || !Path.IsPathFullyQualified(raw)) continue;
             string folder;
-            try { folder = Path.GetFullPath(directory.Trim().Trim('"')); }
+            try { folder = Path.GetFullPath(raw); }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { continue; }
             foreach (var ext in Extensions)
             {

@@ -10,6 +10,7 @@ namespace AIWorkstation.Desktop;
 
 public partial class MainWindow : Window
 {
+    private readonly WorkspaceLease _lease;
     private readonly TaskRepository _repository;
     private readonly List<WorkTask> _tasks;
     private WorkTask? _activeTask;
@@ -24,14 +25,53 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         var appRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WindowsAIWorkstation");
+        _lease = WorkspaceLease.Acquire(appRoot);
+        Closed += (_, _) => _lease.Dispose();
         _repository = new TaskRepository(Path.Combine(appRoot, "tasks.json"));
         try { _tasks = _repository.Load(); }
         catch (Exception ex)
         {
-            _tasks = [];
-            _databaseHealthy = false;
-            MessageBox.Show("本地任务库读取失败。为保护原数据，不会覆盖数据库。\n" + ex.Message,
-                "读取数据异常", MessageBoxButton.OK, MessageBoxImage.Warning);
+            // Backup recovery is never automatic: explicit user confirmation, forensic copy kept.
+            if (_repository.HasBackup && MessageBox.Show(
+                "任务库无法读取。发现上一版备份，是否显式恢复？\n当前损坏文件会另存，备份本身不会删除。\n\n" + ex.Message,
+                "任务库恢复", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var preserved = _repository.RestoreBackup();
+                    _tasks = _repository.Load();
+                    MessageBox.Show("已从上一版备份恢复。损坏文件保留于：\n" + preserved,
+                        "恢复成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception restoreError)
+                {
+                    _tasks = [];
+                    _databaseHealthy = false;
+                    MessageBox.Show("备份恢复失败，已进入只读保护模式。\n" + restoreError.Message,
+                        "恢复失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                _tasks = [];
+                _databaseHealthy = false;
+                MessageBox.Show("未覆盖损坏数据库。请备份并检查 tasks.json / tasks.json.bak。\n" + ex.Message,
+                    "读取数据异常", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        if (_databaseHealthy)
+        {
+            var interruptedCount = _tasks.Sum(WorkflowEngine.MarkInterrupted);
+            if (interruptedCount > 0)
+            {
+                try { _repository.Save(_tasks); }
+                catch (Exception ex)
+                {
+                    _databaseHealthy = false;
+                    MessageBox.Show("检测到未完成阶段，但无法安全保存中断状态。已转为只读模式。\n" + ex.Message,
+                        "恢复保护", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
         }
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AIWorkstation", "projects");
         Directory.CreateDirectory(root);
@@ -44,7 +84,14 @@ public partial class MainWindow : Window
     private void Save()
     {
         if (!_databaseHealthy) throw new InvalidOperationException("任务库损坏，已进入只读保护状态。请先备份并修复 tasks.json。");
-        _repository.Save(_tasks);
+        try { _repository.Save(_tasks); }
+        catch
+        {
+            // Stop editing after a failed write instead of silently accumulating changes
+            // in memory that are absent on disk.
+            _databaseHealthy = false;
+            throw;
+        }
         UpdateTaskList();
     }
 
@@ -103,6 +150,7 @@ public partial class MainWindow : Window
 
     private void CreateTask_Click(object sender, RoutedEventArgs e) => Guard(() =>
     {
+        if (!_databaseHealthy) throw new InvalidOperationException("任务库处于只读保护模式，请先恢复数据。");
         var name = NewTaskTitle.Text.Trim();
         if (name.Length == 0 || name.Length > 160) throw new ArgumentException("任务标题长度需要在 1–160 字符之间。");
         var workspace = WorkspaceGuard.RequireTrustedDirectory(NewTaskWorkspace.Text);
@@ -169,7 +217,7 @@ public partial class MainWindow : Window
     private void SaveStep_Click(object sender, RoutedEventArgs e) => Guard(() =>
     {
         if (_activeStep == null) throw new InvalidOperationException("请先选择阶段。");
-        if (_activeStep.Status is StepStatus.Running or StepStatus.Completed)
+        if (_activeStep.Status is StepStatus.Running or StepStatus.Completed or StepStatus.Interrupted)
             throw new InvalidOperationException("运行中或完成的阶段不能修改计划。");
         var title = StepTitleBox.Text.Trim();
         if (title.Length == 0 || title.Length > 120) throw new ArgumentException("阶段标题长度无效。");
@@ -223,7 +271,9 @@ public partial class MainWindow : Window
     private void StartAgent_Click(object sender, RoutedEventArgs e) => Guard(() =>
     {
         if (_activeTask == null || _activeStep == null) throw new InvalidOperationException("请先选择阶段。");
-        // Preflight before marking Running. No credentials are read or stored.
+        if (!_databaseHealthy) throw new InvalidOperationException("任务数据库处于只读保护模式，不可启动 Agent。");
+        WorkflowEngine.EnsureStartable(_activeTask, _activeStep.Id);
+        // Preflight before any mutation. No provider tokens are accessed.
         WorkspaceGuard.RequireTrustedDirectory(_activeTask.Workspace);
         if (_activeStep.Agent != AgentKind.Manual && AgentTools.Locate(_activeStep.Agent == AgentKind.ClaudeCode ? "claude" : "codex") == null)
             throw new FileNotFoundException("当前 Agent 未安装。请在「Agent 与集成」中查看状态。");
@@ -231,46 +281,45 @@ public partial class MainWindow : Window
         if (plannedDraft.Fingerprint == _activeStep.LastPromptFingerprint &&
             _activeTask.RequestEvents.Any(evt => evt.StageId == _activeStep.Id && evt.Kind == "cli.launched"))
         {
-            var repeat = MessageBox.Show("当前交接指令与上次复制的内容相同。\n\n再次启动 Agent 可能产生重复的模型消耗。确定仍要继续吗？",
-                "重复上下文提醒", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (repeat != MessageBoxResult.Yes)
-            {
-                RequestTrace.Record(_activeTask, _activeStep, "launch.cancelled", "用户取消重复启动；未启动外部 CLI");
-                Save();
+            if (MessageBox.Show("当前交接内容与上次使用的内容相同。\n再次启动可能产生重复 Token 消耗，仍要继续吗？",
+                "重复上下文提醒", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
-            }
-            RequestTrace.Record(_activeTask, _activeStep, "prompt.duplicate_warning", "用户确认使用相同交接指令（是否重复模型调用未知）");
+            RequestTrace.Record(_activeTask, _activeStep, "prompt.duplicate_warning", "用户确认可能重复的交接指令");
         }
-        if (plannedDraft.ApproxTokens > 3500)
-        {
-            var longContext = MessageBox.Show($"交接内容约 {plannedDraft.ApproxTokens:N0} 预估 Token（并非真实计费值），可能较长。\n\n是否继续启动？",
-                "上下文预算提醒", MessageBoxButton.YesNo, MessageBoxImage.Information);
-            if (longContext != MessageBoxResult.Yes) return;
-        }
-        WorkflowEngine.Start(_activeTask, _activeStep.Id);
-        RequestTrace.Record(_activeTask, _activeStep, "stage.started", "本地阶段开始；尚未证明模型收到请求");
-        Save();
+        if (plannedDraft.ApproxTokens > 3500 &&
+            MessageBox.Show($"交接内容约 {plannedDraft.ApproxTokens:N0} 预估 Token（不是计费值）。是否继续？",
+                "上下文提醒", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes)
+            return;
+
+        // Clipboard failure now leaves stage Pending. A failed initial save also rolls back
+        // the in-memory state; no external executable is started until the intent is durable.
+        StageLaunchCoordinator.PrepareAndStart(_activeTask, _activeStep, plannedDraft, Clipboard.SetText, Save);
         RefreshWorkflow();
-        CopyDraft(_activeTask, _activeStep);
-        if (_activeStep.Agent != AgentKind.Manual)
+        if (_activeStep.Agent == AgentKind.Manual)
         {
-            try
-            {
-                AgentTools.LaunchInteractive(_activeStep.Agent, _activeTask.Workspace);
-                RequestTrace.Record(_activeTask, _activeStep, "cli.launched", "外部交互式 CLI 进程已启动；模型请求未观测");
-                Save();
-            }
-            catch (Exception ex)
-            {
-                RequestTrace.Record(_activeTask, _activeStep, "cli.launch_failed", "外部 CLI 启动异常；未确认模型调用");
-                WorkflowEngine.Fail(_activeTask, _activeStep.Id, "启动失败：" + ex.Message);
-                Save();
-                RefreshWorkflow();
-                throw;
-            }
-            Info("官方 Agent 已启动；交接指令已复制，请粘贴到终端。完成后回填实际结果。");
+            Info("人工阶段已开始；请完成后回填实际结果。");
+            return;
         }
-        else Info("人工阶段已开始；请完成后回填实际结果。");
+        try { AgentTools.LaunchInteractive(_activeStep.Agent, _activeTask.Workspace); }
+        catch (Exception ex)
+        {
+            RequestTrace.Record(_activeTask, _activeStep, "cli.launch_failed", "CLI 启动失败；未确认模型调用");
+            WorkflowEngine.Fail(_activeTask, _activeStep.Id, "启动失败：" + ex.Message);
+            Save();
+            RefreshWorkflow();
+            throw;
+        }
+        RequestTrace.Record(_activeTask, _activeStep, "cli.launched", "外部 CLI 已启动；实际模型请求仍未知");
+        try { Save(); }
+        catch (Exception ex)
+        {
+            // NEVER mark Failed: an external process may already be running.
+            Info("CLI 已启动，但事件记录保存失败；请人工核验，避免重复启动。" + ex.Message);
+            MessageBox.Show("外部程序可能仍在运行，不能自动重新启动。请确认终端并修复磁盘写入问题。\n" + ex.Message,
+                "CLI 状态不确定", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        Info("官方 Agent 已启动；交接内容已复制，请粘贴到其终端。模型请求尚未观测。");
     });
 
     private void CompleteStep_Click(object sender, RoutedEventArgs e) => Guard(() =>
@@ -286,7 +335,7 @@ public partial class MainWindow : Window
     private void FailOrRetryStep_Click(object sender, RoutedEventArgs e) => Guard(() =>
     {
         if (_activeTask == null || _activeStep == null) throw new InvalidOperationException("请先选择阶段。");
-        if (_activeStep.Status == StepStatus.Failed) WorkflowEngine.Retry(_activeTask, _activeStep.Id);
+        if (_activeStep.Status is StepStatus.Failed or StepStatus.Interrupted) WorkflowEngine.Retry(_activeTask, _activeStep.Id);
         else WorkflowEngine.Fail(_activeTask, _activeStep.Id, StepResultBox.Text);
         RequestTrace.Record(_activeTask, _activeStep, "stage.changed", "失败或重试状态已更新");
         Save();

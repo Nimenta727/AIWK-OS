@@ -12,10 +12,8 @@ public static class WorkflowEngine
 
     public static void Start(WorkTask task, string stepId)
     {
-        var step = Find(task, stepId);
-        VerifyPrerequisites(task, step);
-        if (step.Status != StepStatus.Pending) throw new InvalidOperationException("当前阶段不可重复启动。");
-        if (step.RequiresApproval && !step.ApprovalGranted) throw new InvalidOperationException("请先批准当前阶段。");
+        var step = EnsureStartable(task, stepId);
+        step.ApprovalGranted = false; // One-shot approval; it cannot be reused after a failure.
         step.Status = StepStatus.Running;
         step.StartedAt = DateTimeOffset.Now;
     }
@@ -42,12 +40,37 @@ public static class WorkflowEngine
     public static void Retry(WorkTask task, string stepId)
     {
         var step = Find(task, stepId);
-        if (step.Status != StepStatus.Failed) throw new InvalidOperationException("只有失败的阶段可以重试。");
+        if (step.Status is not (StepStatus.Failed or StepStatus.Interrupted)) throw new InvalidOperationException("只有失败或中断的阶段可以重试。");
         step.Status = StepStatus.Pending;
         step.Result = "";
         step.StartedAt = null;
         step.CompletedAt = null;
         step.ApprovalGranted = false;
+    }
+
+    public static WorkflowStep EnsureStartable(WorkTask task, string stepId)
+    {
+        var step = Find(task, stepId);
+        VerifyPrerequisites(task, step);
+        if (step.Status != StepStatus.Pending) throw new InvalidOperationException("当前阶段不可重复启动。");
+        if (step.RequiresApproval && !step.ApprovalGranted) throw new InvalidOperationException("请先批准当前阶段。");
+        if (task.Steps.Any(x => x != step && x.Status == StepStatus.Running))
+            throw new InvalidOperationException("当前任务已有执行中的阶段。");
+        return step;
+    }
+
+    /// <summary>Called only on application startup; never resumes or retries an external CLI.</summary>
+    public static int MarkInterrupted(WorkTask task)
+    {
+        var count = 0;
+        foreach (var step in task.Steps.Where(x => x.Status == StepStatus.Running))
+        {
+            step.Status = StepStatus.Interrupted;
+            step.ApprovalGranted = false;
+            RequestTrace.Record(task, step, "stage.interrupted", "工作台重启；外部 CLI 状态未知，需人工核验后重试");
+            count++;
+        }
+        return count;
     }
 
     public static WorkflowStep Find(WorkTask task, string stepId) =>
