@@ -53,4 +53,4 @@ A Claude/Codex plan that exists only in a remote or interactive CLI session, and
 - React/TypeScript, .NET/WPF compile, core smoke suite and Windows self-contained EXE artifact: [Actions 44708213179](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213179).
 - Repository-wide regression checks: [Actions 44708213271](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213271).
 - The compiled artifact was inspected in the working environment: it contains `WindowsAIWorkstation.exe`, `ui-dist/index.html`, and the Plan Studio strings in the bundled JS. This does not demonstrate actual Hyper-V GUI behavior.
-- A metadata-only subsequent change aligns `.csproj` package version to V1.7.1 and requires its own CI run before final release.
+- The follow-up metadata correction is **also Windows CI verified**: [Actions 44708896256](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708896256), with regression checks [44708896217](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708896217).
