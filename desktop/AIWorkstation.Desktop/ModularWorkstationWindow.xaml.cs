@@ -101,6 +101,8 @@ public partial class ModularWorkstationWindow : Window
                 "steps.dependencies" => UpdateDependencies(payload),
                 "worktrees.create" => await CreateWorktree(payload),
                 "ledger.timeline" => ExecutionLedger.Timeline(_controller.GetTask(ReadField(payload,"taskId"))),
+                "plans.list" => PlanWorkspaceService.List(PlanWorkspace(payload)),
+                "plans.read" => await PlanWorkspaceService.ReadAsync(PlanWorkspace(payload), ReadField(payload,"path")),
                 "atlas.flow" => CallFlowBuilder.Build(_controller.GetTask(ReadField(payload,"taskId"))),
                 "atlas.context" => ContextInspector.Preview(
                     _controller.GetTask(ReadField(payload,"taskId")),
@@ -133,7 +135,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.7.0-execution-atlas-structure-evidence",
+        Version = "1.7.1-live-plan-studio",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -245,6 +247,23 @@ public partial class ModularWorkstationWindow : Window
             throw new OperationCanceledException("已取消打开终端。");
         WindowsToolPolicy.OpenUserPowerShell(task.Workspace);
         return new { success = true };
+    }
+
+    // Plan center may inspect the trusted task root or a previously created stage Worktree.
+    // It cannot select arbitrary filesystem paths through WebView messages.
+    private string PlanWorkspace(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload,"taskId"));
+        if (payload.ValueKind == JsonValueKind.Object &&
+            payload.TryGetProperty("stepId", out var field) && field.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(field.GetString()))
+        {
+            var stage=WorkflowEngine.Find(task,field.GetString()!);
+            if (string.IsNullOrWhiteSpace(stage.WorktreePath))
+                throw new InvalidOperationException("所选阶段没有独立 Worktree。");
+            return WorkspaceGuard.RequireTrustedDirectory(stage.WorktreePath);
+        }
+        return WorkspaceGuard.RequireTrustedDirectory(task.Workspace);
     }
 
     private string ResolveWorkspace(JsonElement payload)

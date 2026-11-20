@@ -485,6 +485,48 @@ try
     Assert(!OperatingSystem.IsWindows() ? ThrowsAny(()=>ConPtyTerminal.StartPowerShell(workspace)) : true,
         "ConPTY rejects unsupported OS (real terminal requires Windows GUI acceptance)");
 
+    // V1.8 Plan Studio: only explicitly recognized Markdown plans inside trusted workspaces.
+    var planRoot=Path.Combine(workspace,"plan-studio-project");
+    Directory.CreateDirectory(Path.Combine(planRoot,"docs","plans"));
+    Directory.CreateDirectory(Path.Combine(planRoot,".claude","plans"));
+    File.WriteAllText(Path.Combine(planRoot,"docs","ROADMAP.md"),"# 实施计划\n- [x] 分析\n- [ ] 构建\n");
+    File.WriteAllText(Path.Combine(planRoot,"docs","plans","deployment.md"),"# 部署\n## 阶段一\n- [ ] 预检\n");
+    File.WriteAllText(Path.Combine(planRoot,"docs","plans","secrets.md"),"PRIVATE");
+    File.WriteAllText(Path.Combine(planRoot,"docs","notes.md"),"Not a plan");
+    var planList=PlanWorkspaceService.List(planRoot);
+    Assert(planList.Files.Count==2 && planList.Files.Any(x=>x.Path=="docs/ROADMAP.md")
+        && planList.Files.Any(x=>x.Path=="docs/plans/deployment.md"),
+        "plan discovery is bounded and limited to recognized Markdown plan locations");
+    var planDoc=PlanWorkspaceService.ReadAsync(planRoot,"docs/ROADMAP.md").GetAwaiter().GetResult();
+    Assert(planDoc.Text.Contains("[x]") && planDoc.Sha256.Length==64 && planDoc.Bytes>0,
+        "plan document content and version evidence are read locally");
+    File.WriteAllText(Path.Combine(planRoot,"docs","ROADMAP.md"),"# 实施计划\n- [x] 分析\n- [x] 构建\n");
+    var planUpdated=PlanWorkspaceService.ReadAsync(planRoot,"docs/ROADMAP.md").GetAwaiter().GetResult();
+    Assert(planUpdated.Sha256!=planDoc.Sha256,"plan file changes detected without model inference");
+    Assert(!PlanWorkspaceService.IsAllowedPlanPath("../../secrets.md")
+        && !PlanWorkspaceService.IsAllowedPlanPath("docs/notes.md")
+        && !PlanWorkspaceService.IsAllowedPlanPath("docs/plans/secrets.md")
+        && !PlanWorkspaceService.IsAllowedPlanPath("docs/routine/2026-11-20_log.md"),
+        "plan reader refuses traversal, secret filenames and unrelated documents");
+    Assert(ThrowsAny(()=>PlanWorkspaceService.ReadAsync(planRoot,"../../secrets.md").GetAwaiter().GetResult()),
+        "plan reader does not access files outside workspace");
+    File.WriteAllText(Path.Combine(planRoot,"docs","plans","oversize.md"),new string('x',262145));
+    Assert(!PlanWorkspaceService.List(planRoot).Files.Any(x=>x.Name=="oversize.md")
+        && ThrowsAny(()=>PlanWorkspaceService.ReadAsync(planRoot,"docs/plans/oversize.md").GetAwaiter().GetResult()),
+        "oversized Markdown is rejected before materialization");
+    try
+    {
+        File.CreateSymbolicLink(Path.Combine(planRoot,"docs","plans","linked.md"),
+            Path.Combine(planRoot,"docs","ROADMAP.md"));
+        Assert(!PlanWorkspaceService.List(planRoot).Files.Any(x=>x.Name=="linked.md")
+            && ThrowsAny(()=>PlanWorkspaceService.ReadAsync(planRoot,"docs/plans/linked.md").GetAwaiter().GetResult()),
+            "symlinked plan files are rejected");
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or System.PlatformNotSupportedException or IOException)
+    {
+        Console.WriteLine("SKIP: OS did not permit creating a symbolic-link fixture.");
+    }
+
     Console.WriteLine("All native core smoke tests passed.");
 }
 finally

@@ -1,3 +1,9 @@
+# AIWS V1.7.1 — AI 计划中心 / Plan Studio
+
+新增 **AI 计划中心**：将 AIWS 工作流阶段与项目 Markdown 计划书展示为分层大纲、任务看板和原文，包含清单完成度、依赖/执行状态及每 3 秒的本地近实时刷新。选择不同 Agent Worktree 可查看对应计划文档；打开页面不会发送模型请求，也不会自动扫描供应商账号会话目录。CLI 内部未保存成文件的计划无法自动监控。参见 [计划中心技术设计](docs/PLAN_STUDIO_V171.md) 和 [开发记录](docs/routine/2026-11-20_1705-plan-studio-live-markdown.md)。
+
+---
+
 # AIWS V1.7 — AI 调用与项目结构双向可视化 / Execution Atlas
 
 **新增默认页面：AI 调用与结构。** 左侧展开任务、阶段、上下文和导入的模型/工具事件；右侧对比阶段修改前后的项目目录结构，点文件可看 Git Diff，并从文件反查关联阶段。读取本地文件与 Git 不会额外调用模型。查看本地交接草稿需要用户明确点击。
@@ -6,7 +12,7 @@
 - [V1.3–V2.0 路线图](docs/ROADMAP.md) · [每次修改的记录与下一步](docs/routine/)
 - **不能把阶段和 CLI 启动画成已发生的远程模型请求**：只有官方结构化日志导入后才显示相应 Token；没有数据就显示“未知”。Git 结构变化是两次快照的观察结果，不能直接证明文件作者。
 - 旧版任务只有 Git 状态而没有 V1.7 的目录结构检查点时，保持“证据不足”；新阶段开始/完成后才可建立结构前后对比。
-- **V1.7 Windows CI 已通过：** [Native EXE 构建 44704423770](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44704423770)，自包含 EXE 与相邻 `ui-dist/` 文件均已核验；用户实际 Hyper-V GUI 验收尚未完成。
+- 本项目发布的是 Windows 自包含 EXE + 相邻 `ui-dist/` 文件；Windows CI 和真实 Hyper-V GUI 测试是不同的验收门槛。
 
 ---
 

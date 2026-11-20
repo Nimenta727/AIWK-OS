@@ -63,3 +63,8 @@ export type ContextPart = {kind:string;title:string;characters:number;source:str
 export type ContextReport = {stageId:string;characters:number;originalCharacters:number;savedCharacters:number;approxTokens:number;fingerprint:string;truncated:boolean;text:string;parts:ContextPart[];notice:string};
 export type RelatedStage = {stageId:string;title:string;agent:string;workspace:string;evidence:string;partial:boolean};
 export type RelatedStageLookup = {stages:RelatedStage[];partial:boolean;notice:string};
+
+// Local Markdown plan evidence, not model-generated JSON or provider telemetry.
+export type PlanFile = {path:string;name:string;bytes:number;updatedAt:string;version:string};
+export type PlanCatalog = {workspace:string;files:PlanFile[];checkedAt:string;notices:string[]};
+export type PlanDocument = {path:string;text:string;version:string;updatedAt:string;bytes:number;sha256:string};

@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
-import {Activity, ArrowRight, BadgeCheck, Boxes, ChevronDown, CircleHelp, Code2, Folder, GitBranch, LayoutDashboard, ListTodo, Plus, RefreshCw, Settings2, Sparkles, Terminal, GitCompare, Workflow, Layers3, X} from 'lucide-react';
+import {Activity, ArrowRight, BadgeCheck, Boxes, ChevronDown, CircleHelp, Code2, Folder, GitBranch, LayoutDashboard, ListTodo, Plus, RefreshCw, Settings2, Sparkles, Terminal, GitCompare, Workflow, Layers3, BookOpenCheck, X} from 'lucide-react';
 import {bridge, type Snapshot, type WorkTask, type WorkStep} from './bridge';
 import {WorkflowCanvas} from './components/WorkflowCanvas';
 import {DagCanvas} from './components/DagCanvas';
@@ -11,18 +11,19 @@ import {TaskInspector} from './components/TaskInspector';
 import {DevToolsPanel} from './components/DevToolsPanel';
 import {ProjectExplorer} from './components/ProjectExplorer';
 import {ExecutionAtlas} from './components/ExecutionAtlas';
+import {PlanCenter} from './components/PlanCenter';
 import {T3Skeleton} from './components/T3Skeleton';
 import {T3StatusDot} from './components/T3StatusDot';
 import {sumMeasuredUsage} from './model/workflow.mjs';
 
-type Page = 'overview'|'atlas'|'flow'|'trace'|'project'|'tools'|'integrations'|'terminal'|'ledger';
-const nav=[{id:'overview',label:'工作台概览',icon:LayoutDashboard},{id:'atlas',label:'AI 调用与结构',icon:Layers3},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'project',label:'文件与 Git 变更',icon:Code2},{id:'tools',label:'Git 只读控制台',icon:GitCompare},{id:'terminal',label:'Windows 内置终端',icon:Terminal},{id:'ledger',label:'执行事件账本',icon:ListTodo},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
+type Page = 'overview'|'plans'|'atlas'|'flow'|'trace'|'project'|'tools'|'integrations'|'terminal'|'ledger';
+const nav=[{id:'overview',label:'工作台概览',icon:LayoutDashboard},{id:'plans',label:'AI 计划中心',icon:BookOpenCheck},{id:'atlas',label:'AI 调用与结构',icon:Layers3},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'project',label:'文件与 Git 变更',icon:Code2},{id:'tools',label:'Git 只读控制台',icon:GitCompare},{id:'terminal',label:'Windows 内置终端',icon:Terminal},{id:'ledger',label:'执行事件账本',icon:ListTodo},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
 function TitleLogo(){return <span className="brand-mark"><Sparkles size={19} strokeWidth={1.9}/></span>}
 export default function App(){
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
  const [selectedTask,setSelectedTask]=useState<string|null>(null);
  const [selectedNode,setSelectedNode]=useState<string|null>(null);
- const [page,setPage]=useState<Page>('atlas');
+ const [page,setPage]=useState<Page>('plans');
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [showCreate,setShowCreate]=useState(false);
@@ -43,7 +44,7 @@ export default function App(){
  const create=async()=>{if(!workspace||!title.trim())return;await action('tasks.create',{title,workspace,template});};
  const pickWorkspace=async()=>{try{const result=await bridge.call<{path:string}>('workspaces.pick');if(result?.path)setWorkspace(result.path);}catch(e){setError(String(e));}};
  const measured=task?sumMeasuredUsage(task):null;
- return <div className={`app-shell ${page==='project'?'project-active':''} ${page==='atlas'?'atlas-active':''}`}>
+ return <div className={`app-shell ${page==='project'?'project-active':''} ${page==='atlas'?'atlas-active':''} ${page==='plans'?'plan-active':''}`}>
    <aside className="sidebar"><div className="brand"><TitleLogo/><div><strong>AI Workstation</strong><small>Windows · Personal Console</small></div></div>
      <div className="sidebar-section">工作空间</div>
      <nav className="nav">{nav.map(n=><button key={n.id} className={`nav-link ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}><n.icon size={18} strokeWidth={1.8}/><span>{n.label}</span>{page===n.id&&<span className="nav-active-dot"/>}</button>)}</nav>
@@ -61,6 +62,7 @@ export default function App(){
          <div className="section-title"><span>当前工作流</span><button onClick={()=>setPage('flow')}>查看流程 <ArrowRight size={14}/></button></div>
          {task?<div className="overview-task" onClick={()=>setPage('flow')} role="button" tabIndex={0} onKeyDown={e=>e.key==='Enter'&&setPage('flow')}><div className="task-top"><span className="task-icon"><Code2 size={20}/></span><div><strong>{task.title}</strong><small>{task.workspace}</small></div><span className="subtle-chip">{task.completedCount}/{task.steps.length} 阶段</span></div><div className="step-mini">{task.steps.map((s,i)=><div key={s.id}><span className={`mini-number ${s.status==='Completed'?'done':''}`}>{i+1}</span><span>{s.title}</span>{i<task.steps.length-1&&<span className="mini-line"/>}</div>)}</div></div>:<div className="blank-state"><Sparkles size={25}/><strong>你的第一条工作流，从这里开始</strong><p>选择项目文件夹，AIWS 会准备 Claude → Codex → 审查流程。</p><button className="button dark" onClick={()=>setShowCreate(true)}>创建工作流</button></div>}
        </div>}
+       {page==='plans'&&<PlanCenter task={task} onRefresh={load} onOpenStep={id=>{setSelectedNode(id);setPage('flow')}} onOpenAtlas={()=>setPage('atlas')}/>}
        {page==='atlas'&&<ExecutionAtlas task={task} preferredStageId={selectedNode}/>}
        {page==='flow'&&<div className="workspace-page">{task?<><div className="page-heading"><div><div className="eyebrow">VISUAL WORKFLOW</div><h1>{task.title}</h1><p><Folder size={14}/>{task.workspace}</p></div><div className="right-chip">{task.completedCount} / {task.steps.length} 已完成 <ChevronDown size={14}/></div></div><div className="editor-card"><div className="editor-header"><div><strong>任务协作流程</strong><small>选择节点查看状态、审批和调用证据</small></div><div className="editor-link-tools"><span className="editor-badge"><T3StatusDot phase="connected" label="本地控制层已连接"/> 本地流程引擎</span><button className="button secondary small" onClick={()=>setPage('atlas')}><Layers3 size={14}/> 调用与结构全景</button><button className="button secondary small" onClick={()=>setPage('project')}><GitCompare size={14}/> 查看项目变更</button></div></div>{task.graphMode?<DagCanvas task={task} selected={selectedNode} onPick={setSelectedNode}/>:<WorkflowCanvas task={task} selected={selectedNode} onPick={setSelectedNode}/>}
  <WorkflowDesigner task={task} action={action} busy={busy}/></div></>:<div className="blank-state"><Workflow size={27}/><strong>还没有工作流</strong><button className="button dark" onClick={()=>setShowCreate(true)}>创建任务</button></div>}</div>}
