@@ -83,6 +83,6 @@ def protect_guest_workspace(root, candidate=None, mountinfo=None):
     for point, fs in mounts:
         if point == deepest:
             continue
-        if (point == target or target.is_relative_to(point)) and point.is_relative_to(root):
-            raise PermissionError("Tool cannot cross into mounted filesystem inside workspace")
+        if point.is_relative_to(root):
+            raise PermissionError("Mounted filesystem under AIWS workspace is forbidden")
     return True

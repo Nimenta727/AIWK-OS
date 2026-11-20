@@ -35,7 +35,10 @@ class BoundaryTests(unittest.TestCase):
 
     def test_reject_host_shared_mounts_and_nested_mounts(self):
         mounts = "1 0 0:1 / / rw - ext4 /dev/vda1 rw\n2 1 0:2 / /mnt/shared rw - virtiofs host-share rw\n3 1 0:3 / /home/aiws/projects/host rw - 9p host0 rw\n"
-        self.assertTrue(protect_guest_workspace(Path("/home/aiws/projects"),Path("/home/aiws/projects/a.cs"),mounts))
+        with self.assertRaises(PermissionError):
+            protect_guest_workspace(Path("/home/aiws/projects"), Path("/home/aiws/projects/a.cs"), mounts)
+        self.assertTrue(protect_guest_workspace(Path("/home/aiws/projects"),
+            Path("/home/aiws/projects/a.cs"), "1 0 0:1 / / rw - ext4 /dev/vda1 rw\n"))
         with self.assertRaises(PermissionError):
             protect_guest_workspace(Path("/mnt/shared/proj"), mountinfo=mounts)
         with self.assertRaises(PermissionError):
