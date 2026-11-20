@@ -77,7 +77,7 @@ export function InternalObservatory({task,language,onOpenAtlas,onOpenPlan,onOpen
      <p>{t.files}: {groups.reduce((n,g)=>n+g.files.length,0)} · {t.dirs}: {structure?.changedDirectories??'—'}</p>
      {groups.map(g=><div className="io-folder" key={g.dir}><button type="button" aria-expanded={openDirs.has(g.dir)} onClick={()=>toggle(g.dir)}>
       {openDirs.has(g.dir)?<ChevronDown size={14}/>:<ChevronRight size={14}/>}<FolderTree size={15}/><strong>{g.dir}</strong><small>{g.files.length}</small></button>
-      {openDirs.has(g.dir)&&g.files.map(f=><button type="button" className="io-file" key={f.path} onClick={()=>setFile(f.path)}><FileCode2 size={13}/>{f.path.split('/').at(-1)}<em>{f.change}</em></button>)}</div>)}
+      {openDirs.has(g.dir)&&g.files.map((f:{path:string;change:string})=><button type="button" className="io-file" key={f.path} onClick={()=>setFile(f.path)}><FileCode2 size={13}/>{f.path.split('/').at(-1)}<em>{f.change}</em></button>)}</div>)}
      {!groups.length&&<p>{t.none}</p>}
      {file&&<div className="io-diff"><strong>{file}</strong><pre>{diff?.diff||diff?.note||t.none}</pre></div>}
     </div>}</div>
