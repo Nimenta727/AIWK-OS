@@ -22,3 +22,21 @@
 .aiws-os-card dl{display:grid;grid-template-columns:170px 1fr;gap:15px;font-size:13px}.aiws-os-card dt{color:#71819a}.aiws-os-card dd{margin:0;color:#203654}
 .aiws-os button:focus-visible,.aiws-os input:focus-visible,.aiws-os select:focus-visible{outline:3px solid #769aef;outline-offset:2px}
 @media(max-width:800px){.aiws-os{flex-direction:column}.aiws-os-sidebar{width:100%;padding:13px;gap:8px}.aiws-os-category,.aiws-os-foot{display:none}.aiws-os-sidebar nav{display:flex;overflow:auto}.aiws-os-sidebar nav button{flex-shrink:0}.aiws-os-top{padding:0 14px}.aiws-os-content{padding:28px 16px}.aiws-os-grid{grid-template-columns:1fr}.aiws-os-heading h1{font-size:23px}}
+
+.aiws-os-files-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.aiws-os-files-head h2{display:flex;align-items:center;gap:9px}
+.aiws-os-files-head button,.aiws-os-file-actions button{display:inline-flex;align-items:center;gap:7px;border:1px solid #d8e1eb;border-radius:8px;padding:8px 12px;background:#fff;color:#24446c;cursor:pointer}
+.aiws-os-files-grid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(0,2fr);gap:15px;margin-top:20px}
+.aiws-os-file-list{max-height:60vh;overflow:auto;border:1px solid #e1e6ee;border-radius:10px;padding:7px}
+.aiws-os-file-list button{background:none;border:0;border-radius:7px;display:flex;align-items:center;gap:8px;width:100%;padding:11px 9px;color:#344560;text-align:left;cursor:pointer;font-size:12px}
+.aiws-os-file-list button span{flex:1;overflow-wrap:anywhere;min-width:0}
+.aiws-os-file-list button.selected,.aiws-os-file-list button:hover{background:#edf3ff;color:#244ca2}
+.aiws-os-file-detail{min-width:0;border:1px solid #e1e6ee;border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.aiws-os-file-meta{display:grid;gap:5px;padding:14px;background:#f5f8fc;font-size:12px;overflow-wrap:anywhere}
+.aiws-os-file-meta span{font-family:monospace;color:#718095;font-size:11px}
+.aiws-os-file-detail pre,.aiws-os-file-detail textarea{width:100%;margin:0;border:0;min-height:230px;max-height:54vh;overflow:auto;white-space:pre;tab-size:2;background:#fff;padding:15px;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;color:#283951}
+.aiws-os-file-detail textarea{resize:vertical;border-bottom:1px solid #e6eaf1}
+.aiws-os-file-actions{display:flex;flex-wrap:wrap;gap:9px;padding:12px;border-top:1px solid #e3e8f1}
+.aiws-os-file-actions button.aiws-os-primary{margin:0;background:#315ecf;color:#fff}
+.aiws-os-file-empty{text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;flex:1;color:#91a1b5;min-height:220px;padding:25px}
+@media(max-width:780px){.aiws-os-files-grid{grid-template-columns:1fr}.aiws-os-file-list{max-height:260px}}

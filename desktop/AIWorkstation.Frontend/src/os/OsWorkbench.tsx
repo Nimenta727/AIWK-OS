@@ -1,15 +1,17 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Activity,BrainCircuit,Code2,FolderTree,Layers3,Play,RefreshCw,ShieldCheck} from 'lucide-react';
 import './OsWorkbench.css';
+import GuestFiles from './GuestFiles';
 
 type Tool={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;desktopInstalled:boolean;displayManagerInstalled:boolean;uiBundled:boolean};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type Page='overview'|'code'|'tasks'|'system';
+type Page='overview'|'files'|'code'|'tasks'|'system';
 type Language='zh'|'en';
 const MENU:{id:Page;zh:string;en:string;icon:typeof Activity}[]=[
  {id:'overview',zh:'操作系统工作台',en:'OS Workbench',icon:Layers3},
+ {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
  {id:'code',zh:'跨平台代码智能',en:'Code Intelligence',icon:Code2},
  {id:'tasks',zh:'Agent 任务证据',en:'Agent Tasks',icon:BrainCircuit},
  {id:'system',zh:'系统与安全',en:'System & Security',icon:ShieldCheck}
@@ -93,6 +95,7 @@ export default function OsWorkbench(){
     <div className="aiws-os-content">
      <div className="aiws-os-heading"><small>AIWS OS / LINUX GUEST</small>
       <h1>{page==='overview'?tr('工作台与操作系统，真正贯通','One workspace, integrated with Linux'):
+        page==='files'?tr('AI 工作区文件管理','AI-managed guest files'):
         page==='code'?tr('跨平台代码智能引擎','Cross-platform code intelligence'):
         page==='tasks'?tr('Agent 任务与执行证据','Agent tasks and execution evidence'):
         tr('系统服务与安全边界','System services and security')}</h1>
@@ -111,6 +114,7 @@ export default function OsWorkbench(){
        <button type="button" className="aiws-os-primary" onClick={()=>setPage('code')}>{tr('打开代码智能','Open code intelligence')}</button>
       </section>
      </div>}
+     {page==='files'&&<GuestFiles csrf={csrf} english={language==='en'} onSubmitted={item=>{setJob(item);setPage('tasks');void refresh();}}/>}
      {page==='code'&&<section className="aiws-os-card">
       <h2>{tr('通过 Agent 调用代码能力','Call a code tool through the task controller')}</h2>
       <label>{tr('能力','Capability')}<select value={tool} onChange={e=>setTool(e.target.value)}>{tools.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select></label>
