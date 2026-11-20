@@ -52,7 +52,7 @@ jobs:
           '
           test -s out/aiws-os-smoke/live-image-amd64.hybrid.iso
           (cd out/aiws-os-smoke && sha256sum -c live-image-amd64.hybrid.iso.sha256)
-      - name: Install QEMU (software emulation: hosted runners lack /dev/kvm)
+      - name: "Install QEMU for offline TCG guest boot"
         run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
       - name: Boot guest with no NIC and validate serial receipt
         timeout-minutes: 15
