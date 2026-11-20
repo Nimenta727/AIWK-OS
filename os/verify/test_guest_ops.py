@@ -6,12 +6,17 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"runtime"))
 from aiws_guest_ops import GuestOperations, GuestOperationError, validate
 
 class GuestOperationsTest(unittest.TestCase):
     def setUp(self):
+        self.boundary=patch("aiws_guest_ops.protect_guest_workspace",return_value=True)
+        self.tool_boundary=patch("aiws_toolplane.protect_guest_workspace",return_value=True)
+        self.boundary.start()
+        self.tool_boundary.start()
         self.temp=tempfile.TemporaryDirectory()
         base=Path(self.temp.name)
         self.workspace=base/"guest-project"
@@ -28,6 +33,8 @@ class GuestOperationsTest(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+        self.tool_boundary.stop()
+        self.boundary.stop()
 
     def test_service_is_allowlisted_and_mutations_require_approval(self):
         self.assertEqual(self.ops.execute("service.inspect",

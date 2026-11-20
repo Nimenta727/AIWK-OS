@@ -12,13 +12,15 @@ import sqlite3
 import threading
 import time
 from uuid import uuid4
+from aiws_guest_ops import TOOLS as GUEST_OP_TOOLS, WRITE_TOOLS as GUEST_OP_WRITES, validate as validate_guest_operation
+from aiws_toolplane import catalog as tool_catalog
 
 TOOLS = frozenset({
     "workspace.tree", "file.read", "file.replace", "code.search",
     "git.inspect", "runtime.detect", "browser.local_text", "platform.inspect",
     "code.symbols", "code.references", "code.dependencies", "code.platformApis",
-})
-WRITE_TOOLS = frozenset({"file.replace"})
+}) | GUEST_OP_TOOLS
+WRITE_TOOLS = frozenset({"file.replace"}) | GUEST_OP_WRITES
 MAX_STAGES = 32
 
 class TaskError(ValueError):
@@ -119,6 +121,14 @@ class GuestTaskStore:
             if not isinstance(args, dict) or any(not isinstance(k, str) or
                     not isinstance(v, str) or len(v) > 8192 for k, v in args.items()):
                 raise TaskError("Tool arguments must be bounded string values")
+            if tool in GUEST_OP_TOOLS:
+                validate_guest_operation(tool, args)
+            else:
+                specs = {x["name"]: x["inputSchema"] for x in tool_catalog()}
+                schema = specs.get(tool)
+                if not schema or set(args) - set(schema["properties"]) or any(
+                        field not in args for field in schema["required"]):
+                    raise TaskError("Missing/unknown tool arguments")
             if not isinstance(deps, list) or len(deps) > MAX_STAGES or any(not isinstance(x, str) for x in deps):
                 raise TaskError("Invalid dependencies")
             keys.append(key)
@@ -193,6 +203,19 @@ class GuestTaskStore:
                 values.append(item)
             return {"task": dict(task), "stages": values}
 
+    def record_model_proposal(self, task_id, model_name, prompt, proposal):
+        """Link a model proposal to a durable task without storing the prompt."""
+        if not isinstance(prompt, str) or not isinstance(proposal, dict):
+            raise TaskError("Invalid model provenance")
+        self.get(task_id)
+        with self.lock:
+            self._event(task_id, None, "model.proposed",
+                        {"model": model_name,
+                         "promptSha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                         "proposalSha256": hashlib.sha256(encode(proposal).encode("utf-8")).hexdigest(),
+                         "autoExecuted": False,
+                         "reviewRequired": True})
+
     def audit(self, task_id):
         self.get(task_id)
         with self.lock:
@@ -233,7 +256,8 @@ class GuestTaskStore:
             self.db.execute("UPDATE stages SET state='queued',error=NULL WHERE id=?", (row["id"],))
             self._event(task_id, row["id"], "stage.queued", {"key": stage_key})
             return {"id": row["id"], "task_id": task_id, "stage_key": stage_key,
-                    "tool": row["tool"], "arguments": json.loads(row["args_json"])}
+                    "tool": row["tool"], "arguments": json.loads(row["args_json"]),
+                    "approvalGranted": bool(row["approval"])}
 
     def started(self, task_id, stage_key):
         with self.lock:

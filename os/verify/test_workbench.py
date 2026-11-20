@@ -153,6 +153,43 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(self.request("POST", "/api/v1/tasks/" + taskid +
                                       "/stages/inspect/dispatch", {}, hdr)[0], 400)
 
+    def test_guest_service_and_kernel_dag_are_approval_gated(self):
+        csrf = self.request("GET","/api/v1/session")[1]["csrf"]
+        hdr = {"X-AIWS-CSRF": csrf}
+        dangerous = {"key":"service","label":"Restart guest model",
+            "tool":"service.restart","arguments":{"service":"aiws-local-model.service"},"dependsOn":[]}
+        status,task=self.request("POST","/api/v1/tasks",
+            {"title":"Guest model restart","goal":"","stages":[dangerous]},hdr)
+        self.assertEqual(status,202,task)
+        taskid=task["task"]["id"]
+        uri="/api/v1/tasks/"+taskid+"/stages/service/"
+        self.assertEqual(self.request("POST",uri+"dispatch",{},hdr)[0],400)
+        self.assertEqual(self.request("POST",uri+"approve",{},hdr)[0],202)
+        # Standalone unit tests are deliberately not dedicated VMs.
+        # Guest-only operations cannot be exercised against this host.
+        self.assertEqual(self.request("GET","/api/v1/guest/services")[0],403)
+        self.assertEqual(self.request("GET","/api/v1/guest/kernel")[0],403)
+        invalid={"key":"bad","label":"Host","tool":"service.restart",
+                 "arguments":{"service":"sshd.service"},"dependsOn":[]}
+        self.assertEqual(self.request("POST","/api/v1/tasks",
+            {"title":"Unsafe plan","goal":"","stages":[invalid]},hdr)[0],400)
+
+    def test_local_model_proposal_becomes_pending_audited_task(self):
+        csrf=self.request("GET","/api/v1/session")[1]["csrf"]
+        hdr={"X-AIWS-CSRF":csrf}
+        proposal={"tool":"workspace.tree","arguments":{"path":"."},
+                  "reason":"Inspect guest files","requiresReview":True,
+                  "executed":False,"source":"local-model"}
+        with patch.object(self.server.application.model,"suggest",return_value=proposal):
+            status,task=self.request("POST","/api/v1/model/plan",
+                {"instruction":"List guest project files"},hdr)
+        self.assertEqual(status,202,task)
+        self.assertEqual(task["stages"][0]["state"],"pending")
+        self.assertEqual(task["stages"][0]["tool"],"workspace.tree")
+        events=self.request("GET","/api/v1/tasks/"+task["task"]["id"]+"/audit")[1]["events"]
+        self.assertIn("model.proposed",[e["action"] for e in events])
+        self.assertNotIn("List guest project files",json.dumps(events))
+
     def test_async_result(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
         _, job = self.request("POST", "/api/v1/jobs",

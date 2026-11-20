@@ -54,6 +54,22 @@ class TaskStoreTests(unittest.TestCase):
                             for x in self.store.audit(taskid)))
         self.assertEqual(len(self.store.list()), 1)
 
+    def test_service_and_kernel_plan_validation(self):
+        doc=self.store.create("Guest service","",[
+            stage("inspect",tool="service.inspect",args={"service":"aiws-workbench.service"}),
+            stage("restart",tool="service.restart",deps=["inspect"],
+                  args={"service":"aiws-local-model.service"})])
+        taskid=doc["task"]["id"]
+        self.assertEqual(doc["stages"][1]["approval"],0)
+        with self.assertRaises(TaskError):
+            self.store.dispatch(taskid,"restart")
+        for tool,args in [
+          ("service.inspect",{"service":"host.service"}),
+          ("kernel.stage",{"path":"../host.fragment","expectedSha256":"0"*64}),
+          ("kernel.abandon",{"candidateId":"bad"})]:
+            with self.assertRaises((TaskError,ValueError)):
+                self.store.create("Rejected","",[stage("s",tool=tool,args=args)])
+
     def test_restart_marks_queued_and_running_interrupted(self):
         doc = self.store.create("Recover", "", [stage("first")])
         taskid = doc["task"]["id"]

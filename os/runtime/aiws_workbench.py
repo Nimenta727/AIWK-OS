@@ -17,6 +17,7 @@ from uuid import uuid4
 from aiws_toolplane import audit, catalog, invoke
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
+from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_local_model import LocalPlanner, LocalModelError
 import subprocess
 
@@ -41,6 +42,7 @@ class Controller:
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aiws-agent")
         state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
         self.tasks = GuestTaskStore(state_home / "aiws")
+        self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
 
     def health(self):
@@ -51,7 +53,8 @@ class Controller:
                 "desktopInstalled": bool(shutil.which("xfce4-session")),
                 "displayManagerInstalled": bool(shutil.which("lightdm")),
                 "uiBundled": (self.ui / "index.html").is_file(),
-                "toolCount": len(EXPOSED), "tasksPersistent": True,
+                "toolCount": len(EXPOSED) + len(GUEST_OP_TOOLS), "tasksPersistent": True,
+                "serviceScope": "guest-user-allowlist", "kernelChanges": "candidate-only",
                 "note": "Optional offline LLM makes suggestions only; no guest privilege broker or host VM access."}
 
     def recent(self):
@@ -92,7 +95,9 @@ class Controller:
         with self.lock:
             self.records[identifier]["status"] = "running"
         try:
-            result = invoke(tool, args)
+            result = (self.guest_ops.execute(tool, args,
+                                            approved=action["approvalGranted"])
+                      if tool in GUEST_OP_TOOLS else invoke(tool, args))
             encoded = json.dumps(result, ensure_ascii=False)
             if len(encoded) > 65536:
                 result = {"preview": encoded[:32000], "truncated": True}
@@ -137,6 +142,18 @@ class Controller:
             marker.unlink(missing_ok=True)
         self.model.enabled = enabled
         return self.model.status()
+
+    def model_plan(self, instruction):
+        """Convert a validated local model proposal to a pending DAG, never execute."""
+        proposal = self.model.suggest(instruction)
+        key = "inspect"
+        stage = {"key": key, "label": proposal["reason"][:160],
+                 "tool": proposal["tool"], "arguments": proposal["arguments"],
+                 "dependsOn": []}
+        task = self.tasks.create(("Local proposal: " + proposal["tool"])[:160],
+                                 proposal["reason"], [stage])
+        self.tasks.record_model_proposal(task["task"]["id"], "aiws-local", instruction, proposal)
+        return self.tasks.get(task["task"]["id"])
 
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
@@ -231,6 +248,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, {"events": app.tasks.audit(parts[3])})
                 except TaskError as exc:
                     return self.reply(404, {"error": str(exc)})
+        if path == "/api/v1/guest/services":
+            try:
+                return self.reply(200, {"services": [
+                    app.guest_ops.execute("service.inspect", {"service": name})
+                    for name in ("aiws-workbench.service", "aiws-local-model.service")]})
+            except (PermissionError, ValueError, OSError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/guest/kernel":
+            try:
+                return self.reply(200, app.guest_ops.execute("kernel.inspect", {}))
+            except (PermissionError, ValueError, OSError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/model/status":
             return self.reply(200, app.model.status())
         if path == "/api/v1/health":
@@ -239,7 +268,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"csrf": app.csrf, "mode": "linux-guest"})
         if path == "/api/v1/snapshot":
             return self.reply(200, {"health": app.health(), "jobs": app.recent(),
-                                    "capabilities": [x for x in catalog() if x["name"] in EXPOSED]})
+                                    "capabilities": [x for x in catalog() if x["name"] in EXPOSED] + guest_catalog()})
         if path.startswith("/api/v1/jobs/"):
             job = app.job(path.removeprefix("/api/v1/jobs/"))
             return self.reply(200, job) if job else self.reply(404, {"error": "Unknown job"})
@@ -273,7 +302,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan") and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -306,6 +335,10 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/model/plan":
+                if set(payload) != {"instruction"}:
+                    raise ValueError("Expected instruction")
+                result = app.model_plan(payload["instruction"])
             elif path == "/api/v1/model/suggest":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")

@@ -8,6 +8,7 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import platform
 import re
 import subprocess
 import tempfile
@@ -39,6 +40,13 @@ SPEC = {
     "kernel.recovery_plan": ("candidateId",),
     "kernel.abandon": ("candidateId",),
 }
+
+def catalog():
+    return [{"name": name, "description": "Guest-only service/kernel candidate operation: " + name,
+             "inputSchema": {"type": "object", "properties": {k: {"type": "string"} for k in fields},
+                             "required": list(fields), "additionalProperties": False}}
+            for name, fields in sorted(SPEC.items())]
+
 
 class GuestOperationError(ValueError):
     pass
@@ -88,7 +96,7 @@ def _atomic_private(path, data):
         raise GuestOperationError("Immutable candidate file already exists")
     fd, temp = tempfile.mkstemp(dir=path.parent, prefix=".pending-")
     try:
-        os.fchmod(fd, 0o600)
+        os.chmod(temp, 0o600)
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
             handle.flush()
@@ -163,7 +171,7 @@ class GuestOperations:
             return {"service": "aiws-local-model.service", "restartRequested": True,
                     "hostTouched": False, "privileged": False}
         if tool == "kernel.inspect":
-            return {"runningKernel": os.uname().release, "guestOnly": True,
+            return {"runningKernel": platform.release(), "guestOnly": True,
                     "kernelDeploymentSupported": False, "candidateOnly": True,
                     "note": "No live kernel, bootloader or host access"}
         if tool == "kernel.stage":
@@ -179,7 +187,7 @@ class GuestOperations:
                 raise GuestOperationError("Guest kernel staging quota exceeded")
             candidate_id = uuid4().hex
             receipt = {"id": candidate_id, "status": "staged", "sha256": digest,
-                       "runningKernel": os.uname().release, "entries": lines,
+                       "runningKernel": platform.release(), "entries": lines,
                        "createdAt": int(time.time()), "sourcePath": args["path"],
                        "deployed": False, "bootRecoveryReady": False}
             _atomic_private(self.state / (candidate_id + ".fragment"), data)
@@ -204,7 +212,7 @@ class GuestOperations:
             # Only metadata may change; source snapshot remains immutable.
             fd, temporary = tempfile.mkstemp(dir=self.state, prefix=".status-")
             try:
-                os.fchmod(fd, 0o600)
+                os.chmod(temporary, 0o600)
                 with os.fdopen(fd, "w", encoding="ascii") as out:
                     json.dump(updated, out, sort_keys=True)
                     out.flush()
