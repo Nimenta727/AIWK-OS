@@ -3,6 +3,7 @@ import {Activity,BrainCircuit,Code2,FolderTree,Layers3,Play,RefreshCw,ShieldChec
 import './OsWorkbench.css';
 import GuestFiles from './GuestFiles';
 import GuestTaskStudio from './GuestTaskStudio';
+import GuestSystemConsole from './GuestSystemConsole';
 
 type Tool={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
@@ -137,15 +138,8 @@ export default function OsWorkbench(){
        {job.result!==null&&<pre className="aiws-os-result">{JSON.stringify(job.result,null,2)}</pre>}</section>}
      </div>}
      {(page==='plans'||page==='local')&&<GuestTaskStudio csrf={csrf} english={language==='en'} capabilities={tools} focus={page==='local'?'model':'tasks'}/>}
-     {page==='system'&&<section className="aiws-os-card"><h2>{tr('客户机状态','Guest status')}</h2>
-      <dl><dt>Desktop</dt><dd>{String(health?.desktopInstalled??false)}</dd>
-       <dt>Display manager</dt><dd>{String(health?.displayManagerInstalled??false)}</dd>
-       <dt>UI bundle</dt><dd>{String(health?.uiBundled??false)}</dd>
-       <dt>Autonomous LLM</dt><dd>{String(health?.llmConnected??false)}</dd>
-       <dt>Guest-only</dt><dd>{String(health?.guestOnly??false)}</dd></dl>
-      <p className="aiws-os-muted">{tr('当前为单用户只读任务控制层。自主模型、客户机特权 Broker 和 VM 实机安全验证尚未实现。',
-       'Single-user read-only controller. Autonomous model, guest privilege broker and VM security validation are pending.')}</p>
-     </section>}
+     {page==='system'&&<GuestSystemConsole csrf={csrf} english={language==='en'} onPlanCreated={()=>setPage('plans')}/>}
+
     </div>
    </main>
   </div>;

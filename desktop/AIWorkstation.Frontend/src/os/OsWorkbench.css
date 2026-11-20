@@ -57,3 +57,10 @@
 .aiws-os-stage-status .aiws-os-result{max-height:220px}
 .aiws-os-proposal{border:1px solid #dce5f5;border-radius:10px;padding:16px;background:#f8faff;margin-top:18px}
 .aiws-os-proposal pre{overflow:auto;font-size:12px;color:#354867}
+
+.aiws-os-guest-service{display:flex;align-items:center;justify-content:space-between;gap:10px;
+padding:14px;border:1px solid #dce5f2;border-radius:9px;margin:12px 0;background:#fafcff;
+font-size:12px;overflow-wrap:anywhere}
+.aiws-os-guest-service strong{color:#24446c}.aiws-os-guest-service span{color:#58739b}
+.aiws-os-system-console .aiws-os-primary{display:inline-flex;align-items:center;gap:8px}
+.aiws-os-divider-line{height:1px;background:#dfe6f0;margin:22px 0}
