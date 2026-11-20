@@ -95,6 +95,96 @@ try
     var traced = repository.Load()[0];
     Assert(traced.Steps[0].Usage.IsMeasured && traced.Steps[1].Usage.IsMeasured && traced.RequestEvents.Count > 0, "usage and trace persist without raw JSONL");
     Assert(!File.ReadAllText(file).Contains("thread.started"), "raw provider log is not persisted");
+    // V1.2: project explorer is read-only and stage evidence is explicitly non-attributive.
+    Assert(ProjectWorkspaceService.ParsePorcelain(" M src/a.cs\0?? docs/new.md\0R  new.cs\0old.cs\0").Count == 3,
+        "NUL porcelain parser supports modified, untracked and renamed entries");
+    Assert(!ProjectWorkspaceService.IsSafeRelativePath("../secret")
+        && !ProjectWorkspaceService.IsSafeRelativePath(".git/config")
+        && !ProjectWorkspaceService.IsSafeRelativePath(".GIT/config")
+        && !ProjectWorkspaceService.IsSafeRelativePath("C:/Windows/system.ini")
+        && ProjectWorkspaceService.IsSafeRelativePath("src/nested/file.cs"),
+        "project file paths exclude traversal, git internals and absolute paths");
+    Assert(ThrowsAny(() => ProjectWorkspaceService.RequireSafeFile(projectRoot, "../outside.txt")),
+        "file review rejects escaping the chosen workspace");
+    var leftGit = new ProjectWorkspaceService.GitCheckpoint { Head = "1111111",
+        Files = [new("src/a.cs", " M", "sha-one"), new("old.txt", "??", "old")] };
+    var rightGit = new ProjectWorkspaceService.GitCheckpoint { Head = "2222222",
+        Files = [new("src/a.cs", " M", "sha-two"), new("new.cs", "??", "new")] };
+    var changeReport = ProjectWorkspaceService.Compare("step", "phase", leftGit, rightGit);
+    Assert(changeReport.Files.Count == 3 && changeReport.HeadChanged && !changeReport.Partial,
+        "stage change report captures changed fingerprints, new and cleared paths plus HEAD");
+    Assert(changeReport.Notice.Contains("不能证明") && ProjectWorkspaceService.Compare("step", "phase", null, rightGit).Partial,
+        "stage change reporting never attributes edits to model or invents missing evidence");
+    Assert(ProjectWorkspaceService.ParseCommitPaths("M\0src/a.cs\0R100\0old.cs\0new.cs\0").SequenceEqual(["src/a.cs", "new.cs"]),
+        "committed-file parser handles NUL output including renamed paths");
+    if (AgentTools.Locate("git") is not null)
+    {
+        var repoDir = Path.Combine(workspace, "git-observation");
+        Directory.CreateDirectory(repoDir);
+        static void Git(string dir, params string[] argv)
+        {
+            var info = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = dir,
+                RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false };
+            foreach (var arg in argv) info.ArgumentList.Add(arg);
+            using var proc = System.Diagnostics.Process.Start(info)!;
+            var err = proc.StandardError.ReadToEnd();
+            _ = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            if (proc.ExitCode != 0) throw new Exception("git fixture failure: " + err);
+        }
+        Git(repoDir, "init", "-q");
+        Git(repoDir, "config", "user.email", "tests@aiws.invalid");
+        Git(repoDir, "config", "user.name", "AIWS Tests");
+        var observedFile = Path.Combine(repoDir, "hello.cs");
+        File.WriteAllText(observedFile, "class A {}\n");
+        Git(repoDir, "add", "hello.cs");
+        Git(repoDir, "commit", "-q", "-m", "init");
+        var clean = ProjectWorkspaceService.CaptureAsync(repoDir).GetAwaiter().GetResult();
+        Assert(clean.Files.Count == 0 && !clean.Partial && clean.Head.Length >= 7,
+            "clean Git baseline has real HEAD without phantom changes");
+        File.WriteAllText(observedFile, "class A { int count = 1; }\n");
+        File.WriteAllText(Path.Combine(repoDir, "added.ts"), "export const x = 1;\n");
+        var changed = ProjectWorkspaceService.CaptureAsync(repoDir).GetAwaiter().GetResult();
+        Assert(changed.Files.Any(x => x.Path == "hello.cs" && x.Status.Contains('M'))
+            && changed.Files.Any(x => x.Path == "added.ts" && x.Status == "??"),
+            "actual modified and untracked Git files are captured");
+        var review = ProjectWorkspaceService.ReviewAsync(repoDir, "hello.cs").GetAwaiter().GetResult();
+        Assert(review.Diff.Contains("+class A") && !review.IsPreview,
+            "tracked file review returns actual local Git patch");
+        var preview = ProjectWorkspaceService.ReviewAsync(repoDir, "added.ts").GetAwaiter().GetResult();
+        Assert(preview.IsPreview && preview.Diff.Contains("export const x"),
+            "new source files are previewed only when explicitly selected");
+        var tree = ProjectWorkspaceService.InspectAsync(repoDir).GetAwaiter().GetResult();
+        Assert(tree.Files.Any(x => x.Path == "hello.cs") && tree.Files.Any(x => x.Path == "added.ts")
+            && !tree.Files.Any(x => x.Path.StartsWith(".git/")),
+            "project explorer shows real files while skipping git internal metadata");
+        Git(repoDir, "add", ".");
+        Git(repoDir, "commit", "-q", "-m", "change tracked files");
+        var committed = ProjectWorkspaceService.CaptureAsync(repoDir).GetAwaiter().GetResult();
+        var committedReport = ProjectWorkspaceService.AnalyzeStageAsync(repoDir, "one", "stage", clean, committed).GetAwaiter().GetResult();
+        Assert(committedReport.HeadChanged && committedReport.CommittedFiles.Contains("hello.cs")
+            && committedReport.CommittedFiles.Contains("added.ts"),
+            "committed paths are visible even after working tree becomes clean");
+        var changes = ProjectWorkspaceService.Compare("one", "stage", clean, changed);
+        Assert(changes.Files.Count == 2 && !changes.Partial,
+            "live stage comparison distinguishes two observed workspace changes");
+        Assert(ThrowsAny(() => ProjectWorkspaceService.ReviewAsync(repoDir, "../outside.txt").GetAwaiter().GetResult()),
+            "file patch endpoint refuses traversal before accessing Git");
+        var sensitive = Path.Combine(repoDir, ".env.local");
+        File.WriteAllText(sensitive, "secret=do-not-show");
+        var blocked = ProjectWorkspaceService.ReviewAsync(repoDir, ".env.local").GetAwaiter().GetResult();
+        Assert(!blocked.Diff.Contains("do-not-show") && !blocked.IsPreview,
+            "sensitive untracked file contents are not previewed");
+        var symlinkFile = Path.Combine(repoDir, "foreign.cs");
+        try
+        {
+            File.CreateSymbolicLink(symlinkFile, observedFile);
+            Assert(ThrowsAny(() => ProjectWorkspaceService.RequireSafeFile(repoDir, "foreign.cs")),
+                "file-level symlinks cannot escape review protection");
+        }
+        catch (UnauthorizedAccessException) { Console.WriteLine("SKIP: file symlink requires privileges"); }
+        catch (IOException) { Console.WriteLine("SKIP: file symlink creation unavailable"); }
+    }
     // V1.1: read-only developer tools never accept a shell command or arbitrary Git argv.
     Assert(GitWorkspaceService.SupportedViews.Contains("diff") && !GitWorkspaceService.SupportedViews.Contains("push"),
         "Git inspector exposes a fixed read-only view allowlist");

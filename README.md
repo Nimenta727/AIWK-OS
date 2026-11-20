@@ -1,3 +1,11 @@
+# AIWS V1.2 — Project structure & Git evidence (Windows native desktop)
+
+The AIWS-owned Windows `.exe` now connects **workflow stages** to a **local project file tree, Git status, staged/unstaged per-file Diff, and recorded commit paths**. Use **文件与 Git 变更** in the left sidebar. The evidence is collected locally **without sending any source to Claude/Codex or spending model tokens**. Stage-associated Git changes are observations, **not automatically proof that an Agent wrote a file**.
+
+Build the standalone Windows EXE by running `scripts/Build-NativeDesktop.ps1` on Windows with .NET 10 and Node.js 22; distribute `WindowsAIWorkstation.exe` together with its `ui-dist/` directory. See [V1.2 project evidence spec](docs/PROJECT_EVIDENCE_V12.md) and [change routine](docs/routine/2026-11-20_1420-project-tree-git-stage-evidence.md). The existing Git-only tool console, workflow, approval and execution components remain intact.
+
+---
+
 # AIWS V1.0 — source-level modular Windows workstation
 
 **New default:** our own Windows EXE hosting an offline React workspace UI, backed by the AIWS .NET workflow/approval/trace core. **Not** T3/OpenClaw embedded application pages or upstream servers. See [modular recomposition design](docs/MODULAR_RECOMPOSITION_V1.md).

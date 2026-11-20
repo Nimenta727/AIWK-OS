@@ -55,7 +55,15 @@ public sealed class WorkstationController : IDisposable
     public void Approve(string taskId, string stepId)
         => Change(taskId, task => WorkflowEngine.Approve(task, stepId));
 
-    public void Complete(string taskId, string stepId, string result)
+    public async Task CompleteWithGitAsync(string taskId, string stepId, string result)
+    {
+        var task = GetTask(taskId);
+        WorkflowEngine.Find(task, stepId); // Refuse an unknown stage before performing I/O.
+        var after = await ProjectWorkspaceService.CaptureAsync(task.Workspace);
+        Complete(taskId, stepId, result, after);
+    }
+
+    public void Complete(string taskId, string stepId, string result, ProjectWorkspaceService.GitCheckpoint? after = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         if (result.Length > 12_000) throw new ArgumentException("阶段结果不能超过 12,000 字符。", nameof(result));
@@ -63,15 +71,26 @@ public sealed class WorkstationController : IDisposable
         {
             var step = WorkflowEngine.Find(task, stepId);
             WorkflowEngine.Complete(task, stepId, result);
+            step.GitAfter = after;
             RequestTrace.Record(task, step, "stage.completed", "阶段结果已由用户确认并保存；模型调用次数未知");
         });
     }
 
-    public void StartManual(string taskId, string stepId)
+    public async Task StartManualWithGitAsync(string taskId, string stepId)
+    {
+        var task = GetTask(taskId);
+        WorkflowEngine.EnsureStartable(task, stepId);
+        var before = await ProjectWorkspaceService.CaptureAsync(task.Workspace);
+        StartManual(taskId, stepId, before);
+    }
+
+    public void StartManual(string taskId, string stepId, ProjectWorkspaceService.GitCheckpoint? before = null)
         => Change(taskId, task =>
         {
             var step = WorkflowEngine.EnsureStartable(task, stepId);
             if (step.Agent != AgentKind.Manual) throw new InvalidOperationException("此阶段不是人工执行器。");
+            step.GitBefore = before;
+            step.GitAfter = null;
             WorkflowEngine.Start(task, stepId);
             RequestTrace.Record(task, step, "manual.started", "用户手动开始人工阶段；未启动模型");
         });
@@ -79,7 +98,16 @@ public sealed class WorkstationController : IDisposable
     public void Retry(string taskId, string stepId)
         => Change(taskId, task => WorkflowEngine.Retry(task, stepId));
 
-    public void Launch(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli)
+    public async Task LaunchWithGitAsync(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli)
+    {
+        var task = GetTask(taskId);
+        WorkflowEngine.EnsureStartable(task, stepId);
+        var before = await ProjectWorkspaceService.CaptureAsync(task.Workspace);
+        Launch(taskId, stepId, copyPrompt, startCli, before);
+    }
+
+    public void Launch(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli,
+        ProjectWorkspaceService.GitCheckpoint? before = null)
     {
         EnsureHealthy();
         var task = GetTask(taskId);
@@ -88,7 +116,12 @@ public sealed class WorkstationController : IDisposable
             throw new InvalidOperationException("人工阶段不能启动模型 CLI。");
         var folder = WorkspaceGuard.RequireTrustedDirectory(task.Workspace);
         var draft = HandoffBuilder.Prepare(task, step);
-        StageLaunchCoordinator.PrepareAndStart(task, step, draft, copyPrompt, Save);
+        var oldBefore = step.GitBefore;
+        var oldAfter = step.GitAfter;
+        step.GitBefore = before;
+        step.GitAfter = null;
+        try { StageLaunchCoordinator.PrepareAndStart(task, step, draft, copyPrompt, Save); }
+        catch { step.GitBefore = oldBefore; step.GitAfter = oldAfter; throw; }
         try
         {
             startCli(step.Agent, folder); // Official installed program, not an embedded API.
@@ -111,15 +144,15 @@ public sealed class WorkstationController : IDisposable
         EnsureHealthy();
         var task = GetTask(taskId);
         // Snapshot before mutation: persistence failure cannot leave a phantom status in memory.
-        var stepSnapshots = task.Steps.Select(s => (s, s.Status, s.ApprovalGranted, s.Result, s.StartedAt, s.CompletedAt)).ToList();
+        var stepSnapshots = task.Steps.Select(s => (s, s.Status, s.ApprovalGranted, s.Result, s.StartedAt, s.CompletedAt, s.GitBefore, s.GitAfter)).ToList();
         var oldEvents = task.RequestEvents.ToList();
         try { act(task); Save(); }
         catch
         {
-            foreach (var (s,status,approved,result,start,completed) in stepSnapshots)
+            foreach (var (s,status,approved,result,start,completed,before,after) in stepSnapshots)
             {
                 s.Status = status; s.ApprovalGranted = approved; s.Result = result;
-                s.StartedAt = start; s.CompletedAt = completed;
+                s.StartedAt = start; s.CompletedAt = completed; s.GitBefore = before; s.GitAfter = after;
             }
             task.RequestEvents.Clear();
             task.RequestEvents.AddRange(oldEvents);

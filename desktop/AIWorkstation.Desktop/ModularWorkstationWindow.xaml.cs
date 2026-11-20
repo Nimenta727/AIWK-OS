@@ -91,14 +91,19 @@ public partial class ModularWorkstationWindow : Window
                 "state" => Snapshot(),
                 "workspaces.pick" => PickDirectory(),
                 "tasks.create" => CreateTask(payload),
-                "steps.approve" => StepAction(payload, "approve"),
-                "steps.complete" => StepAction(payload, "complete"),
-                "steps.retry" => StepAction(payload, "retry"),
-                "steps.startManual" => StepAction(payload, "startManual"),
-                "steps.launch" => StepAction(payload, "launch"),
+                "steps.approve" => await StepActionAsync(payload, "approve"),
+                "steps.complete" => await StepActionAsync(payload, "complete"),
+                "steps.retry" => await StepActionAsync(payload, "retry"),
+                "steps.startManual" => await StepActionAsync(payload, "startManual"),
+                "steps.launch" => await StepActionAsync(payload, "launch"),
                 "tools.gitInspect" => await GitWorkspaceService.InspectAsync(
                     _controller.GetTask(ReadField(payload, "taskId")).Workspace, ReadField(payload, "view")),
                 "tools.capabilities" => WindowsToolPolicy.Describe(),
+                "project.overview" => await ProjectWorkspaceService.InspectAsync(
+                    _controller.GetTask(ReadField(payload, "taskId")).Workspace),
+                "project.review" => await ProjectWorkspaceService.ReviewAsync(
+                    _controller.GetTask(ReadField(payload, "taskId")).Workspace, ReadField(payload, "path")),
+                "project.stageChanges" => await StageChangeDetails(payload),
                 "tools.openShell" => OpenUserShell(payload),
                 _ => throw new InvalidOperationException("不允许的工作台操作。")
             };
@@ -113,7 +118,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.1.0-developer-tools",
+        Version = "1.2.0-project-evidence",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -136,16 +141,27 @@ public partial class ModularWorkstationWindow : Window
     private object CreateTask(JsonElement payload) => _controller.CreateTask(
         ReadField(payload, "title"), ReadField(payload, "workspace"), ReadField(payload, "template"));
 
-    private object StepAction(JsonElement payload, string action)
+    private async Task<object> StageChangeDetails(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload, "taskId"));
+        var stage = WorkflowEngine.Find(task, ReadField(payload, "stepId"));
+        // A running stage is compared to a fresh read-only snapshot, never treated as complete.
+        var current = stage.Status == StepStatus.Running
+            ? await ProjectWorkspaceService.CaptureAsync(task.Workspace) : stage.GitAfter;
+        return await ProjectWorkspaceService.AnalyzeStageAsync(task.Workspace, stage.Id, stage.Title,
+            stage.GitBefore, current, stage.StartedAt, stage.CompletedAt);
+    }
+
+    private async Task<object> StepActionAsync(JsonElement payload, string action)
     {
         var taskId = ReadField(payload, "taskId");
         var stepId = ReadField(payload, "stepId");
         switch (action)
         {
             case "approve": _controller.Approve(taskId, stepId); break;
-            case "complete": _controller.Complete(taskId, stepId, ReadField(payload,"result")); break;
+            case "complete": await _controller.CompleteWithGitAsync(taskId, stepId, ReadField(payload,"result")); break;
             case "retry": _controller.Retry(taskId, stepId); break;
-            case "startManual": _controller.StartManual(taskId, stepId); break;
+            case "startManual": await _controller.StartManualWithGitAsync(taskId, stepId); break;
             case "launch":
                 var task = _controller.GetTask(taskId);
                 var step = WorkflowEngine.EnsureStartable(task, stepId);
@@ -153,7 +169,7 @@ public partial class ModularWorkstationWindow : Window
                         $"将以当前 Windows 用户身份启动 {AgentLabel.Name(step.Agent)}，目录：\n{task.Workspace}\n\nAIWS 会将交接提示词复制到剪贴板，但不会自动发送给模型。\n确认继续？",
                         "确认执行官方 Agent", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     throw new OperationCanceledException("已取消外部程序启动。");
-                _controller.Launch(taskId, stepId,
+                await _controller.LaunchWithGitAsync(taskId, stepId,
                     text => Clipboard.SetText(text),
                     (agent,dir) => AgentTools.LaunchInteractive(agent,dir));
                 break;

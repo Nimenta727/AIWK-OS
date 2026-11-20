@@ -20,6 +20,8 @@ public sealed class WorkflowStep
     public int? ImportedUsageEvents { get; set; }
     public List<ProviderEventSummary> ProviderEvents { get; set; } = [];
     public string LastPromptFingerprint { get; set; } = "";
+    public ProjectWorkspaceService.GitCheckpoint? GitBefore { get; set; }
+    public ProjectWorkspaceService.GitCheckpoint? GitAfter { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 }

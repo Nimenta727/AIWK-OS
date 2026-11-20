@@ -43,6 +43,8 @@ public static class WorkflowEngine
         if (step.Status is not (StepStatus.Failed or StepStatus.Interrupted)) throw new InvalidOperationException("只有失败或中断的阶段可以重试。");
         step.Status = StepStatus.Pending;
         step.Result = "";
+        step.GitBefore = null;
+        step.GitAfter = null;
         step.StartedAt = null;
         step.CompletedAt = null;
         step.ApprovalGranted = false;

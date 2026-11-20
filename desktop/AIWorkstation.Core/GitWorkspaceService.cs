@@ -21,7 +21,9 @@ public static class GitWorkspaceService
         ["diff"] = ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", "--", "."],
         ["staged"] = ["diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", "--", "."],
         ["history"] = ["log", "-n", "12", "--pretty=format:%h %s (%cr)"],
-        ["branch"] = ["branch", "--show-current"]
+        ["branch"] = ["branch", "--show-current"],
+        ["head"] = ["rev-parse", "--verify", "HEAD"],
+        ["porcelain"] = ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", "."]
     };
 
     public static IReadOnlyList<string> SupportedViews => Views.Keys.ToArray();
@@ -32,6 +34,31 @@ public static class GitWorkspaceService
     {
         if (!Views.TryGetValue(view, out var arguments))
             throw new ArgumentException("未知 Git 查看操作；只允许预设的只读命令。", nameof(view));
+        return await ExecuteAsync(workspace, view, arguments, cancellationToken);
+    }
+
+    public static Task<Inspection> InspectFileAsync(string workspace, string relative, bool staged, CancellationToken cancellationToken = default)
+    {
+        ProjectWorkspaceService.RequireSafeFile(workspace, relative);
+        var args = new List<string> { "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3" };
+        if (staged) args.Add("--cached");
+        args.Add("--");
+        args.Add(relative);
+        return ExecuteAsync(workspace, staged ? "file.staged" : "file.worktree", args, cancellationToken);
+    }
+
+    public static Task<Inspection> InspectCommitFilesAsync(string workspace, string fromHead, string toHead,
+        CancellationToken cancellationToken = default)
+    {
+        static bool IsHash(string hash) => hash.Length is >= 7 and <= 64 && hash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+        if (!IsHash(fromHead) || !IsHash(toHead))
+            throw new ArgumentException("提交标识格式不合法。");
+        return ExecuteAsync(workspace, "commit.files",
+            ["diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", fromHead, toHead, "--", "."], cancellationToken);
+    }
+
+    private static async Task<Inspection> ExecuteAsync(string workspace, string view, IEnumerable<string> arguments, CancellationToken cancellationToken)
+    {
         var folder = WorkspaceGuard.RequireTrustedDirectory(workspace);
         var git = AgentTools.Locate("git") ?? throw new FileNotFoundException("未检测到 Git。请先安装 Git for Windows。", "git.exe");
         await Slots.WaitAsync(cancellationToken);
@@ -49,6 +76,7 @@ public static class GitWorkspaceService
                 StandardErrorEncoding = Encoding.UTF8
             };
             start.ArgumentList.Add("--no-pager");
+            start.ArgumentList.Add("--literal-pathspecs");
             start.ArgumentList.Add("-c");
             start.ArgumentList.Add("core.fsmonitor=false");
             foreach (var arg in arguments) start.ArgumentList.Add(arg);

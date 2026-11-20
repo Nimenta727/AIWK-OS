@@ -1,6 +1,12 @@
 export type TokenUsage = { input: number|null; output:number|null; cachedInput:number|null; source:string; isMeasured?:boolean };
 export type TraceEvent = { at:string; stageId:string; kind:string; summary:string };
-export type WorkStep = { id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
+export type GitObservedFile = {path:string;status:string;signature:string};
+export type GitCheckpoint = {capturedAt:string;head:string;files:GitObservedFile[];partial:boolean;problem:string};
+export type ProjectFile = {path:string;isDirectory:boolean;status:string;size:number|null;isLink:boolean};
+export type ProjectOverview = {workspace:string;rootName:string;branch:string;head:string;files:ProjectFile[];changedCount:number;truncated:boolean;notices:string[]};
+export type FileReview = {path:string;status:string;diff:string;truncated:boolean;isPreview:boolean;note:string};
+export type StageChangeReport = {stageId:string;stageTitle:string;fromHead:string;toHead:string;headChanged:boolean;files:{path:string;kind:string;before:string;after:string}[];committedFiles:string[];partial:boolean;notice:string;startedAt:string|null;completedAt:string|null};
+export type WorkStep = { gitBefore:GitCheckpoint|null;gitAfter:GitCheckpoint|null; id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
 export type WorkTask = { id:string; title:string; workspace:string; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
 export type Snapshot = { version:string; tasks:WorkTask[]; agents:Record<string,boolean>; limitations:string[] };
 type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void };

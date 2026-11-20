@@ -51,6 +51,8 @@ public sealed class TaskRepository
                 {
                     if (step is null || string.IsNullOrWhiteSpace(step.Id) || !stageIds.Add(step.Id) || step.Usage is null)
                         throw new InvalidDataException("任务库含有缺失或重复的阶段标识，已拒绝加载。");
+                    if ((step.GitBefore?.Files?.Count ?? 0) > 800 || (step.GitAfter?.Files?.Count ?? 0) > 800)
+                        throw new InvalidDataException("Git 检查点条目超过安全上限。");
                     if (!Enum.IsDefined(step.Agent) || !Enum.IsDefined(step.Status))
                         throw new InvalidDataException("任务库含有未知的 Agent 或阶段状态。");
                 }
