@@ -13,6 +13,18 @@ public sealed class RequestTraceEvent
     public string Summary { get; set; } = "";
 }
 
+// Normalized event metadata from explicitly selected provider logs. Never retains text,
+// shell commands, file paths, tool parameters, or provider identifiers.
+public sealed class ProviderEventSummary
+{
+    public int Sequence { get; set; }
+    public string Kind { get; set; } = "";
+    public string ToolCategory { get; set; } = "";
+    public long? Input { get; set; }
+    public long? Output { get; set; }
+    public long? CachedInput { get; set; }
+}
+
 public sealed class TokenUsage
 {
     public long? Input { get; set; }
@@ -48,6 +60,15 @@ public static class RequestTrace
         int usageEvents = 0;
         int toolEvents = 0;
         string? format = null;
+        var providerEvents = new List<ProviderEventSummary>();
+        var eventSequence = 0;
+        void AddEvent(string kind, string category = "", long? usedInput = null, long? usedOutput = null, long? usedCache = null)
+        {
+            eventSequence++;
+            // Keep a bounded, ordered synopsis. 60 events are enough for inspection, not replay.
+            if (providerEvents.Count < 60)
+                providerEvents.Add(new ProviderEventSummary { Sequence = eventSequence, Kind = kind, ToolCategory = category, Input = usedInput, Output = usedOutput, CachedInput = usedCache });
+        }
         var rows = content.Split('\n');
         if (rows.Length > 20001) throw new InvalidDataException("日志事件过多，请导出单次任务日志。");
         foreach (var raw in rows)
@@ -65,6 +86,11 @@ public static class RequestTrace
                     format = "codex";
                     checked { input += i; cached += c; output += o; }
                     usageEvents++;
+                    AddEvent("codex.turn.completed", usedInput: i, usedOutput: o, usedCache: c);
+                }
+                else if (type == "turn.started" && step.Agent == AgentKind.Codex)
+                {
+                    AddEvent("codex.turn.started");
                 }
                 else if (type == "result" && root.TryGetProperty("usage", out var claudeUsage) && claudeUsage.ValueKind == JsonValueKind.Object)
                 {
@@ -74,10 +100,16 @@ public static class RequestTrace
                     // Claude's result is the terminal aggregate: use the last valid result, never sum it with intermediate messages.
                     input = i; cached = c; output = o;
                     usageEvents++;
+                    providerEvents.RemoveAll(e => e.Kind == "claude.result.aggregate");
+                    AddEvent("claude.result.aggregate", usedInput: i, usedOutput: o, usedCache: c);
                 }
                 else if ((type == "item.started" || type == "item.completed") && root.TryGetProperty("item", out var item) && item.ValueKind == JsonValueKind.Object)
                 {
-                    if (TryString(item, "type", out var itemType) && itemType is "command_execution" or "mcp_tool_call" or "web_search") toolEvents++;
+                    if (TryString(item, "type", out var itemType) && itemType is "command_execution" or "mcp_tool_call" or "web_search")
+                    {
+                        toolEvents++;
+                        AddEvent(type == "item.started" ? "tool.started" : "tool.completed", itemType);
+                    }
                 }
             }
             catch (JsonException) { /* Skip truncated/non-JSON diagnostic lines. */ }
@@ -87,6 +119,9 @@ public static class RequestTrace
             throw new InvalidDataException("日志提供商与选定阶段不匹配。");
         step.Usage = new TokenUsage { Input = input, CachedInput = cached, Output = output, Source = format == "codex" ? "Codex JSONL" : "Claude JSON" };
         step.ImportFingerprint = fingerprint;
+        step.ImportedToolEvents = toolEvents;
+        step.ImportedUsageEvents = usageEvents;
+        step.ProviderEvents = providerEvents;
         Record(task, step, "trace.imported", $"导入 {usageEvents} 个用量事件、{toolEvents} 个工具事件；未存储对话内容");
         return new TraceImportReport(usageEvents, input, cached, output, false);
     }

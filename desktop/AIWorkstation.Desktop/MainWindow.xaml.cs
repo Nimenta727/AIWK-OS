@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     private string _page = "home";
     private bool _loading;
     private bool _databaseHealthy = true;
+    private CallFlowSnapshot? _traceSnapshot;
+    private string? _selectedTraceNodeId;
 
     public MainWindow()
     {
@@ -63,6 +65,8 @@ public partial class MainWindow : Window
         FlowView.Visibility = page == "flow" ? Visibility.Visible : Visibility.Collapsed;
         ToolsView.Visibility = page == "tools" ? Visibility.Visible : Visibility.Collapsed;
         TraceView.Visibility = page == "trace" ? Visibility.Visible : Visibility.Collapsed;
+        StepInspectorPanel.Visibility = page == "trace" ? Visibility.Collapsed : Visibility.Visible;
+        TraceInspectorPanel.Visibility = page == "trace" ? Visibility.Visible : Visibility.Collapsed;
         if (page == "trace") RefreshTrace();
         TopHeading.Text = page switch { "flow" => "可视化工作流", "tools" => "Agent 与集成", "trace" => "请求追踪", _ => "工作台概览" };
         NavHome.Background = page == "home" ? (Brush)FindResource("SoftAccent") : Brushes.Transparent;
@@ -109,6 +113,7 @@ public partial class MainWindow : Window
         _tasks.Add(task);
         _activeTask = task;
         _activeStep = task.Steps.FirstOrDefault();
+        _selectedTraceNodeId = null;
         Save();
         RefreshWorkflow();
         ShowPage("flow");
@@ -222,16 +227,41 @@ public partial class MainWindow : Window
         WorkspaceGuard.RequireTrustedDirectory(_activeTask.Workspace);
         if (_activeStep.Agent != AgentKind.Manual && AgentTools.Locate(_activeStep.Agent == AgentKind.ClaudeCode ? "claude" : "codex") == null)
             throw new FileNotFoundException("当前 Agent 未安装。请在「Agent 与集成」中查看状态。");
+        var plannedDraft = HandoffBuilder.Prepare(_activeTask, _activeStep);
+        if (plannedDraft.Fingerprint == _activeStep.LastPromptFingerprint)
+        {
+            var repeat = MessageBox.Show("当前交接指令与上次复制的内容相同。\n\n再次启动 Agent 可能产生重复的模型消耗。确定仍要继续吗？",
+                "重复上下文提醒", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (repeat != MessageBoxResult.Yes)
+            {
+                RequestTrace.Record(_activeTask, _activeStep, "launch.cancelled", "用户取消重复启动；未启动外部 CLI");
+                Save();
+                return;
+            }
+            RequestTrace.Record(_activeTask, _activeStep, "prompt.duplicate_warning", "用户确认使用相同交接指令（是否重复模型调用未知）");
+        }
+        if (plannedDraft.ApproxTokens > 3500)
+        {
+            var longContext = MessageBox.Show($"交接内容约 {plannedDraft.ApproxTokens:N0} 预估 Token（并非真实计费值），可能较长。\n\n是否继续启动？",
+                "上下文预算提醒", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (longContext != MessageBoxResult.Yes) return;
+        }
         WorkflowEngine.Start(_activeTask, _activeStep.Id);
-        RequestTrace.Record(_activeTask, _activeStep, "stage.started", "开始阶段；待官方 CLI 接受指令");
+        RequestTrace.Record(_activeTask, _activeStep, "stage.started", "本地阶段开始；尚未证明模型收到请求");
         Save();
         RefreshWorkflow();
         CopyDraft(_activeTask, _activeStep);
         if (_activeStep.Agent != AgentKind.Manual)
         {
-            try { AgentTools.LaunchInteractive(_activeStep.Agent, _activeTask.Workspace); }
+            try
+            {
+                AgentTools.LaunchInteractive(_activeStep.Agent, _activeTask.Workspace);
+                RequestTrace.Record(_activeTask, _activeStep, "cli.launched", "外部交互式 CLI 进程已启动；模型请求未观测");
+                Save();
+            }
             catch (Exception ex)
             {
+                RequestTrace.Record(_activeTask, _activeStep, "cli.launch_failed", "外部 CLI 启动异常；未确认模型调用");
                 WorkflowEngine.Fail(_activeTask, _activeStep.Id, "启动失败：" + ex.Message);
                 Save();
                 RefreshWorkflow();
@@ -279,20 +309,177 @@ public partial class MainWindow : Window
     {
         if (_activeTask == null)
         {
-            UsageSummary.Text = "暂无任务";
-            UsageDetail.Text = "先创建并打开一个工作流。";
+            _traceSnapshot = null;
+            TraceChainSummary.Text = "尚无任务 · 先创建一个工作流";
+            UsageSummary.Text = "实际用量未知";
+            UsageDetail.Text = "没有工作流与官方用量日志。";
+            TraceQualitySummary.Text = "无已确认的模型请求";
             ContextSummary.Text = "没有待处理的交接内容。";
+            TraceFlowLanes.ItemsSource = null;
             TraceEventsList.ItemsSource = null;
             PromptPreview.Text = "";
+            RenderTraceNodeDetails(null);
             return;
         }
-        var known = _activeTask.Steps.Where(x => x.Usage.IsMeasured).ToArray();
-        UsageSummary.Text = known.Length == 0 ? "尚未导入真实 Token 用量" : $"{known.Sum(x => x.Usage.Total):N0} 已报告 Token（{known.Length} 个阶段）";
-        UsageDetail.Text = known.Length == 0
-            ? "交互式 Claude/Codex 的内部调用不可直接观测。请选择官方导出的 JSONL/JSON 用量日志；实际值未知。"
-            : $"已报告输入 {known.Sum(x => x.Usage.Input ?? 0):N0} · 输出 {known.Sum(x => x.Usage.Output ?? 0):N0} · 缓存输入 {known.Sum(x => x.Usage.CachedInput ?? 0):N0}。尚未导入 { _activeTask.Steps.Count - known.Length} 个阶段；各提供商缓存口径不同，数据并非费用账单。";
-        ContextSummary.Text = _activeStep == null ? "选择某个阶段以分析交接提示。" : DescribeDraft(HandoffBuilder.Prepare(_activeTask, _activeStep));
+        _traceSnapshot = CallFlowBuilder.Build(_activeTask);
+        TraceChainSummary.Text = "用户任务  →  " + string.Join("  →  ", _activeTask.Steps.Select(s => AgentLabel.Name(s.Agent)));
+        UsageSummary.Text = _traceSnapshot.ImportedStages == 0
+            ? "实际 Token：未知"
+            : $"{_traceSnapshot.ImportedTokens:N0} 已导入 Token";
+        UsageDetail.Text = _traceSnapshot.ImportedStages == 0
+            ? "未从官方 CLI 的结构化日志导入用量；这不代表实际使用了 0 Token。"
+            : $"输入 {_traceSnapshot.ImportedInput:N0} · 输出 {_traceSnapshot.ImportedOutput:N0} · 缓存输入 {_traceSnapshot.ImportedCachedInput:N0}（属于输入的一部分，不重复相加）。";
+        TraceQualitySummary.Text = $"已导入 {_traceSnapshot.ImportedStages}/{_activeTask.Steps.Count(s => s.Agent != AgentKind.Manual)} 个模型阶段 · " +
+            $"{_traceSnapshot.UnknownUsageStages} 阶段用量未知 · {_traceSnapshot.DuplicatePreparations} 次重复上下文提醒";
+        ContextSummary.Text = _activeStep == null ? "请选择一个阶段以分析交接上下文。" : DescribeDraft(HandoffBuilder.Prepare(_activeTask, _activeStep));
         TraceEventsList.ItemsSource = _activeTask.RequestEvents.AsEnumerable().Reverse().Select(e => new TraceRow(e)).ToList();
+        var nodes = _traceSnapshot.Nodes.ToArray();
+        if (_selectedTraceNodeId == null || !nodes.Any(n => n.Id == _selectedTraceNodeId))
+            _selectedTraceNodeId = nodes.FirstOrDefault()?.Id;
+        TraceFlowLanes.ItemsSource = _traceSnapshot.Lanes.Select(lane => new TraceLaneRow(lane, _selectedTraceNodeId)).ToList();
+        RenderTraceNodeDetails(nodes.FirstOrDefault(n => n.Id == _selectedTraceNodeId));
+    }
+
+    private void TraceNode_Click(object sender, RoutedEventArgs e) => Guard(() =>
+    {
+        if (sender is not Button { Tag: string id } || _activeTask == null || _traceSnapshot == null) return;
+        var node = _traceSnapshot.Nodes.FirstOrDefault(n => n.Id == id);
+        if (node == null) return;
+        _selectedTraceNodeId = node.Id;
+        _activeStep = WorkflowEngine.Find(_activeTask, node.StepId);
+        RenderStepEditor();
+        RefreshTrace();
+        Info("查看节点证据：" + node.Title + "（不触发 AI 调用）");
+    });
+
+    private void TraceToStep_Click(object sender, RoutedEventArgs e) => Guard(() =>
+    {
+        if (_activeTask == null || _traceSnapshot == null || _selectedTraceNodeId == null) return;
+        var node = _traceSnapshot.Nodes.FirstOrDefault(n => n.Id == _selectedTraceNodeId);
+        if (node == null) return;
+        _activeStep = WorkflowEngine.Find(_activeTask, node.StepId);
+        RenderStepEditor();
+        ShowPage("flow");
+    });
+
+    private void RenderTraceNodeDetails(CallFlowNode? node)
+    {
+        TraceNodeName.Text = node?.Title ?? "请选择节点";
+        TraceNodeState.Text = node == null ? "暂无证据" : TraceNodeRow.StateLabelFor(node.State);
+        TraceNodeDescription.Text = node?.Detail ?? "从可视化调用链中选择一个节点，查看本地事件或官方导入数据。";
+        TraceNodeEvidence.Text = node?.Evidence ?? "未记录";
+        TraceNodeTokens.Text = node?.UsageText ?? "未知（非零值）";
+        TraceNodeTiming.Text = node == null ? "未知" :
+            (node.RecordedAt.HasValue ? $"记录时间 {node.RecordedAt:yyyy-MM-dd HH:mm:ss}\n" : "") + node.DurationText;
+    }
+
+    private void RefreshTrace_Click(object sender, RoutedEventArgs e) => RefreshTrace();
+    private void ExportTrace_Click(object sender, RoutedEventArgs e) => Guard(() =>
+    {
+        if (_activeTask == null) throw new InvalidOperationException("请先选择一个任务。");
+        var snapshot = CallFlowBuilder.Build(_activeTask);
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出脱敏调用链元数据（不含任务内容、工作区或 CLI 日志）",
+            Filter = "JSON 文件|*.json",
+            DefaultExt = ".json",
+            FileName = "aiws-callflow-redacted.json"
+        };
+        if (dialog.ShowDialog() != true) return;
+        File.WriteAllText(dialog.FileName, snapshot.ToRedactedJson());
+        Info("已导出脱敏调用链；不包含任务名称、用户提示词或文件路径。");
+    });
+
+    private sealed class TraceLaneRow
+    {
+        public TraceLaneRow(CallFlowLane lane, string? selected)
+        {
+            Header = lane.Header;
+            Agent = lane.Agent;
+            State = lane.State;
+            Nodes = lane.Nodes.Select((node, i) => new TraceNodeRow(node, i < lane.Nodes.Count - 1, node.Id == selected)).ToArray();
+            ImportedEvents = lane.ImportedEvents.Select(x => new ImportedEventRow(x)).ToArray();
+            ImportedVisibility = ImportedEvents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        public string Header { get; }
+        public string Agent { get; }
+        public string State { get; }
+        public IReadOnlyList<TraceNodeRow> Nodes { get; }
+        public IReadOnlyList<ImportedEventRow> ImportedEvents { get; }
+        public Visibility ImportedVisibility { get; }
+    }
+
+    private sealed class ImportedEventRow(ProviderEventSummary item)
+    {
+        public string Title => item.Kind switch
+        {
+            "codex.turn.started" => $"{item.Sequence:D2} · Codex 回合开始",
+            "codex.turn.completed" => $"{item.Sequence:D2} · Codex 回合用量",
+            "claude.result.aggregate" => $"{item.Sequence:D2} · Claude 最终汇总",
+            "tool.started" => $"{item.Sequence:D2} · 工具启动",
+            "tool.completed" => $"{item.Sequence:D2} · 工具结束",
+            _ => $"{item.Sequence:D2} · 导入事件"
+        };
+        public string Metric => item.Input.HasValue
+            ? $"输入 {item.Input:N0} · 输出 {item.Output:N0} · 缓存 {item.CachedInput:N0}"
+            : item.ToolCategory.Length > 0 ? item.ToolCategory switch
+            {
+                "command_execution" => "命令工具 · 不保存参数",
+                "mcp_tool_call" => "MCP 工具 · 不保存参数",
+                "web_search" => "网页搜索 · 不保存查询",
+                _ => "工具元数据"
+            } : "无用量字段（非零值）";
+    }
+
+    private sealed class TraceNodeRow
+    {
+        private readonly CallFlowNode _node;
+        public TraceNodeRow(CallFlowNode node, bool hasNext, bool selected)
+        {
+            _node = node;
+            ArrowVisibility = hasNext ? Visibility.Visible : Visibility.Collapsed;
+            Surface = selected ? new SolidColorBrush(Color.FromRgb(250, 236, 226)) : node.State switch
+            {
+                FlowState.Imported => new SolidColorBrush(Color.FromRgb(239, 247, 241)),
+                FlowState.Recorded => new SolidColorBrush(Color.FromRgb(252, 246, 239)),
+                FlowState.Attention => new SolidColorBrush(Color.FromRgb(255, 244, 233)),
+                _ => new SolidColorBrush(Color.FromRgb(250, 249, 247))
+            };
+            Stroke = selected ? new SolidColorBrush(Color.FromRgb(177, 106, 75)) :
+                node.State == FlowState.Imported ? new SolidColorBrush(Color.FromRgb(180, 211, 189)) :
+                new SolidColorBrush(Color.FromRgb(233, 226, 218));
+            LabelBrush = node.State switch
+            {
+                FlowState.Imported => new SolidColorBrush(Color.FromRgb(52, 118, 91)),
+                FlowState.Recorded => new SolidColorBrush(Color.FromRgb(166, 98, 68)),
+                FlowState.Attention => new SolidColorBrush(Color.FromRgb(169, 104, 41)),
+                _ => new SolidColorBrush(Color.FromRgb(119, 115, 110))
+            };
+        }
+        public string Id => _node.Id;
+        public string Title => _node.Title;
+        public string Subtitle => _node.Subtitle;
+        public string StateLabel => StateLabelFor(_node.State);
+        public string PhaseLabel => _node.Phase switch
+        {
+            FlowPhase.Routing => "01 / ROUTE",
+            FlowPhase.Context => "02 / CONTEXT",
+            FlowPhase.Launcher => "03 / LAUNCH",
+            FlowPhase.Provider => "04 / PROVIDER",
+            _ => "05 / HANDOFF"
+        };
+        public Brush Surface { get; }
+        public Brush Stroke { get; }
+        public Brush LabelBrush { get; }
+        public Visibility ArrowVisibility { get; }
+        public static string StateLabelFor(FlowState state) => state switch
+        {
+            FlowState.Planned => "计划 / 待执行",
+            FlowState.Recorded => "已记录本地事件",
+            FlowState.Imported => "已导入的统计",
+            FlowState.Attention => "需要关注",
+            _ => "真实调用未知"
+        };
     }
 
     private static string DescribeDraft(PreparedHandoff draft) =>

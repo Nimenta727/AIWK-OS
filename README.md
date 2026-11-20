@@ -2,7 +2,22 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.5 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+> **V0.6 status:** native WPF/.NET source and Windows build pipeline. The Windows executable is published by GitHub Actions **only after its Windows build passes**. This is a prototype, not a finished or audited operating system agent.
+
+## V0.6 — 可视化 AI 请求调用链
+
+新增原生 WPF **调用链画布**（左侧「请求追踪 / Token」），每个任务阶段以五个可点击节点呈现：
+
+**执行器分配 → 上下文准备 → 官方 CLI 启动 → 模型/工具证据 → 结果交接**
+
+- 每个节点都有**计划 / 本地已记录 / 用户导入 / 未知 / 需关注**状态；点击后右侧检查器会显示证据来源、Token 类型与时间范围。
+- 导入 Codex JSONL 可看到有序的回合用量及工具启动/完成事件；导入 Claude 结构化 `result.usage` 显示最终汇总。只保存受限数量的事件类型和数值，不保存日志的对话、命令、参数或私密路径。
+- **明确限制：** GUI 通过官方交互式 CLI 启动进程，不能直接观察其每一次远程模型请求。导入的结构化 JSON 由用户手动选择，工作台不验证其真实性；未导入的消耗为“未知”，而非零。
+- 在重复交接提示词或上下文预估过长时提醒用户确认，避免意外重复启动；这**不是**阻止 CLI 内部 Token 消耗的硬上限。
+- 「导出脱敏链路 JSON」只输出阶段序号、执行器、阶段状态和数值统计，不含任务名、工作目录、提示词、模型回复或原始 CLI 日志。
+- 保持暖白桌面主题；不需要网页服务器或 API Key，不复制账号令牌。
+
+[请求链路详细设计和验收边界](docs/REQUEST_TRACE.md)
 
 ## V0.5 — Request Trace & Token Budget
 

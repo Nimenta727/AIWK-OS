@@ -15,6 +15,10 @@ public sealed class WorkflowStep
     public string Result { get; set; } = "";
     public TokenUsage Usage { get; set; } = new();
     public string ImportFingerprint { get; set; } = "";
+    // Null means not reported; zero is a measured count from a structured log.
+    public int? ImportedToolEvents { get; set; }
+    public int? ImportedUsageEvents { get; set; }
+    public List<ProviderEventSummary> ProviderEvents { get; set; } = [];
     public string LastPromptFingerprint { get; set; } = "";
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

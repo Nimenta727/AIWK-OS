@@ -59,6 +59,21 @@
             <Setter Property="Foreground" Value="{StaticResource Ink}" />
             <Setter Property="FontWeight" Value="Normal" />
         </Style>
+        <Style x:Key="TraceNodeButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource SoftButton}">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
