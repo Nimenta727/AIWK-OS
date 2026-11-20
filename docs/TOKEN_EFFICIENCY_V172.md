@@ -1,3 +1,13 @@
+> **双语导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：本地交接预算、去重与 Token 估算边界。保留历史正文及原始测试/风险描述，不能据此宣称现版已通过新的 Hyper-V 运行验收。
+>
+> English: Local handoff budgets, deduplication and token estimate limits. The historical narrative and original test/risk statements remain intact; this is not evidence of fresh Hyper-V acceptance.
+>
+> [总索引 / Docs index](README.md) · [当前发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # AIWS V1.7.2 — Token-efficient Agent architecture / 节省上下文的执行基座
 
 > 2026-11-20. **Status: implementation, Windows CI pending until verified.**

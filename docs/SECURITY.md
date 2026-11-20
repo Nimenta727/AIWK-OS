@@ -1,3 +1,13 @@
+> **双语导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：安全、Windows 权限、Git、账号和虚拟机限制。保留历史正文及原始测试/风险描述，不能据此宣称现版已通过新的 Hyper-V 运行验收。
+>
+> English: Windows safety, Git permissions, credentials and VM limits. The historical narrative and original test/risk statements remain intact; this is not evidence of fresh Hyper-V acceptance.
+>
+> [总索引 / Docs index](README.md) · [当前发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # Security scope and rollout gates
 
 **Scope:** private experimentation on a Hyper-V Windows guest with existing Claude and ChatGPT subscriptions. This is an **early prototype**, not an agent containment product.

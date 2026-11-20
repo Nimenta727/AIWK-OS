@@ -1,3 +1,13 @@
+> **双语导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：统一 Agent 任务控制平面、交接协议与执行边界。保留历史正文及原始测试/风险描述，不能据此宣称现版已通过新的 Hyper-V 运行验收。
+>
+> English: Unified agent task control plane, handoff protocol and execution boundaries. The historical narrative and original test/risk statements remain intact; this is not evidence of fresh Hyper-V acceptance.
+>
+> [总索引 / Docs index](README.md) · [当前发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # AIWS 统一 Agent 控制平面：任务、上下文与模型调度
 
 > 产品北极星（2026-11-20） · 设计与后续实现计划，**不是**声称已完成自动多 Agent 调度。
