@@ -18,6 +18,7 @@ from aiws_toolplane import audit, catalog, invoke
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_local_model import LocalPlanner, LocalModelError
+import subprocess
 
 HOST = "127.0.0.1"
 PORT = 17640
@@ -104,6 +105,38 @@ class Controller:
             self.records[identifier].update(
                 status=status, error=error, result=result, finishedAt=int(time.time()))
 
+
+
+    def configure_model(self, enabled):
+        # Model lifecycle is a fixed guest-user systemd operation, never a
+        # model-generated shell command or a host hypervisor API.
+        require_guest_runtime()
+        weights = Path.home() / ".local/share/aiws/models/aiws-local.gguf"
+        if enabled:
+            if weights.is_symlink() or not weights.is_file():
+                raise LocalModelError("Install a verified model inside the guest before enabling")
+            protect_guest_workspace((Path.home()/".local/share/aiws").resolve(),
+                                    weights.resolve(strict=True))
+        folder = Path.home()/".config/aiws"
+        folder.mkdir(parents=True,mode=0o700,exist_ok=True)
+        if folder.is_symlink() or not folder.resolve().is_relative_to(Path.home().resolve()):
+            raise LocalModelError("Invalid guest model configuration folder")
+        marker = folder/"local-model-enabled"
+        if marker.is_symlink():
+            raise LocalModelError("Guest model flag symlink forbidden")
+        verb = "enable" if enabled else "disable"
+        result = subprocess.run(["systemctl","--user",verb,"--now",
+                                 "aiws-local-model.service"],
+                                capture_output=True,timeout=15,check=False)
+        if result.returncode != 0:
+            raise LocalModelError("Guest local inference service could not change state")
+        if enabled:
+            marker.write_text("1\n",encoding="ascii")
+            os.chmod(marker,0o600)
+        else:
+            marker.unlink(missing_ok=True)
+        self.model.enabled = enabled
+        return self.model.status()
 
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
@@ -240,7 +273,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable") and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -269,6 +302,10 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.submit(payload["tool"], payload["arguments"])
             elif path == "/api/v1/tasks":
                 result = app.create_plan(payload)
+            elif path in ("/api/v1/model/enable", "/api/v1/model/disable"):
+                if payload:
+                    raise ValueError("Model toggle accepts no body fields")
+                result = app.configure_model(path.endswith("/enable"))
             elif path == "/api/v1/model/suggest":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")

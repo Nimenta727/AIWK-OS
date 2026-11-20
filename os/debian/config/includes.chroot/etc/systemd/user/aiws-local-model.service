@@ -9,4 +9,6 @@ RestartSec=10
 NoNewPrivileges=yes
 PrivateTmp=yes
 UMask=0077
-# Explicitly opt-in: no [Install] WantedBy to autostart in the smoke ISO.
+[Install]
+WantedBy=default.target
+# Not enabled in image; only a guest workbench user action enables this unit.

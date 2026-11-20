@@ -27,7 +27,9 @@ class LocalPlanner:
     def __init__(self, enabled=None, port=PORT):
         # The port is internal/test-only. Neither API clients nor model content
         # may choose an inference URL or point the connection at the host.
-        self.enabled = (os.environ.get("AIWS_LOCAL_MODEL_ENABLED") == "1") if enabled is None else enabled
+        marker = Path.home() / ".config/aiws/local-model-enabled"
+        persisted = marker.is_file() and not marker.is_symlink() and marker.read_text().strip() == "1"
+        self.enabled = ((os.environ.get("AIWS_LOCAL_MODEL_ENABLED") == "1") or persisted) if enabled is None else enabled
         if not isinstance(port, int) or not (1 <= port <= 65535):
             raise LocalModelError("Invalid localhost inference port")
         self.url = "http://" + HOST + ":" + str(port)
@@ -38,7 +40,10 @@ class LocalPlanner:
                   "provider": "llama.cpp", "model": MODEL_ALIAS,
                   "network": "guest-loopback-only",
                   "automaticExecution": False, "cloudFallback": False,
-                  "online": False}
+                  "online": False,
+                  "cpuOnly": True,
+                  "weightsPresent": (not (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_symlink() and
+                                     (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_file())}
         if self.enabled:
             try:
                 with self.opener.open(self.url + "/health", timeout=1.5) as response:
