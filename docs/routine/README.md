@@ -5,3 +5,7 @@
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
 - [2026-11-20 21:30 — 独立 AIWS OS 客户机工程 / Independent guest OS bootstrap](2026-11-20_2130-aiws-os-guest-bootstrap.md)
+
+- [2026-11-20 22:26 — C#/Swift 跨平台代码智能索引 / Code intelligence MVP](2026-11-20_2226-code-intelligence-static-index.md)
+- [2026-11-20 22:32 — XAML 类型映射与 XML 安全 / XAML link and XML hardening](2026-11-20_2232-xaml-xml-hardening.md)
+- [2026-11-20 22:36 — CI 28/28 验证与后续计划 / Verified regression and next steps](2026-11-20_2236-code-intelligence-ci-verified.md)
