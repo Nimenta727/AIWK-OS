@@ -4,10 +4,11 @@ Source: https://github.com/pingdotgg/t3code
 Pinned review revision: `8e8ff9b243e5a4c3a837c9033a134b62aac7dade`
 License: MIT — copyright © 2026 T3 Tools Inc.
 
-Only two small presentational primitives are adapted into AIWS-owned React modules:
+Three small presentational primitives are adapted into AIWS-owned React modules:
 
 - `apps/web/src/components/ConnectionStatusDot.tsx` -> `desktop/AIWorkstation.Frontend/src/components/T3StatusDot.tsx`
 - `apps/web/src/components/ui/skeleton.tsx` -> `desktop/AIWorkstation.Frontend/src/components/T3Skeleton.tsx`
+- `apps/web/src/components/ui/table.tsx` -> `desktop/AIWorkstation.Frontend/src/components/T3ReviewTable.tsx`
 
 These files were ported to remove T3 RPC, application state, Tailwind / Base UI hooks and imports.
 No T3 server, entire application, OAuth store, or T3-internal API is bundled or rehosted.

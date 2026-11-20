@@ -9,7 +9,7 @@ public static class AgentTools
 
     public static string? Locate(string name)
     {
-        if (name is not ("claude" or "codex" or "t3" or "openclaw"))
+        if (name is not ("claude" or "codex" or "t3" or "openclaw" or "git"))
             throw new ArgumentException("仅支持固定白名单中的官方工具。", nameof(name));
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {

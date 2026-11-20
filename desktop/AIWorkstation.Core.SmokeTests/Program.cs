@@ -95,6 +95,39 @@ try
     var traced = repository.Load()[0];
     Assert(traced.Steps[0].Usage.IsMeasured && traced.Steps[1].Usage.IsMeasured && traced.RequestEvents.Count > 0, "usage and trace persist without raw JSONL");
     Assert(!File.ReadAllText(file).Contains("thread.started"), "raw provider log is not persisted");
+    // V1.1: read-only developer tools never accept a shell command or arbitrary Git argv.
+    Assert(GitWorkspaceService.SupportedViews.Contains("diff") && !GitWorkspaceService.SupportedViews.Contains("push"),
+        "Git inspector exposes a fixed read-only view allowlist");
+    Assert(ThrowsAny(() => GitWorkspaceService.InspectAsync(workspace, "push").GetAwaiter().GetResult()),
+        "Git inspector rejects arbitrary git push command");
+    Assert(ThrowsAny(() => GitWorkspaceService.InspectAsync(workspace, "status; whoami").GetAwaiter().GetResult()),
+        "Git inspector rejects shell injection via view parameter");
+    var capabilities = WindowsToolPolicy.Describe();
+    Assert(capabilities.Count == 4 && capabilities.All(x => !string.IsNullOrWhiteSpace(x.Detail)),
+        "Windows capability inventory is explicit and documented");
+    Assert(capabilities.Single(x => x.Id == "shell.user").RequiresUserConfirmation,
+        "interactive PowerShell is user initiated, not an autonomous agent tool");
+    if (AgentTools.Locate("git") is not null)
+    {
+        var gitWorkspace = Path.Combine(workspace, "git-workspace");
+        Directory.CreateDirectory(gitWorkspace);
+        var gitProgram = AgentTools.Locate("git")!;
+        using var init = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(gitProgram)
+        {
+            WorkingDirectory = gitWorkspace,
+            ArgumentList = { "init", "-q" },
+            UseShellExecute = false,
+            CreateNoWindow = true
+        })!;
+        init.WaitForExit();
+        Assert(init.ExitCode == 0, "fixture Git repository initializes");
+        File.WriteAllText(Path.Combine(gitWorkspace, "review-me.txt"), "local fixture");
+        var status = GitWorkspaceService.InspectAsync(gitWorkspace, "status").GetAwaiter().GetResult();
+        Assert(status.ExitCode == 0 && status.Output.Contains("review-me.txt"),
+            "Git inspector returns real read-only worktree status");
+        var summary = GitWorkspaceService.InspectAsync(gitWorkspace, "summary").GetAwaiter().GetResult();
+        Assert(summary.ExitCode == 0 && summary.View == "summary", "Git summary is read-only and completes");
+    }
     // V0.6 evidence-based request flow: a process launch must not become a fabricated model request.
     var graph = CallFlowBuilder.Build(task);
     Assert(graph.Lanes.Count == 3 && graph.Nodes.Count() == 15, "request flow builds five linked phases per stage");

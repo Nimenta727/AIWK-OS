@@ -107,3 +107,9 @@ The V0.1–V0.3 Python + SQLite + browser prototype remains in `aiws/`, `web/`, 
 - Upstream project licensing and integration constraints are explained in [Desktop rebuild](docs/DESKTOP_REBUILD.md).
 
 **Project license:** MIT for our independently written source. Optional companions remain under their original licenses.
+
+## V1.1 — Git review and Windows developer tools (source-level integration)
+
+In the Windows EXE, select an existing task and choose **终端与 Diff** in the left sidebar. The panel reads Git status, summary, staged/unstaged diffs, history and branch from the task's trusted local folder. Git commands are predefined, read-only and never submitted to an AI model. The separate **终端** tab opens Windows PowerShell *only after native user confirmation*; this version does not claim to embed a full ConPTY terminal. **Windows 权限** reports tool availability and whether user approval is needed.
+
+The adapted T3 Code table primitive is MIT attributed; OpenClaw Windows and Kandev remain architectural references, not embedded backends. See `docs/DEVELOPER_MODULES_V11.md` and the timestamped record under `docs/routine/` for actual code ownership and verification.

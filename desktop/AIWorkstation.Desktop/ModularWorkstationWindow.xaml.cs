@@ -96,6 +96,10 @@ public partial class ModularWorkstationWindow : Window
                 "steps.retry" => StepAction(payload, "retry"),
                 "steps.startManual" => StepAction(payload, "startManual"),
                 "steps.launch" => StepAction(payload, "launch"),
+                "tools.gitInspect" => await GitWorkspaceService.InspectAsync(
+                    _controller.GetTask(ReadField(payload, "taskId")).Workspace, ReadField(payload, "view")),
+                "tools.capabilities" => WindowsToolPolicy.Describe(),
+                "tools.openShell" => OpenUserShell(payload),
                 _ => throw new InvalidOperationException("不允许的工作台操作。")
             };
             Reply(id, true, result, null);
@@ -109,7 +113,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.0.0-modular-preview",
+        Version = "1.1.0-developer-tools",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -154,6 +158,18 @@ public partial class ModularWorkstationWindow : Window
                     (agent,dir) => AgentTools.LaunchInteractive(agent,dir));
                 break;
         }
+        return new { success = true };
+    }
+
+    private object OpenUserShell(JsonElement payload)
+    {
+        var task = _controller.GetTask(ReadField(payload, "taskId"));
+        if (MessageBox.Show(this,
+                "将在以下受信任目录中打开独立的 Windows PowerShell：\n" + task.Workspace +
+                "\n\n此终端由你本人操作，不是 Agent 自动执行工具；它继承当前 Windows 用户权限。确认打开？",
+                "启动交互终端", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            throw new OperationCanceledException("已取消打开终端。");
+        WindowsToolPolicy.OpenUserPowerShell(task.Workspace);
         return new { success = true };
     }
 

@@ -1,15 +1,16 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
-import {Activity, ArrowRight, BadgeCheck, Boxes, ChevronDown, CircleHelp, Code2, Folder, GitBranch, LayoutDashboard, ListTodo, Plus, RefreshCw, Settings2, Sparkles, Terminal, Workflow, X} from 'lucide-react';
+import {Activity, ArrowRight, BadgeCheck, Boxes, ChevronDown, CircleHelp, Code2, Folder, GitBranch, LayoutDashboard, ListTodo, Plus, RefreshCw, Settings2, Sparkles, Terminal, GitCompare, Workflow, X} from 'lucide-react';
 import {bridge, type Snapshot, type WorkTask, type WorkStep} from './bridge';
 import {WorkflowCanvas} from './components/WorkflowCanvas';
 import {TracePanel} from './components/TracePanel';
 import {TaskInspector} from './components/TaskInspector';
+import {DevToolsPanel} from './components/DevToolsPanel';
 import {T3Skeleton} from './components/T3Skeleton';
 import {T3StatusDot} from './components/T3StatusDot';
 import {sumMeasuredUsage} from './model/workflow.mjs';
 
-type Page = 'overview'|'flow'|'trace'|'integrations';
-const nav=[{id:'overview',label:'工作台概览',icon:LayoutDashboard},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
+type Page = 'overview'|'flow'|'trace'|'tools'|'integrations';
+const nav=[{id:'overview',label:'工作台概览',icon:LayoutDashboard},{id:'flow',label:'可视化工作流',icon:Workflow},{id:'trace',label:'调用追踪',icon:Activity},{id:'tools',label:'终端与 Diff',icon:GitCompare},{id:'integrations',label:'Agent 与能力',icon:Boxes}] as const;
 function TitleLogo(){return <span className="brand-mark"><Sparkles size={19} strokeWidth={1.9}/></span>}
 export default function App(){
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
@@ -56,6 +57,7 @@ export default function App(){
        </div>}
        {page==='flow'&&<div className="workspace-page">{task?<><div className="page-heading"><div><div className="eyebrow">VISUAL WORKFLOW</div><h1>{task.title}</h1><p><Folder size={14}/>{task.workspace}</p></div><div className="right-chip">{task.completedCount} / {task.steps.length} 已完成 <ChevronDown size={14}/></div></div><div className="editor-card"><div className="editor-header"><div><strong>任务协作流程</strong><small>选择节点查看状态、审批和调用证据</small></div><span className="editor-badge"><T3StatusDot phase="connected" label="本地控制层已连接"/> 本地流程引擎</span></div><WorkflowCanvas task={task} selected={selectedNode} onPick={setSelectedNode}/></div></>:<div className="blank-state"><Workflow size={27}/><strong>还没有工作流</strong><button className="button dark" onClick={()=>setShowCreate(true)}>创建任务</button></div>}</div>}
        {page==='trace'&&<div className="trace-page"><div className="page-heading"><div><div className="eyebrow">REQUEST OBSERVABILITY</div><h1>AI 请求链路</h1><p>区分本地事件、官方结构化日志与不可观测的模型请求。</p></div></div>{task?<TracePanel task={task}/>:<div className="blank-state">创建任务后即可查看调用链。</div>}</div>}
+       {page==='tools'&&<DevToolsPanel task={task}/>}
        {page==='integrations'&&<div className="integrations"><div className="eyebrow">INTEGRATIONS</div><h1>Agent 与系统能力</h1><p className="lead">AIWS 不共享账号密钥，只调用你明确安装和登录的官方 CLI。</p><div className="integrations-grid">{Object.entries(snapshot.agents).map(([name,available])=><div className="integration" key={name}><div className="integration-mark"><Terminal size={23}/></div><div><strong>{name}</strong><p>{available?'已安装 · 需要官方账号登录':'本机未发现 · 需安装官方工具'}</p></div><T3StatusDot phase={available?'connected':'unknown'} label={available?'已检测':'未检测'}/></div>)}</div><div className="notice"><CircleHelp size={18}/><div><strong>源代码拆分与重组</strong><p>这不是 T3 Code 或 OpenClaw 的内嵌界面。UI 与工作流属于 AIWS；少量 T3 UI 原语依据 MIT 协议适配，Windows 任务由自己的 .NET 核心控制。</p></div></div></div>}
      </div>}
    </main>
