@@ -15,6 +15,8 @@
 | \`code.dependencies\` | MSBuild XML ProjectReference、PackageReference、FrameworkReference、PackageVersion、Import 与 TFM、UseWPF；Swift Package.swift 中**字面量** .package/.product 和 Package.resolved pin；XcodeGen platform 提示 | 不执行条件、变量展开、依赖解析或宏 |
 | \`code.platformApis\` | WPF、WinUI/UWP、Interop 和 SwiftUI、AppKit、UIKit 等命名空间/模块及典型 SwiftUI 标识符证据 | 只确认源码中出现该模式，不确认 API 存在或目标 SDK 可用 |
 
+补强：识别 WPF XAML 根元素的 x:Class，映射到 C# 类型名称的候选引用；对 .csproj 的 XML DTD/实体声明直接拒绝，不展开外部资源。这些结果仍非编译器语义验证。
+
 每条符号/引用/API 包含工作区相对文件路径与行列位置，结果有 \`confidence\`、\`semanticVerified=false\`、\`truncated\` 与 \`issues\` 字段。索引每次调用重新从文件读取，避免把旧文件状态伪装成最新；单次最多检查 320 个小于 192 KiB 的候选文件，截断时不提供完整性承诺。按目录忽略 .git、build、obj、node_modules 和链接，不访问工作区之外的路径。
 
 **重要局限：** 这不是 AST 解析器，也不能声称准确理解任意 C# 泛型、Swift 宏、混合语言工程、动态依赖、方法重载、条件编译或代码生成。没有 Roslyn/SourceKit-LSP 的条件下，定义和引用均只能作为候选提示，不用于自动重命名或破坏性重构。

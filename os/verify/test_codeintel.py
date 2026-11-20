@@ -140,6 +140,26 @@ let package = Package(name: "App", dependencies: [
         self.assertTrue(result["issues"])
         self.assertEqual(result["count"], 0)
 
+    def test_xaml_class_binding_and_wpf_markup_evidence(self):
+        self.put("Win/MainWindow.xaml", """<Window x:Class="Sample.MainWindow"
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Button Content="Hello"/>
+            </Window>""")
+        self.put("Win/MainWindow.xaml.cs", "namespace Sample; public partial class MainWindow {}")
+        references = plane.invoke("code.references", {"path": "Win", "symbol": "MainWindow"})
+        self.assertTrue(any(x["path"] == "Win/MainWindow.xaml" and
+                            x["confidence"] == "declarative-class-binding" for x in references["references"]))
+        usages = plane.invoke("code.platformApis", {"path": "Win"})
+        self.assertIn("WPF XAML", {u["apiFamily"] for u in usages["usages"]})
+
+    def test_dtd_and_entities_in_project_manifest_are_rejected(self):
+        self.put("Win/Hazard.csproj", """<!DOCTYPE Project [<!ENTITY x "EXPANDED">]>
+<Project><ItemGroup><PackageReference Include="&x;"/></ItemGroup></Project>""")
+        result = plane.invoke("code.dependencies", {"path": "Win"})
+        self.assertIn("xml-dtd-rejected", {i["reason"] for i in result["issues"]})
+        self.assertEqual(result["items"], [])
+
     def test_mcp_end_to_end_and_optional_schema(self):
         self.put("Example.swift", "struct Demo {}\n")
         tools = {x["name"]: x for x in plane.catalog()}

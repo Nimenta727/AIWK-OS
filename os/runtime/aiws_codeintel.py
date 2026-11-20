@@ -190,6 +190,9 @@ def _api(raw, masked, path, language):
 
 def _xml_manifest(path, raw):
     items, meta, problems = [], {}, []
+    # Never allow DTD/entity expansion from untrusted project files.
+    if "<!DOCTYPE" in raw.upper() or "<!ENTITY" in raw.upper():
+        return [], {}, [{"path": path, "reason": "xml-dtd-rejected"}]
     try:
         document = ET.fromstring(raw)
     except ET.ParseError:
@@ -265,10 +268,39 @@ def _dependencies(entries):
     return {"items": items[:MAX_RESULTS], "projects": metadata[:MAX_RESULTS],
             "issues": problems[:24], "truncated": len(items) > MAX_RESULTS or len(metadata) > MAX_RESULTS}
 
+def _xaml(path, raw):
+    """XAML class binding/source markup evidence; no type or SDK resolution."""
+    refs, apis = [], []
+    if "<!DOCTYPE" in raw.upper() or "<!ENTITY" in raw.upper():
+        return refs, apis
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return refs, apis
+    for key, value in root.attrib.items():
+        if key.endswith("}Class") and re.fullmatch(r"[A-Za-z_][\\w.]*", value, re.ASCII):
+            short = value.rsplit(".", 1)[-1]
+            for m in re.finditer(r"\\bx:Class\\s*=\\s*[\"']"+re.escape(value)+r"[\"']", raw):
+                offset = raw.index(value, m.start(), m.end()) + len(value)-len(short)
+                refs.append({"name": short, "path": path, **_position(raw, offset),
+                             "language": "xaml", "sourceLine": raw.splitlines()[_position(raw, offset)["line"]-1].strip()[:180],
+                             "confidence": "declarative-class-binding", "resolution": "candidate"})
+                break
+    if "http://schemas.microsoft.com/winfx/2006/xaml/presentation" in raw:
+        i = raw.index("http://schemas.microsoft.com/winfx/2006/xaml/presentation")
+        apis.append({"path": path, **_position(raw, i), "apiFamily": "WPF XAML",
+                     "symbol": "XAML presentation namespace", "evidence": "xml-namespace",
+                     "confidence": "convention-only"})
+    return refs, apis
+
 def _build(root, path, resolve_path):
     entries, problems, partial = _sources(root, path, resolve_path)
-    symbols, units, apis = [], [], []
+    symbols, units, apis, xaml_refs = [], [], [], []
     for file, raw in entries:
+        if file.endswith(".xaml"):
+            references, usages = _xaml(file, raw)
+            xaml_refs.extend(references)
+            apis.extend(usages)
         language = CODE.get(Path(file).suffix.lower())
         if not language or file.endswith("Package.swift"):
             continue
@@ -276,7 +308,7 @@ def _build(root, path, resolve_path):
         symbols.extend(definitions)
         units.append((file, raw, mask, language, definitions))
         apis.extend(_api(raw, mask, file, language))
-    return {"symbols": symbols, "units": units, "apiUsages": apis,
+    return {"symbols": symbols, "units": units, "xamlReferences": xaml_refs, "apiUsages": apis,
             "dependencies": _dependencies(entries), "filesScanned": len(entries),
             "issues": problems, "partial": partial}
 
@@ -312,6 +344,9 @@ def references(root, args, resolve_path):
                 break
         if len(refs) >= MAX_RESULTS:
             break
+    for item in state["xamlReferences"]:
+        if item["name"] == name and len(refs) < MAX_RESULTS:
+            refs.append({key: value for key, value in item.items() if key != "name"})
     return {"symbol": name, "definitions": defs[:MAX_RESULTS], "references": refs,
             "ambiguous": len(defs) != 1, "filesScanned": state["filesScanned"],
             "truncated": state["partial"] or len(refs) >= MAX_RESULTS or len(defs)>MAX_RESULTS,
