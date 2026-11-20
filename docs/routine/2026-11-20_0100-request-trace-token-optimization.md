@@ -29,3 +29,12 @@
 2. Test GUI end-to-end in user's Hyper-V guest with provider-exported logs.
 3. Add provider-supported streaming telemetry and user-defined per-stage budgets.
 4. Build redacted, shareable request trace export and visual budget trend chart.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 01:00 +0800 — V0.5 Request Trace and Token efficiency。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **optimization**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)

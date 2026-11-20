@@ -19,3 +19,12 @@
 2. Verify official Claude Code and Codex CLI interactive launch, workspace isolation and task handoff in that guest.
 3. Implement a genuine freeform workflow DAG (branches, connections, retries) and an embedded terminal with supported agent protocols.
 4. Add optional native companion integrations and a signed installer/secure update mechanism.
+
+
+---
+
+## 双语归档概要 / Bilingual archive synopsis (2026-11-20)
+
+- **中文：** 历史主题：2026-11-20 00:20 +08:00 — Windows-native desktop build validated。保留本文当时的修改事实、测试结论和后续计划，不代表现行发行版重新验证。
+- **English:** Historical entry on **passed**. The original implementation notes, verification outcomes and next steps remain intact; no fresh release verification is implied.
+- [历史索引 / Chronology](README.md) · [当前版本 / Current release](../../README.md)
