@@ -54,7 +54,7 @@ class GuestTaskStore:
             stage_key TEXT NOT NULL, label TEXT NOT NULL, tool TEXT NOT NULL,
             args_json TEXT NOT NULL, depends_json TEXT NOT NULL,
             state TEXT NOT NULL, approval INTEGER NOT NULL DEFAULT 0,
-            error TEXT, result_json TEXT, created_at INTEGER NOT NULL,
+            error TEXT, result_json TEXT, created_at INTEGER NOT NULL, ordinal INTEGER NOT NULL,
             UNIQUE(task_id,stage_key)
         );
         CREATE TABLE IF NOT EXISTS audit(
@@ -151,14 +151,14 @@ class GuestTaskStore:
                 self.db.execute(
                     "INSERT INTO tasks(id,title,goal,created_at,updated_at) VALUES(?,?,?,?,?)",
                     (identifier, title, goal, now, now))
-                for stage in stages:
+                for ordinal, stage in enumerate(stages):
                     approval = int(stage["tool"] not in WRITE_TOOLS)
                     self.db.execute(
                         "INSERT INTO stages(id,task_id,stage_key,label,tool,args_json,"
-                        "depends_json,state,approval,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        "depends_json,state,approval,created_at,ordinal) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (uuid4().hex, identifier, stage["key"], stage["label"],
                          stage["tool"], encode(stage["arguments"]), encode(stage["dependsOn"]),
-                         "pending", approval, now))
+                         "pending", approval, now, ordinal))
                 self._event(identifier, None, "task.created",
                             {"title": title, "plan": stages})
                 self.db.execute("COMMIT")
@@ -178,7 +178,7 @@ class GuestTaskStore:
             if not task:
                 raise TaskError("Unknown task ID")
             stages = self.db.execute(
-                "SELECT * FROM stages WHERE task_id=? ORDER BY created_at,id",
+                "SELECT * FROM stages WHERE task_id=? ORDER BY ordinal",
                 (task_id,)).fetchall()
             values = []
             for row in stages:
