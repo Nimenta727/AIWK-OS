@@ -42,6 +42,7 @@ let
 in {
   imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
   networking.hostName = "aiws-os";
+  environment.etc."aiws/guest-managed".text = "AIWS_GUEST_ONLY_VERSION=1\n";
   networking.networkmanager.enable = false;
   networking.firewall.enable = true;
 

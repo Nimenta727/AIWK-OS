@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from aiws_crossplatform import inspect_project, scaffold_project
+from aiws_guest_boundary import protect_guest_workspace
 from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
 import time
 from urllib.parse import urlsplit
@@ -56,6 +57,7 @@ def _workspace():
     root = raw.resolve(strict=True)
     if root == Path("/") or root == Path.home():
         raise ValueError("Guest root or entire home is not an acceptable workspace")
+    protect_guest_workspace(root)
     return root
 
 def _path(root, value=".", allow_missing=False):
@@ -74,6 +76,7 @@ def _path(root, value=".", allow_missing=False):
     resolved = current.resolve(strict=False)
     if not resolved.is_relative_to(root):
         raise ValueError("Workspace path escape")
+    protect_guest_workspace(root, resolved)
     if not allow_missing and not resolved.exists():
         raise FileNotFoundError(value)
     return resolved

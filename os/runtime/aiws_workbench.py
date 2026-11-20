@@ -15,6 +15,7 @@ import time
 from urllib.parse import urlsplit
 from uuid import uuid4
 from aiws_toolplane import audit, catalog, invoke
+from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 
 HOST = "127.0.0.1"
 PORT = 17640
@@ -204,12 +205,18 @@ def main():
     parser.add_argument("--port", type=int, default=PORT)
     parser.add_argument("--self-check", action="store_true")
     args = parser.parse_args()
-    if os.geteuid() == 0:
-        parser.error("Must run as an unprivileged guest desktop user")
+    try:
+        require_guest_runtime()
+    except PermissionError as exc:
+        parser.error(str(exc))
     workspace = Path(os.environ.get("AIWS_WORKSPACE", str(Path.home() / ".local/share/aiws/projects"))).expanduser()
     if not workspace.is_absolute() or workspace.is_symlink() or workspace in (Path("/"), Path.home()):
         parser.error("Workspace must be a dedicated non-symlink absolute folder")
     workspace.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        protect_guest_workspace(workspace.resolve(strict=True))
+    except PermissionError as exc:
+        parser.error(str(exc))
     os.environ["AIWS_WORKSPACE"] = str(workspace.resolve(strict=True))
     ui = Path(os.environ.get("AIWS_UI_DIR", "/usr/local/share/aiws/workbench"))
     if args.self_check:

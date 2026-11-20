@@ -34,7 +34,7 @@ case "${AIWS_OS_PROFILE:-full}" in
   *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
 esac
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
-cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$repo/os/runtime/aiws_guest_boundary.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
 ui="$repo/desktop/AIWorkstation.Frontend/dist"
 if [[ ! -s "$ui/index.html" ]]; then
   echo "ERROR: Build the shared React workbench first (cd desktop/AIWorkstation.Frontend && npm install && npm run build)." >&2
