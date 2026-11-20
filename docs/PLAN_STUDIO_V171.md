@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：计划展示、Markdown 大纲与增量刷新。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Plan Studio, Markdown outlines and incremental local refresh. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # AIWS V1.7.1 — Plan Studio / AI 计划中心
 
 Status: **Windows CI verified** on 2026-11-20 (native run 44708213179; regression run 44708213271); **Hyper-V GUI acceptance remains pending**. This feature was requested after the V1.7 Execution Atlas and does not replace the planned V1.8 Windows capability broker.

@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：Worktree、Windows 终端、事件账本和 DAG 的实施。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Worktree isolation, ConPTY terminal, event ledger and DAG implementation. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # AIWS V1.3–V1.6 integration / Worktree, ConPTY, Ledger, DAG
 
 > 2026-11-20 · Windows native desktop modules, NOT automatic cloud-model proxying. Source builds on V1.2. Test truth is in GitHub Actions and real Hyper-V validation records; do not infer GUI correctness from CI alone.

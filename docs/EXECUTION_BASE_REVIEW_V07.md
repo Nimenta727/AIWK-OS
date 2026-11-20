@@ -1,3 +1,13 @@
+> **中英导读 / Bilingual overview (2026-11-20)**
+>
+> 中文：执行基座、事务持久化和恢复边界。本文保留其原始版本背景和测试事实；过往计划、检查或验证不自动代表当前已完成。
+>
+> English: Execution base, durable storage, recovery and security boundaries. This document preserves its original version context and verification history; earlier plans or results are not automatically current release guarantees.
+>
+> [文档索引 / Index](README.md) · [最新发行 / Release](RELEASE_NOTES_V19.md)
+
+---
+
 # Windows AI Workstation V0.7 — Execution Base Code Review
 
 Review date: **2026-11-20 (UTC)**  
