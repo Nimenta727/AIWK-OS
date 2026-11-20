@@ -318,6 +318,8 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("No arguments allowed for dispatch")
                 result = app.dispatch_stage(route[3], route[5])
+        except PermissionError as exc:
+            return self.reply(403, {"error": str(exc)[:240]})
         except (ValueError, KeyError, TypeError) as exc:
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)

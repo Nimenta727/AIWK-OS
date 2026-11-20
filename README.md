@@ -36,7 +36,7 @@ AIWS 是自己的 **WPF / .NET 10 Windows 桌面 EXE**，通过 WebView2 承载�
 - 已提交 Linux 工作台服务、MCP 工具接口、C#/Swift 代码分析和 React OS 页面；现有 Windows 工作台保留原有运行路径。
 - **已实测：** Debian 实验 ISO 真正构建并 SHA 校验；[QEMU 直接内核启动与 LightDM/XFCE/guest HTTP/MCP](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44762589191) 全部通过。尚未完成原生固件 ISO 启动、工作台 GUI 实际可见与点击、NixOS ISO build/boot、自主 Agent、统一任务 DAG 迁移、权限 Broker 和宿主隔离安全验收。
 
-**AIWS Shell 方向：** 已提交专用的 AIWS 主界面会话配方，客户机默认以 kiosk 工作台代替 XFCE 面板；是否真正显示并通过浏览器点击验收，要以新 QEMU CI 结果为准。已增加客户机持久 SQLite DAG、审批与审计以及可选离线小模型 JSON 建议层。真实模型权重与微调结果仍未交付，不能宣称内置 2B 已运行。
+**AIWS Shell 方向：** 已提交专用的 AIWS 主界面会话配方，客户机默认以 kiosk 工作台代替 XFCE 面板；已在 [真实 Debian/QEMU 验收](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44787989404) 中确认可见 Chromium 窗口、文件点击、DAG 创建/执行及 AIWS 主界面 framebuffer。已增加客户机持久 SQLite DAG、审批与审计以及可选离线小模型 JSON 建议层。真实模型权重与微调结果仍未交付，不能宣称内置 2B 已运行。
 
 工程说明：[AIWS OS 模块化重构](docs/AIWS_MODULAR_OS.md)、[OS 工程](os/README.md)、[镜像与 QEMU 启动验证](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/aiws-os-image-boot.yml)。
 

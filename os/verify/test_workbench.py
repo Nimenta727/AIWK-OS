@@ -114,6 +114,17 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed", result)
         self.assertEqual((self.root / "Example.cs").read_text(), text)
 
+    def test_local_model_lifecycle_cannot_manage_host(self):
+        token=self.request("GET","/api/v1/session")[1]["csrf"]
+        self.assertEqual(self.request("POST","/api/v1/model/enable",{})[0],403)
+        hdr={"X-AIWS-CSRF":token}
+        status,response=self.request("POST","/api/v1/model/enable",{},hdr)
+        self.assertEqual(status,403,response)
+        self.assertIn("AIWS",response["error"])
+        status,response=self.request("POST","/api/v1/model/disable",{},hdr)
+        self.assertEqual(status,403,response)
+        self.assertFalse(self.request("GET","/api/v1/model/status")[1]["online"])
+
     def test_persistent_task_dag_and_disabled_offline_model(self):
         self.assertFalse(self.request("GET", "/api/v1/model/status")[1]["configured"])
         token = self.request("GET", "/api/v1/session")[1]["csrf"]

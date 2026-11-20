@@ -55,3 +55,12 @@ AI may manage **guest workspace and guest OS kernel sources**, subject to review
 - **Local 2B model:** optional guest-only llama.cpp service script, intent proposal API, dataset validation and offline LoRA training recipe committed. Neither pretrained weights nor LoRA adapters are bundled or trained; CPU/VRAM and tool accuracy in a real guest remain unmeasured. No host GPU passthrough.
 
 **Release status remains experimental. Do not mark P0 GUI passed before actual guest UI click evidence.**
+
+
+## 2026-11-21 P0-A test evidence (verified)
+GitHub Actions run 44787989404 completed successfully with Debian real ISO + QEMU guest:
+- LightDM logged into the AIWS Shell (not XFCE), Openbox served only as minimal WM, Chromium kiosk window was visible to X11.
+- Selenium inside guest clicked AIWS file tree, opened a guest-only test file, created and dispatched a SQLite DAG task; the tool result reached completed.
+- Guest serial emitted AIWS_GUI_BROWSER_PASS and AIWS_BOOT_SMOKE_PASS with shell=aiws gui=clicked. CI also captured a 1280x800 framebuffer showing the AIWS Workbench UI.
+- This is the first P0-A GUI smoke acceptance, not a full production desktop quality gate (still needs native firmware ISO boot, long-running stability, IME/audio, accessibility, all functionality).
+- Guest model is still deliberately not present in the ISO; the GUI confirmed its optional inactive state. Host access remains forbidden.

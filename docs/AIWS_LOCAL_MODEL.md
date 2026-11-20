@@ -27,3 +27,9 @@
 https://huggingface.co/Qwen/Qwen3.5-2B
 https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 https://huggingface.co/docs/trl/peft_integration
+
+
+## 模型开关与资源限制
+工作台提供显式启用/关闭按钮，只在客户机预装模型文件后允许启用；调用严格固定的 guest systemd user service，不执行模型产生的任意命令。单元使用 MemoryMax=5G、CPUQuota=200%、仅允许 guest loopback 网络地址；这是客户机进程资源限制，不是 GPU 显存的实验保证。若资源不足，服务会失败，工作台和确定性任务管理不应随之失效。
+
+P0 GUI 已在 GitHub run 44787989404 完成真实 Chromium 可见窗口与 Selenium 文件/DAG 点击验收；本地小模型仍未装载，测试确认其为可选状态。

@@ -30,3 +30,5 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 02:05 — 专用模型合成数据与离线评估](2026-11-21_0205-local-model-dataset-evaluation.md)
 - [2026-11-21 02:12 — Guest LoRA 训练配方](2026-11-21_0212-guest-offline-lora-training-recipe.md)
 - [2026-11-21 02:16 — 拒绝主机训练数据读取](2026-11-21_0216-lora-train-guest-data-guard.md)
+
+- [2026-11-21 02:26 — 本地模型从工作台受控启停](2026-11-21_0226-local-model-workbench-toggle.md)
