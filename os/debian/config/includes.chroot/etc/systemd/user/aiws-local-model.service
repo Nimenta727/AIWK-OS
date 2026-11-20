@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional AIWS guest-local offline inference service
+After=default.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/aiws-local-model
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+# Explicitly opt-in: no [Install] WantedBy to autostart in the smoke ISO.
