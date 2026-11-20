@@ -1,0 +1,40 @@
+#!/bin/sh
+# Runs only in experimental offline ISO. Emits a strict guest boot receipt to ttyS0.
+set -u
+emit() { printf '%s\n' "$1" > /dev/ttyS0 2>/dev/null || printf '%s\n' "$1"; }
+if ! command -v lightdm >/dev/null 2>&1 ||
+   ! command -v xfce4-session >/dev/null 2>&1; then
+    emit "AIWS_BOOT_SMOKE_FAIL: desktop-packages"
+    exit 1
+fi
+desktop=0
+for i in $(seq 1 65); do
+    if systemctl is-active --quiet display-manager && pgrep -x xfce4-session >/dev/null; then
+        desktop=1
+        break
+    fi
+    sleep 2
+done
+if [ "$desktop" -ne 1 ]; then
+    emit "AIWS_BOOT_SMOKE_FAIL: display-manager-or-xfce-not-running"
+    exit 1
+fi
+health=0
+for i in $(seq 1 35); do
+    if curl --fail --silent --noproxy '*' --max-time 2 http://127.0.0.1:17640/api/v1/health |
+        python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["uiBundled"] and d["guestOnly"] and d["toolCount"] >= 10'; then
+        health=1
+        break
+    fi
+    sleep 2
+done
+if [ "$health" -ne 1 ]; then
+    emit "AIWS_BOOT_SMOKE_FAIL: workbench-agent-unhealthy"
+    exit 1
+fi
+if ! /usr/local/bin/aiws-toolctl --list | grep -q '"code.symbols"'; then
+    emit "AIWS_BOOT_SMOKE_FAIL: mcp-unavailable"
+    exit 1
+fi
+emit "AIWS_BOOT_SMOKE_PASS: lightdm=active xfce=active workbench=active tools=mcp ui=react"
+exit 0

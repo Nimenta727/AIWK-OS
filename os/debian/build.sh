@@ -23,11 +23,21 @@ mkdir -p -- "$out"
 cd -- "$out"
 lb config --distribution trixie --architectures amd64 --binary-images iso-hybrid \
   --debian-installer none --archive-areas main --linux-flavours amd64 \
-  --bootappend-live "boot=live components quiet"
+  --bootappend-live "boot=live components console=ttyS0,115200n8"
 cp -a -- "$repo/os/debian/config/." "$out/config/"
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
-cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
-chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-toolctl"
+cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+ui="$repo/desktop/AIWorkstation.Frontend/dist"
+if [[ ! -s "$ui/index.html" ]]; then
+  echo "ERROR: Build the shared React workbench first (cd desktop/AIWorkstation.Frontend && npm install && npm run build)." >&2
+  exit 1
+fi
+mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
+cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-toolctl" \
+  "$out/config/includes.chroot/usr/local/bin/aiws-workbench" \
+  "$out/config/includes.chroot/usr/local/bin/aiws-open-workbench" \
+  "$out/config/includes.chroot/usr/local/bin/aiws-boot-smoke"
 echo "Building AIWS OS Live ISO using Debian package repositories..."
 lb build
 iso="$out/live-image-amd64.hybrid.iso"

@@ -1,0 +1,11 @@
+[Unit]
+Description=AIWS OS CI guest boot integration evidence
+After=display-manager.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aiws-boot-smoke
+TimeoutStartSec=300
+StandardOutput=journal+console
+StandardError=journal+console
+[Install]
+WantedBy=multi-user.target

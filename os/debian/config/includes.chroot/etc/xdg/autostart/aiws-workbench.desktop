@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=AIWS OS Workbench
+Comment=Unified guest-local AI-native workstation
+Exec=/usr/local/bin/aiws-open-workbench
+Terminal=false
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true

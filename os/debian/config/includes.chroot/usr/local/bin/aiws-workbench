@@ -1,0 +1,5 @@
+#!/bin/sh
+# AIWS guest ordinary-user workbench server; no root or host VM channel.
+set -eu
+if [ "$(id -u)" -eq 0 ]; then echo 'Refusing to run the workbench as root' >&2; exit 1; fi
+exec /usr/bin/python3 /usr/local/lib/aiws/aiws_workbench.py "$@"
