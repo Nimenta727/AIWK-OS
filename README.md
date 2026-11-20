@@ -1,3 +1,9 @@
+# Product roadmap / 后续开发总规划
+
+**[完整路线图：V1.3–V2.0、架构拆分、模块迁移、验收与风险](docs/ROADMAP.md)** · [开发日志](docs/routine/)
+
+---
+
 # AIWS V1.2 — Project structure & Git evidence (Windows native desktop)
 
 The AIWS-owned Windows `.exe` now connects **workflow stages** to a **local project file tree, Git status, staged/unstaged per-file Diff, and recorded commit paths**. Use **文件与 Git 变更** in the left sidebar. The evidence is collected locally **without sending any source to Claude/Codex or spending model tokens**. Stage-associated Git changes are observations, **not automatically proof that an Agent wrote a file**.
