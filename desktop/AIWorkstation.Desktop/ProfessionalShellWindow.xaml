@@ -1,0 +1,69 @@
+<Window x:Class="AIWorkstation.Desktop.ProfessionalShellWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Windows AI Workstation · Professional UI" Width="1500" Height="920"
+        MinWidth="1024" MinHeight="680" WindowStartupLocation="CenterScreen"
+        Background="#F9FAFB" FontFamily="Segoe UI">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="54"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="34"/>
+    </Grid.RowDefinitions>
+    <Border Grid.Row="0" Background="White" BorderBrush="#E8EBEF" BorderThickness="0,0,0,1">
+      <Grid Margin="16,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="220"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Border Background="#CC825E" CornerRadius="7" Width="27" Height="27" VerticalAlignment="Center">
+            <TextBlock Text="✦" Foreground="White" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="AI Workstation" FontWeight="SemiBold" FontSize="14" Foreground="#292D32"/>
+            <TextBlock Text="专业前端工作区" FontSize="10" Foreground="#8A929D"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="T3Tab" Content="T3 Code" Click="T3Tab_Click" Padding="16,8" Margin="0,0,4,0" Background="#F5EBE5" Foreground="#9A553A" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand"/>
+          <Button x:Name="OpenClawTab" Content="OpenClaw" Click="OpenClawTab_Click" Padding="16,8" Margin="0,0,4,0" Background="Transparent" Foreground="#59616A" BorderThickness="0" Cursor="Hand"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0">
+          <TextBox x:Name="EndpointInput" Width="310" Height="30" Padding="9,4" VerticalContentAlignment="Center"
+                   ToolTip="只能使用本机 127.0.0.1 / localhost 地址，不保存凭据"/>
+          <Button Content="连接本机服务" Click="Connect_Click" Margin="8,0,0,0" Padding="12,6" Background="#30353B" Foreground="White" BorderThickness="0" Cursor="Hand" />
+        </StackPanel>
+        <Button Grid.Column="3" Content="AIWS 任务与流程" Click="OpenNative_Click" VerticalAlignment="Center"
+                Padding="12,7" Background="#F3F4F6" Foreground="#383D44" BorderBrush="#E1E4E8" Cursor="Hand" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1">
+      <wv2:WebView2 x:Name="UpstreamWebView" Visibility="Collapsed"/>
+      <Grid x:Name="WelcomePanel" Background="#FAFAF9">
+        <Border Background="White" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="16" Padding="35" Width="620" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <StackPanel>
+            <TextBlock Text="连接真正的开源专业前端" FontSize="23" FontWeight="SemiBold" Foreground="#252729" Margin="0,0,0,12"/>
+            <TextBlock Text="这里显示 T3 Code / OpenClaw 的原版运行界面，不是 AIWS 仿制的 UI。" FontSize="14" TextWrapping="Wrap" Foreground="#66707C" Margin="0,0,0,18"/>
+            <TextBlock Text="1. 在这台 Windows 虚拟机安装并启动对应的官方服务。" FontSize="13" Foreground="#505A64" Margin="0,0,0,7" />
+            <TextBlock Text="2. 把服务打开时显示的本机 http://127.0.0.1:端口 地址填到顶部。" FontSize="13" TextWrapping="Wrap" Foreground="#505A64" Margin="0,0,0,7" />
+            <TextBlock Text="3. 点击「连接本机服务」。原版前端将完整出现在这个 EXE 里。" FontSize="13" Foreground="#505A64" Margin="0,0,0,18" />
+            <Border Background="#F9F4EE" CornerRadius="10" Padding="15">
+              <TextBlock Text="AIWS 原生任务、审批、审计与调用流程仍可通过右上角打开。上游 UI 不会自动获得 AIWS 的任务数据或 Windows 管理权限。" FontSize="12" TextWrapping="Wrap" Foreground="#8C624D" />
+            </Border>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Grid>
+    <Border Grid.Row="2" Background="White" BorderBrush="#E8EBEF" BorderThickness="0,1,0,0">
+      <Grid Margin="16,0">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="StatusText" Text="未连接 · 请先启动 T3 Code 本机服务" FontSize="11" Foreground="#78828C" VerticalAlignment="Center"/>
+        <TextBlock Grid.Column="1" Text="仅本机地址 · 禁止远程网页 · 不读取订阅凭据" FontSize="11" Foreground="#89929C" VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

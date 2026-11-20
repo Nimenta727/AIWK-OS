@@ -19,6 +19,17 @@ static bool Throws(Action action)
     catch (InvalidDataException) { return true; }
 }
 
+// Professional frontend bridge must never silently load an arbitrary remote site or token URL.
+Assert(LocalFrontendEndpoint.TryParse("http://127.0.0.1:3773/", out var localT3) && localT3 is not null, "T3 local UI allowed");
+Assert(LocalFrontendEndpoint.TryParse("http://localhost:18789/", out var localClaw) && localClaw is not null, "OpenClaw loopback allowed");
+Assert(!LocalFrontendEndpoint.TryParse("https://example.com/", out _), "remote site rejected");
+Assert(!LocalFrontendEndpoint.TryParse("http://localhost:3773/?token=secret", out _), "URL token rejected");
+Assert(!LocalFrontendEndpoint.TryParse("file:///C:/Windows/system.ini", out _), "file scheme rejected");
+Assert(!LocalFrontendEndpoint.TryParse("http://localhost.evil.com:3773/", out _), "lookalike hostname rejected");
+Assert(!LocalFrontendEndpoint.TryParse("http://foo:pass@localhost:3773/", out _), "embedded credentials rejected");
+Assert(LocalFrontendEndpoint.IsWithinOrigin(new Uri("http://127.0.0.1:3773/chat"), localT3!), "same-origin UI navigation allowed");
+Assert(!LocalFrontendEndpoint.IsWithinOrigin(new Uri("http://127.0.0.1:3774/"), localT3!), "other port navigation rejected");
+
 var safeBase = OperatingSystem.IsWindows() ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : Path.GetTempPath();
 var workspace = Path.Combine(safeBase, "aiws-desktop-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(workspace);

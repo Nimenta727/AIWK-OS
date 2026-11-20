@@ -2,7 +2,19 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.7 status:** native WPF/.NET compiled and Windows CI [verified successfully](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528), including core smoke tests and x64 single-file EXE publish. This is a prototype, not a finished or audited operating system agent.
+> **V0.8 integration status:** new embedded upstream shell requires Windows CI compilation and VM runtime validation. V0.7 core remains intact. Earlier **V0.7 status:** native WPF/.NET compiled and Windows CI [verified successfully](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528), including core smoke tests and x64 single-file EXE publish. This is a prototype, not a finished or audited operating system agent.
+
+## V0.8 — original professional frontend in the Windows EXE
+
+The application now **opens to an embedded original T3 Code or OpenClaw UI** in Microsoft WebView2, rather than a newly hand-drawn imitation. The previously built native AIWS task editor, approvals and request traces remain accessible through **AIWS 任务与流程**.
+
+**Important distinction:** this is the **upstream frontend being hosted from its separately running official local service**, not a copied/forked frontend source tree. T3 Code is deeply coupled to its own React runtime and RPC server. We deliberately did not claim to have transplanted its full source code or merged its task database and token information into AIWS. See [upstream frontend integration and limitations](docs/PROFESSIONAL_FRONTENDS.md).
+
+- Start the official T3 Code local web server on your Windows guest (e.g. with its supported `t3` CLI) or the local OpenClaw Gateway/UI.
+- Run `WindowsAIWorkstation.exe`, choose T3 Code or OpenClaw, enter the local HTTP address printed by the upstream service, and click **连接本机服务**.
+- Only explicit `localhost`, `127.0.0.1` or IPv6 loopback endpoints are accepted. Third-party remote navigations and new windows are blocked inside the embedded browser; use the system browser for official sign-in.
+- The WebView2 Runtime must be present on the guest; it normally ships with recent Windows 11 installations. **Do not enter API tokens into the AIWS URL field.**
+- Upstream applications retain independent authorization, state and license. AIWS does not proxy subscriptions or grant OS-level capabilities to an embedded UI.
 
 ## V0.7 — execution base stabilization (code-review driven)
 

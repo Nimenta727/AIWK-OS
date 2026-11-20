@@ -8,7 +8,7 @@ public partial class App : Application
     {
         try
         {
-            MainWindow = new MainWindow();
+            MainWindow = new ProfessionalShellWindow();
             MainWindow.Show();
         }
         catch (Exception ex)
