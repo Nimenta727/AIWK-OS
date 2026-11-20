@@ -8,7 +8,7 @@ export type FileReview = {path:string;status:string;diff:string;truncated:boolea
 export type StageChangeReport = {stageId:string;stageTitle:string;fromHead:string;toHead:string;headChanged:boolean;files:{path:string;kind:string;before:string;after:string}[];committedFiles:string[];partial:boolean;notice:string;startedAt:string|null;completedAt:string|null};
 export type ExecutionRecord = {id:string;stageId:string;runId:string;kind:string;source:string;evidence:'observed'|'imported'|'inferred'|'unknown';at:string;metadata:string};
 export type WorkStep = { dependsOn:string[];worktreePath:string;worktreeBaseline:string;runId:string;  gitBefore:GitCheckpoint|null;gitAfter:GitCheckpoint|null; id:string; title:string; agent:'ClaudeCode'|'Codex'|'Manual'; status:'Pending'|'Running'|'Completed'|'Failed'|'Interrupted'; approvalGranted:boolean; requiresApproval:boolean; instructions:string; result:string; usage:TokenUsage; lastPromptFingerprint:string; startedAt:string|null; completedAt:string|null };
-export type WorkTask = { id:string; title:string; workspace:string; graphMode:boolean; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
+export type WorkTask = { id:string; title:string; workspace:string; graphMode:boolean; promptWarningTokens:number; promptStopTokens:number; executionRecords:ExecutionRecord[]; createdAt:string; steps:WorkStep[]; requestEvents:TraceEvent[]; completedCount:number };
 export type Snapshot = { version:string; tasks:WorkTask[]; agents:Record<string,boolean>; limitations:string[] };
 type Pending = { resolve:(x:unknown)=>void; reject:(e:Error)=>void };
 type Message = {id:number;action:string;payload:Record<string,unknown>};
@@ -68,3 +68,7 @@ export type RelatedStageLookup = {stages:RelatedStage[];partial:boolean;notice:s
 export type PlanFile = {path:string;name:string;bytes:number;updatedAt:string;version:string};
 export type PlanCatalog = {workspace:string;files:PlanFile[];checkedAt:string;notices:string[]};
 export type PlanDocument = {path:string;text:string;version:string;updatedAt:string;bytes:number;sha256:string};
+
+// AIWS local *estimated* handoff size. Not billing, provider-side token usage,
+// or a hard limit on an external interactive CLI's internal context.
+export type PromptBudgetAssessment = {approxTokens:number;warningTokens:number;stopTokens:number;originalCharacters:number;sentCharacters:number;savedCharacters:number;warn:boolean;blocked:boolean;duplicate:boolean;note:string};

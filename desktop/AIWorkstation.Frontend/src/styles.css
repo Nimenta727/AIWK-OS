@@ -124,3 +124,8 @@
 .plan-updates span{background:#f7f1e9;border-radius:6px;padding:5px 9px}.plan-foot{margin-top:14px}
 @media(max-width:1100px){.app-shell.plan-active{grid-template-columns:200px minmax(0,1fr)}.plan-center{padding:23px 20px}.plan-stage-columns{grid-template-columns:repeat(2,minmax(155px,1fr))}.plan-kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.app-shell.plan-active{grid-template-columns:150px minmax(0,1fr)}.plan-layout{grid-template-columns:minmax(0,1fr)}.plan-library{min-height:auto}.plan-kpis{gap:7px}.plan-center{padding:16px 11px}.plan-workarea{padding:14px}.plan-stage-columns{grid-template-columns:repeat(2,minmax(110px,1fr))}}
+
+/* V1.7.2 local prompt preflight, no model usage. */
+.budget-settings{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:10px;margin-bottom:8px}
+.budget-settings label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-foreground,#666)}
+.budget-settings input{max-width:86px;padding:5px 7px;border:1px solid var(--border,#ddd);border-radius:6px;background:transparent;color:inherit}

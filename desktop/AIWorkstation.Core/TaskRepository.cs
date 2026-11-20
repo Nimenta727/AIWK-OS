@@ -69,6 +69,7 @@ public sealed class TaskRepository
                     if (!Enum.IsDefined(step.Agent) || !Enum.IsDefined(step.Status))
                         throw new InvalidDataException("任务库含有未知的 Agent 或阶段状态。");
                 }
+                ContextBudgetPolicy.Validate(task.PromptWarningTokens, task.PromptStopTokens);
                 WorkflowGraph.Validate(task);
             }
             return tasks;

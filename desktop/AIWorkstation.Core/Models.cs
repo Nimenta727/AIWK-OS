@@ -37,6 +37,10 @@ public sealed class WorkTask
     public string Workspace { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public bool GraphMode { get; set; }
+    // AIWS local handoff limits. These are character-based token ESTIMATES,
+    // never provider-wide actual token or billing limits.
+    public int PromptWarningTokens { get; set; } = ContextBudgetPolicy.DefaultWarningTokens;
+    public int PromptStopTokens { get; set; } = ContextBudgetPolicy.DefaultStopTokens;
     public List<WorkflowStep> Steps { get; set; } = [];
     public List<ExecutionRecord> ExecutionRecords { get; set; } = [];
     public string WorkspaceFor(WorkflowStep step) => string.IsNullOrWhiteSpace(step.WorktreePath) ? Workspace : step.WorktreePath;
@@ -64,6 +68,21 @@ public static class AgentLabel
 
 public static class WorkflowTemplates
 {
+    // A single model stage plus human validation avoids obligatory plan/review model calls
+    // for simple tasks. The user can still opt into deeper multi-agent workflows.
+    public static WorkTask Lean(string name, string workspace) => new()
+    {
+        Title = name,
+        Workspace = workspace,
+        Steps =
+        [
+            new() { Title = "实现与测试（单 Agent）", Agent = AgentKind.Codex,
+                Instructions = "先检查任务相关路径，再实施最小必要修改并执行相关测试；返回简明变更与验证结果。", RequiresApproval = true },
+            new() { Title = "人工验收", Agent = AgentKind.Manual,
+                Instructions = "检查 Diff 与测试证据，确认结果或要求重新实施；不额外启动模型。", RequiresApproval = false }
+        ]
+    };
+
     public static WorkTask DualAgent(string name, string workspace) => new()
     {
         Title = name,

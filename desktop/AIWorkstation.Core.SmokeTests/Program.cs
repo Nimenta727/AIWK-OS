@@ -485,6 +485,63 @@ try
     Assert(!OperatingSystem.IsWindows() ? ThrowsAny(()=>ConPtyTerminal.StartPowerShell(workspace)) : true,
         "ConPTY rejects unsupported OS (real terminal requires Windows GUI acceptance)");
 
+    // V1.7.2: deterministic AIWS-owned prompt-size guard, with no external model calls.
+    var lean = WorkflowTemplates.Lean("simple change", workspace);
+    Assert(lean.Steps.Count == 2 && lean.Steps.Count(x=>x.Agent!=AgentKind.Manual) == 1,
+        "lean workflow avoids obligatory second model pass");
+    var efficient = WorkflowTemplates.DualAgent("budget", workspace);
+    var efficientStage = efficient.Steps[0];
+    var baselineBudget = ContextBudgetPolicy.Assess(efficient, efficientStage);
+    Assert(!baselineBudget.Blocked && baselineBudget.ApproxTokens>0 && !baselineBudget.Duplicate,
+        "default preflight estimates only AIWS-owned draft without calling a provider");
+    Assert(ThrowsAny(()=>ContextBudgetPolicy.Validate(499,600))
+        && ThrowsAny(()=>ContextBudgetPolicy.Validate(8000,3000)),
+        "invalid or inverted context thresholds are rejected");
+    efficient.PromptWarningTokens=500;
+    efficient.PromptStopTokens=650;
+    efficientStage.Instructions=new string('界',1200);
+    var over = ContextBudgetPolicy.Assess(efficient, efficientStage);
+    Assert(over.Blocked && over.Warn && over.ApproxTokens>over.StopTokens,
+        "large explicit stage instructions are surfaced and blocked, not silently truncated");
+    Assert(ThrowsAny(()=>ContextBudgetPolicy.RequireAllowed(efficient,efficientStage)),
+        "hard prompt-size preflight rejects launch before clipboard");
+    efficientStage.Instructions="short instructions";
+    var repeatDraft=HandoffBuilder.Prepare(efficient,efficientStage);
+    efficientStage.LastPromptFingerprint=repeatDraft.Fingerprint;
+    var again=ContextBudgetPolicy.Assess(efficient,efficientStage);
+    Assert(again.Duplicate && ThrowsAny(()=>ContextBudgetPolicy.RequireAllowed(efficient,efficientStage)),
+        "repeated identical prompt refuses unconfirmed relaunch");
+    ContextBudgetPolicy.RequireAllowed(efficient,efficientStage,true);
+    using(var budgetController=new WorkstationController(Path.Combine(workspace,"budget-store")))
+    {
+        var budgetTask=budgetController.CreateTask("budget persistence",workspace,"lean");
+        Assert(budgetController.Preflight(budgetTask.Id,budgetTask.Steps[0].Id).ApproxTokens>0,
+            "controller read-only preflight works before approval");
+        budgetController.SetPromptBudget(budgetTask.Id,600,900);
+        Assert(budgetTask.PromptWarningTokens==600 && budgetTask.PromptStopTokens==900,
+            "local budget settings persist through the controller");
+        Assert(ThrowsAny(()=>budgetController.SetPromptBudget(budgetTask.Id,900,600)),
+            "invalid edit does not modify existing settings");
+        budgetTask.Steps[0].Instructions=new string('中',1500);
+        budgetController.Approve(budgetTask.Id,budgetTask.Steps[0].Id);
+        var copied=false;var launched=false;
+        Assert(ThrowsAny(()=>budgetController.Launch(budgetTask.Id,budgetTask.Steps[0].Id,
+                _=>copied=true,(_,_)=>launched=true))
+            && !copied && !launched && budgetTask.Steps[0].Status==StepStatus.Pending,
+            "core refuses over-budget stage before clipboard or external CLI launch");
+        budgetTask.Steps[0].Instructions="small and verifiable";
+        budgetTask.Steps[0].LastPromptFingerprint=HandoffBuilder.Prepare(budgetTask,budgetTask.Steps[0]).Fingerprint;
+        Assert(ThrowsAny(()=>budgetController.Launch(budgetTask.Id,budgetTask.Steps[0].Id,
+                _=>copied=true,(_,_)=>launched=true)) && !copied && !launched,
+            "core prevents accidental repeated launches without native confirmation");
+    }
+    using(var budgetReopen=new WorkstationController(Path.Combine(workspace,"budget-store")))
+    {
+        var saved=budgetReopen.Tasks.Single();
+        Assert(saved.PromptWarningTokens==600 && saved.PromptStopTokens==900,
+            "budget settings survive restart and JSON store validation");
+    }
+
     // V1.8 Plan Studio: only explicitly recognized Markdown plans inside trusted workspaces.
     var planRoot=Path.Combine(workspace,"plan-studio-project");
     Directory.CreateDirectory(Path.Combine(planRoot,"docs","plans"));

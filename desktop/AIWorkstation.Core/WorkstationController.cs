@@ -49,6 +49,7 @@ public sealed class WorkstationController : IDisposable
         WorkTask task = template switch
         {
             "research" => WorkflowTemplates.Research(safeTitle, folder),
+            "lean" => WorkflowTemplates.Lean(safeTitle, folder),
             "dag" => WorkflowTemplates.ParallelReview(safeTitle, folder),
             "dual" => WorkflowTemplates.DualAgent(safeTitle, folder),
             _ => throw new ArgumentException("未知工作流模板。", nameof(template))
@@ -58,6 +59,24 @@ public sealed class WorkstationController : IDisposable
         try { Save(); }
         catch { _tasks.Remove(task); throw; }
         return task;
+    }
+
+    public ContextBudgetPolicy.Assessment Preflight(string taskId, string stepId)
+    {
+        var task = GetTask(taskId);
+        return ContextBudgetPolicy.Assess(task, WorkflowEngine.Find(task, stepId));
+    }
+
+    public void SetPromptBudget(string taskId, int warningTokens, int stopTokens)
+    {
+        ContextBudgetPolicy.Validate(warningTokens, stopTokens);
+        Change(taskId, task =>
+        {
+            task.PromptWarningTokens = warningTokens;
+            task.PromptStopTokens = stopTokens;
+            ExecutionLedger.Append(task, null, "context.budget.updated",
+                metadata: $"warning={warningTokens}; stop={stopTokens}; estimates-only");
+        });
     }
 
     public void Approve(string taskId, string stepId)
@@ -160,22 +179,24 @@ public sealed class WorkstationController : IDisposable
         => Change(taskId, task => {var step=WorkflowEngine.Find(task,stepId);
             WorkflowEngine.Retry(task,stepId);ExecutionLedger.Append(task,step,"stage.retry.armed");});
 
-    public async Task LaunchWithGitAsync(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli)
+    public async Task LaunchWithGitAsync(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli, bool confirmDuplicate = false)
     {
         var task = GetTask(taskId);
-        WorkflowEngine.EnsureStartable(task, stepId);
-        var before = await ProjectWorkspaceService.CaptureAsync(task.WorkspaceFor(WorkflowEngine.Find(task,stepId)));
-        Launch(taskId, stepId, copyPrompt, startCli, before);
+        var ready = WorkflowEngine.EnsureStartable(task, stepId);
+        ContextBudgetPolicy.RequireAllowed(task, ready, confirmDuplicate); // Before any file scan or clipboard write.
+        var before = await ProjectWorkspaceService.CaptureAsync(task.WorkspaceFor(ready));
+        Launch(taskId, stepId, copyPrompt, startCli, before, confirmDuplicate);
     }
 
     public void Launch(string taskId, string stepId, Action<string> copyPrompt, Action<AgentKind, string> startCli,
-        ProjectWorkspaceService.GitCheckpoint? before = null)
+        ProjectWorkspaceService.GitCheckpoint? before = null, bool confirmDuplicate = false)
     {
         EnsureHealthy();
         var task = GetTask(taskId);
         var step = WorkflowEngine.EnsureStartable(task, stepId);
         if (step.Agent == AgentKind.Manual)
             throw new InvalidOperationException("人工阶段不能启动模型 CLI。");
+        ContextBudgetPolicy.RequireAllowed(task, step, confirmDuplicate);
         var folder = WorkspaceGuard.RequireTrustedDirectory(task.WorkspaceFor(step));
         var draft = HandoffBuilder.Prepare(task, step);
         var oldBefore = step.GitBefore;
@@ -214,9 +235,13 @@ public sealed class WorkstationController : IDisposable
         var oldLedger = task.ExecutionRecords.ToList();
         var oldDependencies=task.Steps.Select(x=>(x,x.DependsOn.ToList(),x.WorktreePath,x.WorktreeBaseline,x.RunId)).ToArray();
         var oldStepCount=task.Steps.Count;
+        var oldWarningTokens = task.PromptWarningTokens;
+        var oldStopTokens = task.PromptStopTokens;
         try { act(task); Save(); }
         catch
         {
+            task.PromptWarningTokens = oldWarningTokens;
+            task.PromptStopTokens = oldStopTokens;
             foreach (var (s,status,approved,result,start,completed,before,after) in stepSnapshots)
             {
                 s.Status = status; s.ApprovalGranted = approved; s.Result = result;

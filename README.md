@@ -1,3 +1,11 @@
+# AIWS V1.7.2 — Token-aware local handoff preflight
+
+New tasks default to a **lean single-Agent + human-review** workflow. Before launching an official interactive CLI, AIWS previews the *estimated* size of its own handoff prompt and prevents over-limit or unconfirmed duplicate launches **before copying to the clipboard**. Per-task warning/stop estimates can be configured in the stage inspector; the default is 2,500 / 6,000 estimated tokens. This is **not a provider-side token cap** or a claim to observe all internal CLI usage. Reading plans, files, Git and execution graphs does not call a model.
+
+See [V1.7.2 context and budget design](docs/TOKEN_EFFICIENCY_V172.md) and [routine record](docs/routine/2026-11-20_1745-context-budget-preflight.md). Continue to use `ui-dist/` alongside the Windows EXE. Hyper-V GUI acceptance remains pending.
+
+---
+
 # AIWS V1.7.1 — AI 计划中心 / Plan Studio
 
 新增 **AI 计划中心**：将 AIWS 工作流阶段与项目 Markdown 计划书展示为分层大纲、任务看板和原文，包含清单完成度、依赖/执行状态及每 3 秒的本地近实时刷新。选择不同 Agent Worktree 可查看对应计划文档；打开页面不会发送模型请求，也不会自动扫描供应商账号会话目录。CLI 内部未保存成文件的计划无法自动监控。Windows 原生 CI 已通过：[编译与核心测试](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213179)、[回归检查](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44708213271)，Hyper-V GUI 实机验收尚未进行。参见 [计划中心技术设计](docs/PLAN_STUDIO_V171.md) 和 [开发记录](docs/routine/2026-11-20_1705-plan-studio-live-markdown.md)。

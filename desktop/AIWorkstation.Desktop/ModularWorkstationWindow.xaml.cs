@@ -97,6 +97,8 @@ public partial class ModularWorkstationWindow : Window
                 "steps.retry" => await StepActionAsync(payload, "retry"),
                 "steps.startManual" => await StepActionAsync(payload, "startManual"),
                 "steps.launch" => await StepActionAsync(payload, "launch"),
+                "steps.preflight" => _controller.Preflight(ReadField(payload,"taskId"), ReadField(payload,"stepId")),
+                "tasks.setPromptBudget" => SetPromptBudget(payload),
                 "steps.add" => AddStep(payload),
                 "steps.dependencies" => UpdateDependencies(payload),
                 "worktrees.create" => await CreateWorktree(payload),
@@ -135,7 +137,7 @@ public partial class ModularWorkstationWindow : Window
 
     private object Snapshot() => new
     {
-        Version = "1.7.1-live-plan-studio",
+        Version = "1.7.2-context-budget-preflight",
         Tasks = _controller.Tasks,
         Agents = new Dictionary<string, bool>
         {
@@ -148,6 +150,16 @@ public partial class ModularWorkstationWindow : Window
             "Windows CLI 继承当前用户权限；工作目录检查不是沙箱。"
         }
     };
+
+    private object SetPromptBudget(JsonElement payload)
+    {
+        var taskId = ReadField(payload,"taskId");
+        if (!payload.TryGetProperty("warningTokens",out var warn) || !warn.TryGetInt32(out var warningTokens)
+            || !payload.TryGetProperty("stopTokens",out var stop) || !stop.TryGetInt32(out var stopTokens))
+            throw new ArgumentException("预算必须是整数。");
+        _controller.SetPromptBudget(taskId, warningTokens, stopTokens);
+        return new { success = true };
+    }
 
     private object? PickDirectory()
     {
@@ -225,13 +237,24 @@ public partial class ModularWorkstationWindow : Window
             case "launch":
                 var task = _controller.GetTask(taskId);
                 var step = WorkflowEngine.EnsureStartable(task, stepId);
+                var check = _controller.Preflight(taskId, stepId);
+                if (check.Blocked)
+                    throw new InvalidOperationException(check.Note + $"（估算 {check.ApproxTokens} / 上限 {check.StopTokens} Token）");
+                if (check.Duplicate && MessageBox.Show(this,
+                        "本阶段交接内容与上一次完全相同。重复启动可能重复消耗 Token。\n\n" +
+                        "请先确认原 CLI 没有在运行、这次重试确有必要。仍要再次启动吗？",
+                        "重复提示词拦截",MessageBoxButton.YesNo,MessageBoxImage.Warning)!=MessageBoxResult.Yes)
+                    throw new OperationCanceledException("已取消重复调用。");
                 if (MessageBox.Show(this,
-                        $"将以当前 Windows 用户身份启动 {AgentLabel.Name(step.Agent)}，目录：\n{task.WorkspaceFor(step)}\n\nAIWS 会将交接提示词复制到剪贴板，但不会自动发送给模型。\n确认继续？",
-                        "确认执行官方 Agent", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        $"本地交接草稿预估 {check.ApproxTokens:N0} Token，提醒阈值 {check.WarningTokens:N0}，拦截阈值 {check.StopTokens:N0}。\n" +
+                        (check.Warn ? "注意：已触发上下文规模提醒或重复提示词检查。\n" : "") +
+                        $"\n将以当前 Windows 用户身份启动 {AgentLabel.Name(step.Agent)}，目录：\n{task.WorkspaceFor(step)}\n\n" +
+                        "AIWS 只复制交接草稿，不自动发出模型请求；真实 CLI 内部 Token 用量未知。\n确认继续？",
+                        "交接预算与 CLI 启动确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     throw new OperationCanceledException("已取消外部程序启动。");
                 await _controller.LaunchWithGitAsync(taskId, stepId,
                     text => Clipboard.SetText(text),
-                    (agent,dir) => AgentTools.LaunchInteractive(agent,dir));
+                    (agent,dir) => AgentTools.LaunchInteractive(agent,dir), confirmDuplicate: check.Duplicate);
                 break;
         }
         return new { success = true };
