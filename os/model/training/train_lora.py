@@ -22,17 +22,29 @@ def main():
     parser.add_argument("--ack-large-guest-memory-cost",action="store_true")
     parser.add_argument("--epochs",type=int,default=1)
     args=parser.parse_args()
-    rows,holdout=load_validate(args.dataset)
     if not args.train_in_guest:
+        # Static CI dry run only; never read a user-specified host dataset.
+        if Path(args.dataset).resolve() != (here/"synthetic_intents.jsonl").resolve():
+            parser.error("Non-guest dry runs may only validate bundled synthetic examples")
+        rows,holdout=load_validate(args.dataset)
         print(json.dumps({"dry_run":True,"train_examples":len(rows),
                           "held_out":len(holdout),"adapter_trained":False}))
         return
+    from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
+    require_guest_runtime()
     if not args.ack_large_guest_memory_cost:
         parser.error("LoRA training requires explicit guest-only resource approval")
     if not 1<=args.epochs<=3:
         parser.error("Epochs must be between 1 and 3")
-    from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
-    require_guest_runtime()
+    dataset_path = Path(args.dataset).resolve(strict=True)
+    # Production/authorized data is readable only from the dedicated guest
+    # AIWS training directory. The bundled synthetic fixture is never used
+    # as a real training source.
+    training_root = (Path.home()/".local/share/aiws/training").resolve()
+    if not dataset_path.is_relative_to(training_root):
+        parser.error("Training dataset must reside inside private AIWS guest training directory")
+    protect_guest_workspace(training_root, dataset_path)
+    rows,holdout=load_validate(dataset_path)
     # Do not allow model training to load from or write to host/shared filesystems.
     state=Path.home()/".local/share/aiws"
     if state.is_symlink():
