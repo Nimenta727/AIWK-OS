@@ -59,7 +59,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           iso="$PWD/out/aiws-os-smoke/live-image-amd64.hybrid.iso"
-          serial="$PWD/out/aiws-os-smoke/boot-serial.log"
+          serial="$PWD/boot-serial.log"
           qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 \
             -boot d -cdrom "$iso" -nic none -display none -vga std \
             -serial "file:$serial" -monitor none -no-reboot &
@@ -87,12 +87,12 @@ jobs:
         with:
           name: aiws-os-guest-boot-evidence
           path: |
-            out/aiws-os-smoke/boot-serial.log
+            boot-serial.log
             out/aiws-os-smoke/live-image-amd64.hybrid.iso.sha256
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload experimental smoke ISO
-        if: success()
+      - name: Upload experimental smoke ISO for image and boot debugging
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aiws-os-debian-live-smoke-iso
