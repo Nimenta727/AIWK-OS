@@ -29,6 +29,8 @@ Assert(!LocalFrontendEndpoint.TryParse("http://localhost.evil.com:3773/", out _)
 Assert(!LocalFrontendEndpoint.TryParse("http://foo:pass@localhost:3773/", out _), "embedded credentials rejected");
 Assert(LocalFrontendEndpoint.IsWithinOrigin(new Uri("http://127.0.0.1:3773/chat"), localT3!), "same-origin UI navigation allowed");
 Assert(!LocalFrontendEndpoint.IsWithinOrigin(new Uri("http://127.0.0.1:3774/"), localT3!), "other port navigation rejected");
+Assert(ThrowsAny(() => T3ServiceLauncher.StartLoopback(80)), "official CLI refuses privileged service port before launching");
+Assert(ThrowsAny(() => T3ServiceLauncher.StartLoopback(65536)), "official CLI refuses invalid service port before launching");
 
 var safeBase = OperatingSystem.IsWindows() ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : Path.GetTempPath();
 var workspace = Path.Combine(safeBase, "aiws-desktop-tests-" + Guid.NewGuid().ToString("N"));

@@ -45,3 +45,11 @@ A loopback URL restriction protects against accidentally loading public websites
 5. Add scoped integration and request trace adapters only using documented upstream interfaces. Never silently scrape credentials or bypass subscriptions.
 
 The next milestone is **one shared navigation and data protocol**; V0.8 is the real upstream UI embedding foundation, not complete product unification.
+
+## V0.9: first-run T3 service launch
+
+The native home screen now has an explicit **启动并连接已安装的 T3 Code** action. It checks the provided loopback URL before launching, to avoid intentionally creating a second copy of an already responsive service. If unavailable, it invokes the official `t3 serve --host 127.0.0.1 --port <port>` CLI discovered through the fixed tool allowlist and probes the local endpoint. No authentication token, arbitrary command, or remote URL is passed to the CLI.
+
+This is an integration of an original running frontend, **not a source-level port**. T3 Code's MIT license allows a future fork with attribution; its upstream RPC and package dependencies mean a full source migration must be developed and tested as a coherent app rather than copying individual JSX files into WPF. OpenClaw remains optional. Separate apps continue to own their task databases and user authorizations.
+
+Security/runtime trade-offs: a responsive port is evidence of a listener, not cryptographic proof of service identity. AIWS has no privileged WebView2 message bridge and blocks external navigation. Stop and audit unexpected listeners manually; never enter credentials into an untrusted local service. A `t3` process launched here remains independently running after the AIWS window closes.

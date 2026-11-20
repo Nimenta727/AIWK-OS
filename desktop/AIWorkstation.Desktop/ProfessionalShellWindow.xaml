@@ -51,6 +51,11 @@
             <TextBlock Text="1. 在这台 Windows 虚拟机安装并启动对应的官方服务。" FontSize="13" Foreground="#505A64" Margin="0,0,0,7" />
             <TextBlock Text="2. 把服务打开时显示的本机 http://127.0.0.1:端口 地址填到顶部。" FontSize="13" TextWrapping="Wrap" Foreground="#505A64" Margin="0,0,0,7" />
             <TextBlock Text="3. 点击「连接本机服务」。原版前端将完整出现在这个 EXE 里。" FontSize="13" Foreground="#505A64" Margin="0,0,0,18" />
+            <Button x:Name="QuickStartT3Button" Content="启动并连接已安装的 T3 Code" Click="QuickStartT3_Click"
+                    Padding="16,12" Margin="0,0,0,12" HorizontalAlignment="Stretch"
+                    Background="#C77C5D" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                    BorderThickness="0" Cursor="Hand"/>
+            <TextBlock Text="无需另装 AIWS 版模型。此按钮只启动本机已安装的官方 T3 服务；Claude/Codex 使用原有登录。OpenClaw 仍需先启动自己的 Gateway。" FontSize="12" TextWrapping="Wrap" Foreground="#76808B" Margin="0,0,0,16" />
             <Border Background="#F9F4EE" CornerRadius="10" Padding="15">
               <TextBlock Text="AIWS 原生任务、审批、审计与调用流程仍可通过右上角打开。上游 UI 不会自动获得 AIWS 的任务数据或 Windows 管理权限。" FontSize="12" TextWrapping="Wrap" Foreground="#8C624D" />
             </Border>

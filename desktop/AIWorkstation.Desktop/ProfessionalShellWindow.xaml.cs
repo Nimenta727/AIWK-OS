@@ -17,7 +17,7 @@ public partial class ProfessionalShellWindow : Window
     private const string ClawKey = "openclaw";
     private string _selected = T3Key;
     private readonly Dictionary<string, string> _savedEndpoints = new();
-    private readonly HttpClient _healthClient = new(new HttpClientHandler { AllowAutoRedirect = false })
+    private readonly HttpClient _healthClient = new(new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false })
     {
         Timeout = TimeSpan.FromSeconds(2)
     };
@@ -74,6 +74,7 @@ public partial class ProfessionalShellWindow : Window
             browser.Navigate("about:blank");
         UpstreamWebView.Visibility = Visibility.Collapsed;
         WelcomePanel.Visibility = Visibility.Visible;
+        QuickStartT3Button.Visibility = key == T3Key ? Visibility.Visible : Visibility.Collapsed;
         EndpointInput.Text = _savedEndpoints.GetValueOrDefault(key)
             ?? (key == T3Key ? LocalFrontendEndpoint.T3Default : LocalFrontendEndpoint.OpenClawDefault);
         T3Tab.Background = key == T3Key ? new SolidColorBrush(Color.FromRgb(245, 235, 229)) : Brushes.Transparent;
@@ -89,12 +90,77 @@ public partial class ProfessionalShellWindow : Window
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
     {
-        var tabAtStart = _selected;
-        if (!LocalFrontendEndpoint.TryParse(EndpointInput.Text, out var url) || url is null)
+        if (!TryGetSelectedEndpoint(out var url) || url is null) return;
+        await ConnectToUriAsync(url, _selected);
+    }
+
+    private bool TryGetSelectedEndpoint(out Uri? url)
+    {
+        if (LocalFrontendEndpoint.TryParse(EndpointInput.Text, out url) && url is not null)
+            return true;
+        StatusText.Text = "地址无效：只允许 http(s)://localhost / 127.0.0.1 / [::1]，不允许账号、Token 或查询参数。";
+        return false;
+    }
+
+    private async Task<bool> IsServiceResponsiveAsync(Uri url)
+    {
+        try
         {
-            StatusText.Text = "地址无效：只允许 http(s)://localhost / 127.0.0.1 / [::1]，不允许账号、Token 或查询参数。";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var response = await _healthClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            return true; // Unauthorized is still a response from a running local service.
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return false;
+        }
+    }
+
+    private async void QuickStartT3_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected != T3Key || !TryGetSelectedEndpoint(out var url) || url is null) return;
+        // The official CLI is started only on an explicitly validated local HTTP endpoint.
+        // HTTPS may be used to connect manually but is not something this launcher configures.
+        if (url.Scheme != Uri.UriSchemeHttp || url.AbsolutePath != "/" ||
+            url.Host is not ("127.0.0.1" or "localhost"))
+        {
+            StatusText.Text = "一键启动只支持本机 HTTP 根地址；其他地址请使用手动连接。";
             return;
         }
+        QuickStartT3Button.IsEnabled = false;
+        try
+        {
+            if (!await IsServiceResponsiveAsync(url))
+            {
+                T3ServiceLauncher.StartLoopback(url.Port);
+                StatusText.Text = "已启动官方 T3 CLI，正在等待本机服务…";
+                bool ready = false;
+                for (int attempt = 0; attempt < 15; attempt++)
+                {
+                    await Task.Delay(800);
+                    if (_selected != T3Key) return;
+                    if (await IsServiceResponsiveAsync(url)) { ready = true; break; }
+                }
+                if (!ready)
+                {
+                    StatusText.Text = "已请求启动官方 T3，但本机端口尚未响应。检查 T3 终端输出或手动填写实际地址。";
+                    return;
+                }
+            }
+            if (_selected == T3Key) await ConnectToUriAsync(url, T3Key);
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or ArgumentException)
+        {
+            StatusText.Text = "未能启动官方 T3 服务：" + ex.Message;
+        }
+        finally
+        {
+            QuickStartT3Button.IsEnabled = true;
+        }
+    }
+
+    private async Task ConnectToUriAsync(Uri url, string tabAtStart)
+    {
         StatusText.Text = "检查本机服务连接…";
         try
         {

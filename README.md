@@ -2,7 +2,20 @@
 
 **Native Windows EXE, not a localhost webpage.** A new Windows-first AI agent workbench for Hyper-V virtual machines, inspired by the quiet, warm white desktop experience of Claude without copying its assets or product design.
 
-> **V0.8 integration status:** Windows WPF compile, core smoke tests and self-contained EXE publish passed in [CI run 44660930497](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44660930497). Hyper-V guest UI and upstream-service connectivity still require hands-on validation. V0.7 core remains intact. Earlier **V0.7 status:** native WPF/.NET compiled and Windows CI [verified successfully](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528), including core smoke tests and x64 single-file EXE publish. This is a prototype, not a finished or audited operating system agent.
+> **V0.8 integration status:** new embedded upstream shell requires Windows CI compilation and VM runtime validation. V0.7 core remains intact. Earlier **V0.7 status:** native WPF/.NET compiled and Windows CI [verified successfully](https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44657658528), including core smoke tests and x64 single-file EXE publish. This is a prototype, not a finished or audited operating system agent.
+
+## V0.9 — one-click original professional frontend
+
+With the original T3 Code interface already embedded in the native EXE, the home screen now includes **启动并连接已安装的 T3 Code**. If a loopback service is responding, AIWS connects without starting a duplicate. Otherwise it starts the *separately installed, official* `t3 serve --host 127.0.0.1 --port <selected>` process and briefly probes for readiness before loading the original UI in WebView2. The T3 process remains owned by the official tool and does not stop when AIWS exits.
+
+- **Still the real upstream UI:** no imitations, scraped login data, or copied assets. T3 has its own React/RPC/server runtime and must be installed separately.
+- **Still Windows-native:** the AIWS application itself is WPF/.NET and is packaged as a self-contained Windows EXE; original upstream UI runs inside an embedded WebView2 window.
+- **Only T3 receives one-click launching:** OpenClaw continues to require a separately configured Gateway and local address. AIWS does not start Gateway services or manage OpenClaw credentials.
+- **Conservative security:** only the explicitly validated local HTTP root address can be auto-launched; existing loopback service is checked first. Login happens through the upstream-supported flow, and AIWS does not collect subscription secrets.
+
+Instructions: install the [official T3 CLI](https://github.com/pingdotgg/t3code#install), confirm `t3 --help` in PowerShell, then open `WindowsAIWorkstation.exe` and choose **启动并连接已安装的 T3 Code**. If it fails, verify the port displayed by the official service and use **连接本机服务**.
+
+The next architectural milestone is an independently tested **source-level fork / adapter**. We do not claim that hosting the upstream UI means its source code, data store, or routing engine has been merged into AIWS.
 
 ## V0.8 — original professional frontend in the Windows EXE
 
