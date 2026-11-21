@@ -39,6 +39,13 @@ class PureTests(unittest.TestCase):
         self.assertEqual((empty["in"], empty["unknownSessions"]), (None, 1))
         self.assertEqual(obs.token_totals([])["in"], None)
 
+    def test_supervisor_and_router_sessions_are_not_counted_as_unknown_usage(self):
+        t = obs.token_totals([session("claude", **{"in": 5}), session("supervisor", basis="none"), session("router", basis="none")])
+        self.assertEqual((t["in"], t["knownSessions"], t["unknownSessions"]), (5, 1, 0))
+        self.assertEqual(set(obs.token_by_agent([session("supervisor", basis="none"), session("local", basis="none")])), {"local"})
+        ok = {"valid": True, "events": 1}
+        self.assertEqual(obs.verdict(ok, overview(), [session("supervisor", basis="none")])["level"], "green")
+
     def test_token_by_agent(self):
         by = obs.token_by_agent([session("claude", **{"in": 1}), session("codex", **{"in": 2}), session("claude", **{"in": 3})])
         self.assertEqual((by["claude"]["in"], by["codex"]["in"]), (4, 2))
@@ -112,6 +119,8 @@ class WorkbenchTests(unittest.TestCase):
         self.cfg = patch("aiws_workbench.load_config", lambda: {"externalEnabled": False, "providers": {"claude": True, "codex": True},
                                                                 "extraLocalKeywords": [], "extraExternalKeywords": []})
         self.cfg.start()
+        self.bcfg = patch("aiws_workbench.load_builder_config", lambda: {"enabled": False, "envAllow": []})
+        self.bcfg.start()
         self.start_server()
 
     def start_server(self):
@@ -129,7 +138,7 @@ class WorkbenchTests(unittest.TestCase):
 
     def tearDown(self):
         self.stop_server()
-        self.cfg.stop(); self.env.stop(); self.temp.cleanup()
+        self.cfg.stop(); self.bcfg.stop(); self.env.stop(); self.temp.cleanup()
 
     def req(self, method, path, payload=None, headers=None):
         conn = http.client.HTTPConnection(HOST, self.server.server_port, timeout=5)
@@ -148,7 +157,7 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(s["verdict"]["level"], "green")
         self.assertEqual(s["tasks"]["tasks"], 0)
         self.assertIsNone(s["tokens"]["total"]["in"])
-        self.assertEqual(s["status"]["builder"]["state"], "not-configured")
+        self.assertEqual(s["status"]["builder"]["state"], "disabled")
         self.assertIsNone(s["tokens"]["budget"])
         self.assertFalse(s["status"]["router"]["externalEnabled"])
 

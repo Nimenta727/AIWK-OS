@@ -9,9 +9,13 @@ type SessionRow={session:string;agent:string;status:string;events:number;toolCal
 type Waiting={taskId:string;stageKey:string;tool:string;label:string;taskTitle:string;ready:boolean};
 type Failure={taskId:string;stageKey:string;tool:string;label:string;error:string};
 type RecentTask={id:string;title:string;createdAt:number;stages:Record<string,number>};
-type Summary={demo:boolean;
- status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean};builder:{state:string};router:{externalEnabled:boolean}};
- tokens:{total:Totals;byAgent:Record<string,Totals>;budget:{used:number|null;limit:number}|null};
+type Budget={mandateId:string;used:number;limit:number;input:{used:number;limit:number};output:{used:number;limit:number}};
+type RunApproval={runId:string;category:string;tool:string;detail:string};
+type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number};
+type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
+type Summary={demo:boolean;runApprovals:RunApproval[];
+ status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
+ tokens:{total:Totals;byAgent:Record<string,Totals>;budget:Budget|null};
  tasks:{tasks:number;stages:Record<string,number>;needsApproval:Waiting[];failures:Failure[];recent:RecentTask[]};
  sessions:SessionRow[];recent:Array<{ts:number;source:string;label:string;status:string}>;
  verdict:{level:string;sentences:Bilingual[]};audit:{valid:boolean;events:number}};
@@ -36,10 +40,14 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
  const [text,setText]=useState('');
  const [reply,setReply]=useState<string>('');
  const [busy,setBusy]=useState(false);
+ const [builder,setBuilder]=useState<BuilderInfo|null>(null);
+ const [form,setForm]=useState({provider:'claude',projectDir:'',prompt:'',inputK:'200',outputK:'60',minutes:'30',turns:'30',tools:'Read,Edit,Write,Bash(npm test)',
+  del:true,install:true,push:true});
+ const [formOpen,setFormOpen]=useState(false);
  const headers={'Content-Type':'application/json','X-AIWS-CSRF':csrf};
  const timer=useRef<number|undefined>(undefined);
  const load=useCallback(async()=>{
-  try{setSummary(await api<Summary>('/observatory'));setError('');}
+  try{const [a,b]=await Promise.all([api<Summary>('/observatory'),api<BuilderInfo>('/builder')]);setSummary(a);setBuilder(b);setError('');}
   catch(e){setError(String(e instanceof Error?e.message:e));}
  },[]);
  // Resource-saving: poll only while the tab is visible; refresh immediately when it becomes visible again.
@@ -63,6 +71,39 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
    await api(base+'approve',{method:'POST',headers,body:'{}'});
    await api(base+'dispatch',{method:'POST',headers,body:'{}'});
    await new Promise(r=>setTimeout(r,400));await load();
+  }catch(e){setError(String(e instanceof Error?e.message:e));}
+  finally{setBusy(false);}
+ };
+ const decide=async(runId:string,action:'approve'|'deny')=>{
+  if(busy||!csrf)return;
+  setBusy(true);setError('');
+  try{await api('/builder/runs/'+runId+'/'+action,{method:'POST',headers,body:'{}'});await new Promise(r=>setTimeout(r,300));await load();}
+  catch(e){setError(String(e instanceof Error?e.message:e));}
+  finally{setBusy(false);}
+ };
+ const stopRun=async(runId:string)=>{
+  if(busy||!csrf)return;
+  setBusy(true);
+  try{await api('/builder/runs/'+runId+'/stop',{method:'POST',headers,body:'{}'});await new Promise(r=>setTimeout(r,500));await load();}
+  catch(e){setError(String(e instanceof Error?e.message:e));}
+  finally{setBusy(false);}
+ };
+ const revoke=async(id:string)=>{
+  if(busy||!csrf)return;
+  try{await api('/builder/mandates/'+id+'/revoke',{method:'POST',headers,body:'{}'});await load();}
+  catch(e){setError(String(e instanceof Error?e.message:e));}
+ };
+ const grantAndStart=async()=>{
+  if(busy||!csrf||!form.prompt.trim()||!form.projectDir.trim())return;
+  setBusy(true);setError('');
+  try{
+   const approvals=['network','shell','outside-project',...(form.del?['delete']:[]),...(form.install?['install-dependency']:[]),...(form.push?['git-push']:[])];
+   const m=await api<{id:string}>('/builder/mandates',{method:'POST',headers,body:JSON.stringify({
+    provider:form.provider,projectDir:form.projectDir.trim(),allowedTools:form.tools.split(',').map(x=>x.trim()).filter(Boolean),
+    permissionMode:'default',maxTurns:Number(form.turns),wallClockMinutes:Number(form.minutes),
+    tokenBudget:{input:Number(form.inputK)*1000,output:Number(form.outputK)*1000},needApprovalFor:approvals})});
+   await api('/builder/runs',{method:'POST',headers,body:JSON.stringify({mandateId:m.id,prompt:form.prompt})});
+   setFormOpen(false);setForm(f=>({...f,prompt:''}));await load();
   }catch(e){setError(String(e instanceof Error?e.message:e));}
   finally{setBusy(false);}
  };
@@ -104,7 +145,8 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
   <section className="aiws-obs-strip" aria-label={tr('状态','Status')}>
    <span className={'aiws-obs-chip '+(model?.online?'ok':model?.configured?'warn':'off')}><CircleDot size={13}/>
     {tr('本地模型','Local model')}: {model?.online?tr('在线','online'):model?.configured?tr('未就绪','not ready'):tr('未启用','off')}</span>
-   <span className="aiws-obs-chip off"><CircleDot size={13}/>{tr('构建通道','Builder')}: {tr('未配置','not configured')}</span>
+   <span className={'aiws-obs-chip '+(s?.status.builder.state==='running'?'ok':s?.status.builder.state==='awaiting-approval'?'warn':'off')} data-aiws="builder-chip"><CircleDot size={13}/>
+    {tr('构建通道','Builder')}: {({disabled:tr('未启用','off'),idle:tr('空闲','idle'),running:tr('运行中','running'),'awaiting-approval':tr('等待批准','awaiting approval')} as Record<string,string>)[s?.status.builder.state||'disabled']||s?.status.builder.state}</span>
    <span className={'aiws-obs-chip '+(s?.status.router.externalEnabled?'warn':'ok')}><CircleDot size={13}/>
     {tr('外部模型','External')}: {s?.status.router.externalEnabled?tr('已启用（需你确认）','enabled (needs consent)'):tr('关闭','off')}</span>
    <span className={'aiws-obs-chip light '+tone} data-aiws="audit-light"><ShieldCheck size={13}/>{tr('审计','Audit')}: {tone==='red'?tr('异常','problem'):tone==='yellow'?tr('需注意','attention'):tr('正常','ok')}</span>
@@ -122,9 +164,9 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
     {bars.map(b=><div className="aiws-obs-bar" key={b.agent}><span>{b.agent}</span>
      <div><i style={{width:b.pct+'%'}}/></div><em>{formatTokens(b.total)}</em></div>)}
     <div className="aiws-obs-budget" data-aiws="budget">
-     {budget.level==='none'?<p className="aiws-os-muted">{tr('预算：未设置（授权令牌上线后启用）','Budget: not set (arrives with the authorisation mandate)')}</p>:
+     {budget.level==='none'?<p className="aiws-os-muted">{tr('预算：尚无授权（在下方“构建”里授权后显示）','Budget: no mandate yet (grant one under "Build" below)')}</p>:
       <><div className={'aiws-obs-meter '+budget.level}><i style={{width:Math.min(100,(budget.ratio||0)*100)+'%'}}/></div>
-       <p className="aiws-os-muted">{formatTokens(s?.tokens.budget?.used)} / {formatTokens(s?.tokens.budget?.limit)}</p></>}
+       <p className="aiws-os-muted">{formatTokens(s?.tokens.budget?.used)} / {formatTokens(s?.tokens.budget?.limit)} {tr('（输入+输出，已授权总预算）','(input+output, granted total)')}</p></>}
     </div>
    </section>
 
@@ -143,8 +185,13 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
   </div>
 
   <section className="aiws-os-card" data-aiws="inbox">
-   <h2>{tr('需要你','Needs you')} <small>({(s?.tasks.needsApproval.length||0)+(s?.tasks.failures.length||0)})</small></h2>
-   {!(s?.tasks.needsApproval.length||s?.tasks.failures.length)&&<p className="aiws-os-muted">{tr('现在没有需要你处理的事。','Nothing needs you right now.')}</p>}
+   <h2>{tr('需要你','Needs you')} <small>({(s?.tasks.needsApproval.length||0)+(s?.tasks.failures.length||0)+(s?.runApprovals.length||0)})</small></h2>
+   {s?.runApprovals.map(a=><div className="aiws-obs-row" key={a.runId} data-aiws="run-approval">
+    <div><strong>{tr('构建任务想要执行敏感操作：','The build wants a sensitive action: ')}{a.category}</strong><small>{a.tool} · {a.detail}</small>
+     <small>{tr('构建已暂停。注意：操作可能在被发现前已经开始，批准只是让它继续。','The build is paused. The action may have started before it was noticed; approving lets it continue.')}</small></div>
+    <span><button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'approve')}><Check size={15}/>{tr('批准继续','Approve')}</button>
+     <button type="button" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'deny')}><X size={15}/>{tr('拒绝并终止','Deny & stop')}</button></span></div>)}
+   {!(s?.tasks.needsApproval.length||s?.tasks.failures.length||s?.runApprovals.length)&&<p className="aiws-os-muted">{tr('现在没有需要你处理的事。','Nothing needs you right now.')}</p>}
    {s?.tasks.needsApproval.map(w=><div className="aiws-obs-row" key={w.taskId+w.stageKey}>
     <div><strong>{w.label}</strong><small>{w.tool} · {w.taskTitle}</small></div>
     {w.ready?<button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void approveAndRun(w)}><Check size={15}/>{tr('批准并运行','Approve & run')}</button>:
@@ -152,6 +199,37 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
    {s?.tasks.failures.map(f=><div className="aiws-obs-row fail" key={f.taskId+f.stageKey}>
     <div><strong>{f.label}</strong><small>{f.tool} · {f.error||tr('失败','failed')}</small></div>
     <button type="button" onClick={()=>onOpenAdvanced('plans')}>{tr('查看','Inspect')}</button></div>)}
+  </section>
+
+  <section className="aiws-os-card" data-aiws="builder">
+   <h2>{tr('构建','Build')} <small>{tr('（官方 CLI，在你的授权范围内工作）','(official CLI, inside your mandate)')}</small></h2>
+   {!builder?.enabled?<p className="aiws-os-muted">{tr('构建通道默认关闭。要启用，请在 ~/.config/aiws/builder.json 写入 {"enabled": true}。注意：在专用用户与域名白名单网络（O4）完成之前，CLI 会以当前客户机用户的权限运行，隔离较弱。',
+     'The builder is off by default. Enable it with {"enabled": true} in ~/.config/aiws/builder.json. Until the dedicated user and domain-allowlisted network (step O4) exist, the CLI runs with this guest user\'s privileges, so isolation is weaker.')}</p>:<>
+    {builder.status.active?<div className="aiws-obs-row"><div><strong>{tr('正在构建','Building')} · {builder.status.active.state}</strong>
+      <small>{tr('轮次','turns')} {builder.status.active.turns} · {tr('已用','used')} {formatTokens(builder.status.active.usedInput)}/{formatTokens(builder.status.active.usedOutput)}</small></div>
+      <button type="button" disabled={busy||!csrf} onClick={()=>void stopRun(builder.status.active!.runId)}><X size={15}/>{tr('停止','Stop')}</button></div>:
+     <button type="button" className="aiws-obs-link" onClick={()=>setFormOpen(v=>!v)}>{formOpen?tr('收起','Close'):tr('授权并开始构建…','Grant a mandate and start a build…')}</button>}
+    {formOpen&&!builder.status.active&&<div className="aiws-obs-form">
+     <label>{tr('云端模型（官方 CLI）','Provider (official CLI)')}<select value={form.provider} onChange={e=>setForm({...form,provider:e.target.value})}>
+      {Object.entries(builder.providers).map(([k,v])=><option key={k} value={k}>{k}{v.installed?'':tr('（本机未安装）',' (not installed)')}</option>)}</select></label>
+     <label>{tr('项目文件夹（工作区内的子文件夹）','Project folder (a sub-folder of the workspace)')}<input value={form.projectDir} onChange={e=>setForm({...form,projectDir:e.target.value})} placeholder="app"/></label>
+     <label>{tr('要构建什么','What to build')}<textarea rows={3} maxLength={4000} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})}/></label>
+     <div className="aiws-obs-form-grid">
+      <label>{tr('输入预算 (k token)','Input budget (k)')}<input value={form.inputK} onChange={e=>setForm({...form,inputK:e.target.value})}/></label>
+      <label>{tr('输出预算 (k token)','Output budget (k)')}<input value={form.outputK} onChange={e=>setForm({...form,outputK:e.target.value})}/></label>
+      <label>{tr('最长时间 (分钟)','Max minutes')}<input value={form.minutes} onChange={e=>setForm({...form,minutes:e.target.value})}/></label>
+      <label>{tr('最多轮次','Max turns')}<input value={form.turns} onChange={e=>setForm({...form,turns:e.target.value})}/></label></div>
+     <label>{tr('允许的工具（逗号分隔；不能授予不受限的 Bash）','Allowed tools (comma separated; unrestricted Bash can never be granted)')}<input value={form.tools} onChange={e=>setForm({...form,tools:e.target.value})}/></label>
+     <p className="aiws-os-muted">{tr('下列操作发生时暂停并问你：','Pause and ask me before:')}
+      <label className="aiws-obs-check"><input type="checkbox" checked={form.del} onChange={e=>setForm({...form,del:e.target.checked})}/>{tr('删除','delete')}</label>
+      <label className="aiws-obs-check"><input type="checkbox" checked={form.install} onChange={e=>setForm({...form,install:e.target.checked})}/>{tr('安装依赖','install dependencies')}</label>
+      <label className="aiws-obs-check"><input type="checkbox" checked={form.push} onChange={e=>setForm({...form,push:e.target.checked})}/>git push</label><br/>
+      {tr('联网、shell、越出项目文件夹：始终需要批准，无法关闭。','Network, shell and leaving the project folder always need approval and cannot be switched off.')}</p>
+     <button type="button" className="aiws-os-primary" disabled={busy||!csrf||!form.prompt.trim()||!form.projectDir.trim()} onClick={()=>void grantAndStart()}>
+      {tr('授权并开始','Grant and start')}</button></div>}
+    {builder.mandates.length>3&&<p className="aiws-os-muted">{tr('仅显示最近 3 个授权，另有 ','Showing the 3 newest mandates; ')}{builder.mandates.length-3}{tr(' 个。',' more.')}</p>}
+    {builder.mandates.slice(0,3).map(m=><div className="aiws-obs-task" key={m.id}><span>{m.provider} · {m.projectDir} · {formatTokens(m.used.input+m.used.output)}/{formatTokens(m.tokenBudget.input+m.tokenBudget.output)}</span>
+     <button type="button" className="aiws-obs-link" onClick={()=>void revoke(m.id)}>{tr('撤销授权','Revoke')}</button></div>)}</>}
   </section>
 
   <section className="aiws-os-card" data-aiws="verdict">

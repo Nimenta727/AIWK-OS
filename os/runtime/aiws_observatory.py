@@ -4,12 +4,16 @@ No model call, no network, no process. Everything shown is derived from the task
 the event store and local status; numbers the providers did not report stay unknown (None).
 """
 TOKEN_KEYS = ("in", "out", "cacheRead", "cacheWrite")
+NO_PROVIDER_USAGE = ("supervisor", "router")     # these never consume provider tokens: not "unknown", just not applicable
+
+def metered(sessions):
+    return [s for s in sessions if s["agent"] not in NO_PROVIDER_USAGE]
 
 def token_totals(sessions):
     """Sum only what was REPORTED. Sessions without numbers are counted, never guessed."""
     total = {k: None for k in TOKEN_KEYS}
     known = unknown = unverified = 0
-    for s in sessions:
+    for s in metered(sessions):
         t = s["tokens"]
         if t["basis"] == "none":
             unknown += 1
@@ -23,15 +27,15 @@ def token_totals(sessions):
 
 def token_by_agent(sessions):
     groups = {}
-    for s in sessions:
+    for s in metered(sessions):
         groups.setdefault(s["agent"], []).append(s)
     return {agent: token_totals(items) for agent, items in sorted(groups.items())}
 
-def verdict(audit, overview, sessions, now_text=None):
+def verdict(audit, overview, sessions, run_approvals=0):
     """Red/yellow/green plus up to three plain sentences (bilingual). Rules only, no model."""
     stages = overview["stages"]
     failed = stages.get("failed", 0)
-    waiting = len(overview["needsApproval"])
+    waiting = len(overview["needsApproval"]) + run_approvals
     errored = sum(1 for s in sessions if s["status"] == "error")
     unrecognized = sum(s["unrecognizedEvents"] for s in sessions)
     totals = token_totals(sessions)
@@ -60,7 +64,16 @@ def verdict(audit, overview, sessions, now_text=None):
         level = "yellow"
     return {"level": level, "sentences": sentences[:3]}
 
-def build_summary(*, sessions, overview, audit, model, router, demo, recent_events, builder=None, budget=None):
+def budget_view(mandate, live_input=0, live_output=0):
+    """Budget of the mandate that is in use: totals over input+output, plus each dimension."""
+    if not mandate:
+        return None
+    used_in, used_out = mandate["used"]["input"] + live_input, mandate["used"]["output"] + live_output
+    limit_in, limit_out = mandate["tokenBudget"]["input"], mandate["tokenBudget"]["output"]
+    return {"mandateId": mandate["id"], "used": used_in + used_out, "limit": limit_in + limit_out,
+            "input": {"used": used_in, "limit": limit_in}, "output": {"used": used_out, "limit": limit_out}}
+
+def build_summary(*, sessions, overview, audit, model, router, demo, recent_events, builder=None, budget=None, run_approvals=()):
     return {
         "demo": demo,
         "status": {"localModel": {"configured": model["configured"], "online": model["online"], "weightsPresent": model["weightsPresent"]},
@@ -70,6 +83,7 @@ def build_summary(*, sessions, overview, audit, model, router, demo, recent_even
         "tasks": overview,
         "sessions": sessions,
         "recent": recent_events,
-        "verdict": verdict(audit, overview, sessions),
+        "runApprovals": list(run_approvals),
+        "verdict": verdict(audit, overview, sessions, len(run_approvals)),
         "audit": {"valid": bool(audit.get("valid")), "events": audit.get("events", 0)},
     }

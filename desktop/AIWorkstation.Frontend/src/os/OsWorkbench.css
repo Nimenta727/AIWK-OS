@@ -120,3 +120,12 @@ font-size:12px;overflow-wrap:anywhere}
 .aiws-obs-reply{max-width:1130px;margin:0 auto 10px;background:#fff;border:1px solid #dce5f5;border-radius:10px;padding:11px 14px;font-size:13px;color:#314564;display:flex;justify-content:space-between;gap:10px}
 .aiws-obs-reply button{border:0;background:none;cursor:pointer;color:#74839a}
 @media(max-width:800px){.aiws-obs-grid{grid-template-columns:1fr}.aiws-obs-input{left:0}.aiws-obs-session{grid-template-columns:16px 60px minmax(0,1fr) 50px}.aiws-obs-session small{display:none}}
+
+.aiws-obs-form{display:grid;gap:12px;margin:10px 0;padding:14px;border:1px solid #e1e7ef;border-radius:10px;background:#f9fbff}
+.aiws-obs-form label{display:grid;gap:6px;font-size:12px;font-weight:600;color:#314564;margin:0}
+.aiws-obs-form input,.aiws-obs-form select,.aiws-obs-form textarea{border:1px solid #d6deea;border-radius:8px;padding:9px;width:100%;font:inherit;background:#fff}
+.aiws-obs-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.aiws-obs-check{display:inline-flex!important;grid-template-columns:none!important;align-items:center;gap:5px!important;margin:0 14px 0 4px!important;font-weight:500!important}
+.aiws-obs-check input{width:auto}
+.aiws-obs-row .aiws-os-primary+button{margin-left:8px}
+@media(max-width:800px){.aiws-obs-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

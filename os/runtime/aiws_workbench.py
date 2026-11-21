@@ -24,6 +24,8 @@ from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
 from aiws_events import EventStore, EventError, SAFE_NAME, make_event
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
+from aiws_mandate import MandateStore, MandateError
+from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 import subprocess
 
@@ -67,6 +69,8 @@ class Controller:
             self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
         self.events = EventStore(state_home / "aiws-observatory")
+        self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
+        self.supervisor = Supervisor(self.mandates, self.events, self.workspace)
         if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
             self._seed_demo()
 
@@ -94,6 +98,31 @@ class Controller:
         self._emit("local", "local", "usage", tokens=tokens)
         self._emit("local", "local", "message", detail=outcome[:60])
 
+    # ---- builder (official CLI under a user mandate) ----
+    @staticmethod
+    def _mandate_view(m):
+        keys = ("id", "provider", "projectDir", "allowedTools", "permissionMode", "maxTurns", "tokenBudget",
+                "wallClockMinutes", "needApprovalFor", "requireMetering", "expires", "state", "used")
+        return {k: m[k] for k in keys}
+
+    def builder_overview(self):
+        try:
+            config = load_builder_config()
+        except SupervisorError:
+            config = {"enabled": False, "envAllow": []}
+        providers = {name: {"installed": shutil.which(name) is not None} for name in ("claude", "codex")}
+        return {"enabled": config["enabled"], "providers": providers,
+                "mandates": [self._mandate_view(m) for m in self.mandates.active()],
+                "status": self.supervisor.status()}
+
+    def builder_grant(self, payload):
+        if not load_builder_config()["enabled"]:
+            raise PermissionError("The builder is disabled (enable it in ~/.config/aiws/builder.json)")
+        return self._mandate_view(self.mandates.grant(payload))
+
+    def builder_start(self, mandate_id, prompt):
+        return self.supervisor.start(mandate_id, prompt)
+
     def observatory(self):
         overview = self.tasks.overview()
         sessions = self.events.sessions(30)
@@ -108,9 +137,24 @@ class Controller:
                            "label": e["kind"] + (" · " + e["tool"] if e.get("tool") else ""),
                            "status": e.get("status", "ok")})
         recent.sort(key=lambda x: -x["ts"])
+        try:
+            builder_enabled = load_builder_config()["enabled"]
+        except SupervisorError:
+            builder_enabled = False
+        status = self.supervisor.status()
+        active = status["active"]
+        mandates = self.mandates.active()
+        in_use = next((m for m in mandates if active and m["id"] == active["mandateId"]), mandates[0] if mandates else None)
+        run_approvals = ([{"runId": active["runId"], **{k: active["pending"][k] for k in ("category", "tool", "detail")}}]
+                         if active and active["pending"] else [])
+        builder = {"state": ("disabled" if not builder_enabled else active["state"] if active else "idle"),
+                   "enabled": builder_enabled, "runId": active["runId"] if active else None,
+                   "turns": active["turns"] if active else 0}
         return aiws_observatory.build_summary(
             sessions=sessions, overview=overview, audit=self.tasks.verify_audit(), model=self.model.status(),
-            router=router, demo=any(s["session"].startswith("demo-") for s in sessions), recent_events=recent[:16])
+            router=router, demo=any(s["session"].startswith("demo-") for s in sessions), recent_events=recent[:16],
+            builder=builder, run_approvals=run_approvals,
+            budget=aiws_observatory.budget_view(in_use, active["usedInput"] if active else 0, active["usedOutput"] if active else 0))
 
     def health(self):
         agent_health = self.agent.request("health") if self.agent is not None else {}
@@ -529,6 +573,8 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(session) or after < 0:
                 return self.reply(400, {"error": "A valid session id is required"})
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/builder":
+            return self.reply(200, app.builder_overview())
         if path == "/api/v1/route/config":
             try:
                 config = load_config()
@@ -577,7 +623,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs") and not (
+                len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
+                    (route[3] == "mandates" and route[5] == "revoke") or
+                    (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -612,6 +661,23 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/builder/mandates":
+                result = app.builder_grant(payload)
+            elif path == "/api/v1/builder/runs":
+                if set(payload) != {"mandateId", "prompt"}:
+                    raise ValueError("Expected mandateId and prompt")
+                result = app.builder_start(payload["mandateId"], payload["prompt"])
+            elif route[:3] == ["api", "v1", "builder"]:
+                if payload:
+                    raise ValueError("No arguments allowed")
+                if route[3] == "mandates":
+                    result = app._mandate_view(app.mandates.revoke(route[4]))
+                elif route[5] == "stop":
+                    app.supervisor.stop(route[4])
+                    result = {"stopped": True}
+                else:
+                    app.supervisor.decide(route[4], route[5] == "approve")
+                    result = {"decided": route[5]}
             elif path == "/api/v1/route":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")
@@ -640,6 +706,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(503, {"error": str(exc)[:240]})
         except PermissionError as exc:
             return self.reply(403, {"error": str(exc)[:240]})
+        except SupervisorError as exc:
+            return self.reply(409, {"error": str(exc)[:240]})
         except (ValueError, KeyError, TypeError) as exc:
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)

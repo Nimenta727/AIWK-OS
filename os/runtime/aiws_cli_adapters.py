@@ -27,7 +27,7 @@ def _describe(name, data):
         return None
     for key in ("command", "file_path", "path", "pattern", "url", "query"):
         if isinstance(data.get(key), str) and data[key].strip():
-            return redact(data[key], 60)
+            return redact(data[key], 120)
     return None
 
 class _Base:
@@ -40,6 +40,7 @@ class _Base:
         self.invalid = 0
         self.ended = False
         self.failed = False
+        self.turns = 0          # assistant turns seen, for the supervisor's turn limit
 
     def _ev(self, kind, **fields):
         try:
@@ -94,6 +95,7 @@ class ClaudeStreamAdapter(_Base):
         super().__init__(session, clock)
         self.tool_names = {}
         self.usage_seen = {}
+        self.counted = set()
 
     def _usage_delta(self, message_id, usage):
         fields = {"in": "input_tokens", "out": "output_tokens",
@@ -147,6 +149,9 @@ class ClaudeStreamAdapter(_Base):
         if text_chars:
             out += self._ev("message", detail="%d chars" % text_chars)
         message_id = message.get("id") if isinstance(message.get("id"), str) else "m%d" % self.lines
+        if message_id not in self.usage_seen and message_id not in self.counted:
+            self.turns += 1
+        self.counted.add(message_id[:80])
         usage = message.get("usage")
         if isinstance(usage, dict):
             current, delta = self._usage_delta(message_id[:80], usage)
@@ -221,8 +226,11 @@ class CodexJsonAdapter(_Base):
         kind, body = self._normalise(data)
         if kind == "thread.started":
             return self._ev("start", detail="codex thread")
-        if kind in ("turn.started", None):
-            return [] if kind else self._unrecognized("none")
+        if kind == "turn.started":
+            self.turns += 1
+            return []
+        if kind is None:
+            return self._unrecognized("none")
         if kind in ("item.started", "item.updated"):
             item = body.get("item") if isinstance(body.get("item"), dict) else {}
             name = self._tool_name(item)
