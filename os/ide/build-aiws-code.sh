@@ -48,13 +48,15 @@ m = json.load(open(p))
 m["name"], m["short_name"] = "AIWS Code", "AIWS Code"
 open(p, "w").write(json.dumps(m, indent="\t") + "\n")
 PY
-# 4) Built-in extensions that only talk to Microsoft/GitHub account services are not needed offline.
-rm -rf -- src/extensions/microsoft-authentication src/extensions/github-authentication
+# 4) (Account-service extensions are removed from the OUTPUT after the build, below: the upstream gulp graph reads their
+#    tsconfig.json, so deleting the source directories first breaks the build - found in the first real run.)
 
 ( cd src && pnpm install --frozen-lockfile && pnpm run gulp vscode-reh-web-linux-x64-min-ci )
 
 out="$work/vscode-reh-web-linux-x64"      # upstream writes next to the source tree (BUILD_ROOT = dirname(REPO_ROOT))
 [[ -x "$out/node" || -f "$out/out/server-main.js" ]] || { echo "ERROR: expected server output not found in $out" >&2; exit 1; }
+# 4b) Built-in extensions that only talk to Microsoft/GitHub account services are not needed offline: drop them from the output.
+rm -rf -- "$out/extensions/microsoft-authentication" "$out/extensions/github-authentication"
 # 5) Legal: the MIT license and third-party notices MUST travel with every copy (they are not "branding").
 install -m 0644 src/LICENSE.txt "$out/LICENSE.txt"
 install -m 0644 src/ThirdPartyNotices.txt "$out/ThirdPartyNotices.txt"
