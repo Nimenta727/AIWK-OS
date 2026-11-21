@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"t-2"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"i1","type":"command_execution","command":"make build"}}
+{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"make build","exit_code":2,"status":"failed"}}
+{"type":"turn.failed","error":{"message":"rate limit reached, retry later"}}

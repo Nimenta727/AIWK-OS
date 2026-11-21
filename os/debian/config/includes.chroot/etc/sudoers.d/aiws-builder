@@ -1,0 +1,4 @@
+# Managed by AIWS. The workbench user may run commands ONLY as the unprivileged builder sandbox user
+# (no root, no other users). On installed systems replace "user" with the workbench account.
+Defaults:user !use_pty
+user ALL=(aiws-builder) NOPASSWD: ALL

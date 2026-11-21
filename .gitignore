@@ -13,3 +13,4 @@ aiws-package.zip
 .auth/
 *.log
 .DS_Store
+node_modules/

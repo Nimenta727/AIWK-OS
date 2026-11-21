@@ -14,14 +14,10 @@ import threading
 import time
 from uuid import uuid4
 from aiws_guest_ops import TOOLS as GUEST_OP_TOOLS, WRITE_TOOLS as GUEST_OP_WRITES, validate as validate_guest_operation
-from aiws_toolplane import catalog as tool_catalog
+from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
 
-TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.replace", "code.search",
-    "git.inspect", "runtime.detect", "browser.local_text", "platform.inspect",
-    "code.symbols", "code.references", "code.dependencies", "code.platformApis",
-}) | GUEST_OP_TOOLS
-WRITE_TOOLS = frozenset({"file.replace"}) | GUEST_OP_WRITES
+TOOLS = PLANE_READ_TOOLS | FILE_WRITE_TOOLS | GUEST_OP_TOOLS
+WRITE_TOOLS = FILE_WRITE_TOOLS | GUEST_OP_WRITES
 MAX_STAGES = 32
 
 class TaskError(ValueError):
@@ -249,6 +245,38 @@ class GuestTaskStore:
             return [dict(x) for x in self.db.execute(
                 "SELECT * FROM tasks ORDER BY created_at DESC,id DESC LIMIT 100").fetchall()]
 
+    def overview(self):
+        """Bounded read-only digest for the observatory: counts, what needs the user, recent activity."""
+        with self.lock:
+            stages = {r["state"]: r["n"] for r in self.db.execute(
+                "SELECT state, COUNT(*) AS n FROM stages GROUP BY state").fetchall()}
+            tasks = self.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+            waiting = []
+            for r in self.db.execute(
+                    "SELECT s.task_id, s.stage_key, s.tool, s.label, s.depends_json, t.title FROM stages s "
+                    "JOIN tasks t ON t.id=s.task_id WHERE s.state IN ('pending','interrupted') AND s.approval=0 "
+                    "ORDER BY s.created_at DESC, s.ordinal LIMIT 20").fetchall():
+                deps = json.loads(r["depends_json"])
+                ready = all(self.db.execute("SELECT state FROM stages WHERE task_id=? AND stage_key=?",
+                                            (r["task_id"], d)).fetchone()["state"] == "completed" for d in deps)
+                waiting.append({"taskId": r["task_id"], "stageKey": r["stage_key"], "tool": r["tool"],
+                                "label": r["label"][:160], "taskTitle": r["title"][:160], "ready": ready})
+            failures = [{"taskId": r["task_id"], "stageKey": r["stage_key"], "tool": r["tool"],
+                         "label": r["label"][:160], "error": (r["error"] or "")[:200]} for r in self.db.execute(
+                "SELECT task_id, stage_key, tool, label, error FROM stages WHERE state='failed' "
+                "ORDER BY created_at DESC LIMIT 10").fetchall()]
+            recent = []
+            for t in self.db.execute("SELECT id, title, created_at FROM tasks ORDER BY created_at DESC, id DESC LIMIT 12").fetchall():
+                counts = {r["state"]: r["n"] for r in self.db.execute(
+                    "SELECT state, COUNT(*) AS n FROM stages WHERE task_id=? GROUP BY state", (t["id"],)).fetchall()}
+                recent.append({"id": t["id"], "title": t["title"][:160], "createdAt": t["created_at"], "stages": counts})
+            activity = [{"ts": r["created_at"], "action": r["action"], "taskId": r["task_id"], "tool": r["tool"]}
+                        for r in self.db.execute(
+                "SELECT a.created_at, a.action, a.task_id, s.tool FROM audit a LEFT JOIN stages s ON s.id=a.stage_id "
+                "ORDER BY a.seq DESC LIMIT 12").fetchall()]
+        return {"tasks": tasks, "stages": stages, "needsApproval": waiting, "failures": failures,
+                "recent": recent, "activity": activity}
+
     def get(self, task_id):
         with self.lock:
             task = self.db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
@@ -324,6 +352,24 @@ class GuestTaskStore:
                 "toolMappingRequired":True,
             })
         return self.get(tid)
+
+    ROUTE_KEYS = {"route", "rule", "agent", "instructionSha256", "forbidden", "externalAllowed", "externalEnabled"}
+
+    def record_route(self, task_id, decision):
+        """Audit WHERE a request was routed. Only the instruction hash is stored, never its text."""
+        if (not isinstance(decision, dict) or set(decision) != self.ROUTE_KEYS
+                or decision["route"] not in ("local", "external", "manual")
+                or not isinstance(decision["rule"], str) or len(decision["rule"]) > 48
+                or decision["agent"] not in ("local", "claude", "codex", "dual")
+                or not isinstance(decision["instructionSha256"], str) or len(decision["instructionSha256"]) != 64
+                or not isinstance(decision["forbidden"], list) or len(decision["forbidden"]) > 16
+                or any(not isinstance(x, str) or len(x) > 32 for x in decision["forbidden"])
+                or not isinstance(decision["externalAllowed"], bool) or not isinstance(decision["externalEnabled"], bool)):
+            raise TaskError("Invalid route decision")
+        self.get(task_id)
+        with self.lock, self._transition():
+            self._event(task_id, None, "route.decided", dict(decision))
+        return self.get(task_id)
 
     def record_model_proposal(self, task_id, model_name, prompt, proposal):
         """Link a model proposal to a durable task without storing the prompt."""

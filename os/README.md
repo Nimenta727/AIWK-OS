@@ -71,7 +71,7 @@ CI 分为静态契约、Debian 镜像、QEMU 直接内核诊断、ISO BIOS/OVMF 
 
 物理机器固件/USB 启动、通用安装器、Secure Boot、完整中文输入法/跨应用剪贴板、内核强制隔离的独立低权限执行 Worker、自动更新与恢复、真实模型稳定质量验收。NixOS 是并行适配，不应视为已发布的第二套稳定镜像。
 
-许可证以根目录 [LICENSE](../LICENSE) 为准（当前 MIT）。Debian/Linux/浏览器/语言工具链的发行许可与源码义务必须分别履行。
+许可证以根目录 [LICENSE](../LICENSE) 为准（当前 Apache-2.0）。Debian/Linux/浏览器/语言工具链的发行许可与源码义务必须分别履行。
 
 ---
 

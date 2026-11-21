@@ -1,92 +1,141 @@
-# AIWK-OS · AI Workstation & AI-native Linux guest
+# AIWK-OS · 面向程序员的 AI 原生操作系统
 
-**中文** · [English](#english) · [文档中心](docs/README.md) · [代码结构](docs/CODEBASE_MAP.md) · [Git 开发记录](docs/routine/README.md)
+**中文** · [English](#english) · [文档中心](docs/README.md) · [代码结构](docs/CODEBASE_MAP.md) · [开发记录](docs/routine/README.md)
 
-> **工程预览 / Engineering preview** — 仓库包含两个不同的运行目标：Windows 原生 AI 工作台和实验性 AI 原生 Linux 客户机系统。不是已经正式发行的稳定操作系统。
+> **一句话定位：你用自然语言说要做什么，系统替你去操作；你只需要「看」和「批准」。**
+> AIWK-OS 是一个专为程序员设计的 Debian 系 Linux 发行版。它的首页不是桌面，而是一个**只读的观察台**——
+> 展示 token 用量、模型状态、调用状态、任务进度和审计结论；需要手动开发时，再打开内置的 **AIWS Code** 编辑器和完整的语言工具链。
 
-## 项目定位
+> **工程预览 / Engineering preview** — 这是处于开发中的实验系统，**不是**稳定发行版。哪些部分已经验证、哪些没有，见下方[「现在到了哪一步」](#现在到了哪一步)。
 
-**AIWK-OS** 将可审计的 Agent 任务、计划、DAG、权限审批和执行证据组织成统一工作台。当前同时维护：
+## 它是什么，不是什么
 
-| 运行目标 | 技术实现 | 当前边界 |
-| --- | --- | --- |
-| **Windows 工作台** | WPF / .NET 10 + WebView2 + 共用 React 前端 | 有构建和自动化测试；实际 Hyper-V GUI、ACL、安装器与签名需另行验收 |
-| **Linux AIWS OS** | Debian 13 Live ISO、Openbox/XFCE Shell、Chromium 应用窗口、systemd 用户服务、SQLite DAG | 实验系统；原生 BIOS/UEFI ISO 引导和实体硬件仍需独立验证 |
-| **可选本地小模型** | llama.cpp / Qwen3.5-2B GGUF、只读建议与离线评测 | 权重与推理效果不由源代码存在自动证明；以真实 guest CI 结果为准 |
+| 它是 | 它不是 |
+| --- | --- |
+| **自然语言驱动**的开发环境：说需求，系统拆任务、走审批、交给模型和工具去做 | 又一个需要你逐项点击的传统桌面 |
+| **本地小模型当中转站**：离线运行，只负责理解指令、做本机文件/系统基础操作，并把大任务转交给云端 | 一个联网、能自己下载、自己执行任何命令的“全能 Agent” |
+| **云端大模型通过官方 CLI**（Claude Code / Codex）接入，在你一次性授权的范围内工作；不存放 API 密钥 | 绕过厂商认证或保存你账号凭据的工具 |
+| **一切可审计**：每次调用、每个阶段、每次审批都有记录，首页给出一句话结论 | 黑盒：你看不到模型做了什么 |
+| 面向程序员：**常用语言环境与开源工具预装**，AIWS Code（Code - OSS 重新品牌化构建）随需打开 | 面向普通办公用户的系统 |
+| **省 token、省资源**：本地模型空闲即卸载，用量只统计提供方上报的真实数字 | 不计成本地把所有事都丢给云端 |
 
-Windows 和 Linux 共用 `desktop/AIWorkstation.Frontend` 的 React 组件，但**不共用相同的操作系统权限**。Windows 任务历史可以受限导入 Linux 作证据，原有审批不能自动转化为 Linux 可执行权限。
+## 工作方式
 
-## 当前实现与安全边界
+```text
+你（自然语言）
+   │
+   ▼
+┌──────────────── 观察台（首页，只读） ────────────────┐
+│ token · 模型状态 · 调用状态 · 任务 · 审计结论 · 待你批准  │
+└───────────────────────────────────────────────┘
+   │ 指令                                   ▲ 事件与证据
+   ▼                                         │
+本地小模型（离线中转）──只提议，不执行──▶ 审批 DAG ──▶ 本机文件/系统工具（受限、可撤销）
+   │ 超出本地能力，且你已授权
+   ▼
+官方 CLI（Claude Code / Codex）──专用低权限用户 + 出口域名白名单──▶ 在授权目录里构建项目
+```
 
-Linux 客户机路径：**AIWS Shell → Workbench → 独立 systemd Agent → 同 UID Permission Broker → 持久化 DAG/工具 → 审计证据**。Broker 通过 UNIX Socket 核对运行中的阶段、参数与审批记录；MCP 对外只暴露只读入口。**这是应用层 fail-closed 策略，不是内核强制隔离**：相同 UID 的恶意进程及客户机 root 仍可能绕过。
+三条不变的原则：
 
-BIOS/UEFI 原生 ISO 启动 CI 已加入，和原有 QEMU 直接加载内核的诊断路径分开。只有对应固件 CI 完成且通过，才能称为该固件路径验收通过；也不代表物理机器启动、安装升级或 Secure Boot 已通过。
+1. **模型只提议，执行要审批。** 写操作永远生成「待批准」阶段；删除只是移到可恢复的回收站。
+2. **本地模型不联网。** 它只能读取下载进度、系统和网络**状态**，不能下载、不能抓取。
+3. **云端构建有边界。** 一次授权 = 一个目录 + token 预算 + 工具清单 + 时长上限；以独立低权限用户运行，网络只允许访问白名单域名（内核防火墙 + 代理双重限制）。
+
+## 程序员开箱即用
+
+- **语言与运行时**：Python（含 pip/venv/pipx）、Node.js + TypeScript、Go、Rust、Java（OpenJDK 21 + Maven）、Ruby、PHP、Lua、C/C++（gcc/g++/clang/clangd/cmake/meson/ninja）；清单见 `os/debian/config/package-lists/`，包名已对照真实 Debian 索引校验。
+- **常用开源工具**：git / gh / git-delta、ripgrep / fd / jq、tmux / neovim、gdb / valgrind、shellcheck / shfmt、SQLite / PostgreSQL 客户端、编程字体等。
+- **AIWS Code**：基于 [Code - OSS](https://github.com/microsoft/vscode)（MIT）源码的重新品牌化构建，保留上游版权与第三方声明，**不使用** Microsoft 的名称、图标、市场和服务；扩展来自 Open VSX。见 [os/ide/NOTICE.md](os/ide/NOTICE.md)。
+- **工作台界面参照 VS Code 布局**：活动栏、侧边栏（真实文件树）、标签页、底部面板、状态栏、命令面板（`Ctrl+Shift+P`），深色/浅色主题。观察台是第一个、固定的标签页。
+
+> 有意没有包含的：.NET SDK、pnpm、black、ruff 不在 Debian 主仓库（可用 pipx/npm 自行安装）；Docker 因权限模型另行评估。说明见 [软件包清单](os/debian/config/package-lists/aiws-devtools.list.chroot) 开头的注释。
+
+## 现在到了哪一步
+
+| 部分 | 状态 |
+| --- | --- |
+| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 382 项、前端 61 项） |
+| 前端（VS Code 风格外壳） | **已在真实浏览器里点过**（深/浅主题、标签、命令面板、文件查看） |
+| Debian 13 镜像构建、BIOS/UEFI 引导 | CI 工作流已有；**以对应提交的 Actions 结论为准** |
+| AIWS Code 的真实构建与浏览器内运行 | **配方、补丁、扫描器已验证；完整构建尚未在本仓库环境里执行** |
+| 真实客户机里的模型质量、官方 CLI 实跑、完整镜像体积 | **未验证**（有检查清单，等待真实运行） |
+| 内核强制隔离、通用安装器、Secure Boot、物理机启动 | **未完成**；当前 Permission Broker 是应用层策略，不是内核隔离 |
+
+静态测试通过**不等于**固件、真机、模型或发行验收通过。
 
 ## 快速开始
 
-### Windows 11 x64 工作台
+### 构建 Linux 镜像（实验）
 
-从 [Releases](https://github.com/Nimenta727/AIWK-OS/releases) 获取与版本匹配的**预发布** ZIP，完整解压，保留 EXE 相邻的 `ui-dist/`。需要 WebView2 Runtime。预览版可能未签名；请先核对来源及校验和，建议在非管理员测试环境运行。
-
-开发者需要 Node.js 22、.NET 10 SDK 和 Windows PowerShell：
-
-```powershell
-.\scripts\Build-NativeDesktop.ps1
-```
-
-Windows CI 产物：[Native Desktop](https://github.com/Nimenta727/AIWK-OS/actions/workflows/native-desktop.yml)。
-
-### Linux 客户机实验镜像
-
-在隔离的 Debian 13 (trixie) 构建环境执行（需要 live-build/chroot 权限及软件包下载）：
+在隔离的 Debian 13 (trixie) 构建环境执行（需要 live-build/chroot 权限与软件包下载）：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
-sudo ./os/debian/build.sh
+sudo ./os/debian/build.sh                       # AIWS_OS_PROFILE=smoke 为不含开发工具链的小镜像
 ```
 
-生成镜像通常位于 `out/aiws-os/live-image-amd64.hybrid.iso`。在具备 KVM 的 Linux 宿主上可使用：
+可选：先按 [os/ide/README.md](os/ide/README.md) 构建 AIWS Code，再用 `AIWS_CODE_TARBALL` / `AIWS_CODE_SHA256` 嵌入镜像。
+在具备 KVM 的 Linux 宿主上可用 `./os/host/run-qemu-offline.sh out/aiws-os/live-image-amd64.hybrid.iso` 离线试运行（无网络、无宿主共享）。
+**不要把 ISO 写入重要磁盘**——目前没有经验证的安装器。
+
+### 只看工作台界面（不需要整个系统）
 
 ```bash
-./os/host/run-qemu-offline.sh out/aiws-os/live-image-amd64.hybrid.iso
+cd desktop/AIWorkstation.Frontend && npm install && npm test && npm run build
+python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监听 127.0.0.1
 ```
 
-默认无网络、无宿主目录共享、无宿主设备直通。具体构建前提和限制见 [OS 工程指南](os/README.md)。**不要把 ISO 直接写入重要磁盘**；本项目还没有经验证的通用安装器。
+### Windows 工作台（次要目标）
 
-## Alpha 0.1 开发路线
+仓库同时维护一个 Windows 原生 AI 工作台（WPF / .NET 10 + WebView2，共用同一套 React 前端），用于任务/DAG/证据的桌面端。它**不**共用 Linux 的权限。获取与构建见 [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) 与 `scripts/Build-NativeDesktop.ps1`。
 
-当前已启动 [M1–M4 工程计划](docs/AIWS_OS_ALPHA_PLAN.md)：M1 只读安装预检（**未启用安装或磁盘写入**），M2 原生应用启动器、通知和可选 Fcitx5 输入支持。M3 强制隔离与 M4 自主 Agent 完整验收仍未完成。具体状态以 CI 和真实虚拟机验证为准。
+## 仓库地图
+
+| 目录 | 内容 |
+| --- | --- |
+| `os/runtime/` | 客户机 Python 服务：Workbench、Agent、Broker、任务 DAG、模型网关/路由、观察台、构建监督（模块清单 `MODULES`） |
+| `os/debian/` | live-build 配方、软件包清单、systemd 单元、桌面 Shell |
+| `os/ide/` | AIWS Code：构建配方、补丁、品牌资源、许可说明 |
+| `os/builder/` | 官方 CLI 构建通道的隔离与自检 |
+| `os/model/` | 本地模型运行器、评测与训练规范 |
+| `os/verify/` | 静态契约与行为测试 |
+| `desktop/AIWorkstation.Frontend/` | React 前端（Linux 模式在 `src/os`） |
+| `desktop/AIWorkstation.{Desktop,Core}/` | Windows 原生宿主 |
+| `aiws/` `app.py` `web/` `tests/` | 旧版 Python 控制平面，仅作兼容/回归 |
+
+细节见 [代码结构](docs/CODEBASE_MAP.md)。
 
 ## 开发入口
 
 | 需要做什么 | 阅读 |
 | --- | --- |
-| 理解目录、依赖和模块职责 | [代码结构与模块边界](docs/CODEBASE_MAP.md) |
-| 查看当前产品功能和限制 | [文档中心](docs/README.md) |
-| 固件启动、Shell、权限隔离的验收标准 | [OS 生产级门槛](docs/AIWS_OS_PRODUCTION_GATES.md) |
-| Broker 的权限决策与威胁模型 | [Permission Broker](docs/AIWS_PERMISSION_BROKER.md) |
-| 模型训练、独立评测和质量门禁 | [模型微调规范](docs/AIWS_MODEL_FINETUNING_STANDARD.md) |
-| Windows 历史到 Linux Agent 的映射 | [迁移映射](docs/AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md) |
-| 查看每次修改、验证和下一步 | [Routine 日志](docs/routine/README.md) |
-| 历史版本与旧版技术设计 | [历史资料导航](docs/HISTORY.md) |
+| 理解系统路线与已定决策 | [AI 原生路线](docs/AIWS_NATIVE_AI_PLAN.md) · [观察台计划](docs/AIWS_OBSERVATORY_PLAN.md) · [模型路由](docs/AIWS_MODEL_ROUTER.md) |
+| 安全边界与威胁模型 | [SECURITY](docs/SECURITY.md) · [Permission Broker](docs/AIWS_PERMISSION_BROKER.md) |
+| 固件启动、Shell、隔离的验收标准 | [OS 生产级门槛](docs/AIWS_OS_PRODUCTION_GATES.md) |
+| 发行流程与检查表 | [发行说明（OS 预览）](docs/RELEASE_NOTES_OS_PREVIEW.md) · [检查清单](docs/RELEASE_CHECKLIST.md) · [CHANGELOG](CHANGELOG.md) |
+| 第三方组件与许可 | [第三方清单](docs/THIRD_PARTY.md) |
+| 每次修改、验证与下一步 | [Routine 日志](docs/routine/README.md) |
 
-## 发行与许可
+## 许可
 
-目前是**工程预览**，不是正式稳定 OS 发行。Windows 打包、Linux ISO、真实固件启动、离线模型性能和安全隔离是不同验收门槛，不得互相代替。
-
-仓库自有代码的当前许可证以 [LICENSE](LICENSE) 为准，**目前为 MIT**；第三方组件遵循各自许可证和署名义务。未来改为 Apache-2.0 需要单独处理贡献者与第三方授权，不能通过修改 README 自动完成。
+仓库自有代码遵循根目录 [LICENSE](LICENSE)（**Apache License 2.0**）。第三方组件（Debian 软件包、Code - OSS、llama.cpp、各语言工具链等）遵循各自许可证，见 [第三方清单](docs/THIRD_PARTY.md)；
+重新品牌化不改变上游许可，也不去除上游署名。
 
 ---
 
 ## English
 
-**AIWK-OS** develops a Windows-native AI workstation alongside an experimental Debian-based AI-native Linux guest. Both share React UI sources, but the WPF/.NET runtime and Linux systemd/SQLite Agent runtime are distinct products and trust domains.
+**AIWK-OS is an AI-native operating system designed for programmers.** You describe what you want in natural language; the system operates for you, and you mostly *watch and approve*.
 
-- **Windows:** WPF/.NET 10, WebView2, task plans, worktrees, evidence and approval. CI coverage is not equivalent to completed Hyper-V manual acceptance.
-- **Linux:** Debian 13 Live image, Openbox/XFCE native taskbar, Chromium app window, durable task DAG, independent Agent and same-UID Permission Broker. The Broker is **not** mandatory kernel-enforced confinement.
-- **Local model:** optional GGUF/llama.cpp integration and a held-out guest benchmark. Model accuracy, refusal rates, memory and latency must be verified by completed real-guest runs.
-- **Boot:** BIOS and UEFI ISO firmware jobs are separate from direct-kernel QEMU diagnostics. A passing static test is not proof of firmware or physical hardware boot.
-- **License:** repository `LICENSE` currently states MIT; upstream and system-package licenses remain separate.
+- **Home screen = a read-only Observatory**: token usage, model status, call status, tasks, and a one-sentence audit verdict. Detailed logs and request payloads are one click away, only when you ask.
+- **A local, offline small model is the relay.** It understands instructions and performs basic file/system operations, but it only *proposes*; every write needs your approval. It never touches the network.
+- **Cloud models come through the official CLIs** (Claude Code / Codex) under a one-time *mandate* (directory, token budget, tool list, time limit), as a dedicated unprivileged user behind a kernel firewall and a domain-allowlist proxy. No API keys are stored.
+- **Built for developers**: common language toolchains and open-source tools are preinstalled, and **AIWS Code** — a rebranded build of the MIT-licensed Code - OSS (no Microsoft names, logos, marketplace or services; upstream credits kept) — opens on demand. The workbench UI follows the VS Code layout (activity bar, side bar, tabs, panel, status bar, command palette; dark/light themes).
+- **Token- and resource-frugal by design**: the local model unloads when idle, and usage numbers are only what the provider reports.
 
-For build instructions, module ownership, security boundaries, historical designs and release gates, start at [Documentation](docs/README.md), [Codebase map](docs/CODEBASE_MAP.md), [OS build](os/README.md), and [Routine](docs/routine/README.md).
+**Status: engineering preview.** Code and unit/contract tests exist (Python 382, frontend 61) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
+
+Repository code is licensed under Apache-2.0 (see `LICENSE`); third-party components keep their own licenses ([docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)).
+Start at [Documentation](docs/README.md), [Codebase map](docs/CODEBASE_MAP.md), [OS build](os/README.md) and [Routine log](docs/routine/README.md).

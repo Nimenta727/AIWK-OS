@@ -4,6 +4,18 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-22 11:00 — O5：小模型框架省资源与省 token](2026-11-22_1100-observatory-o5-model-framework.md)
+- [2026-11-22 08:30 — O4：构建通道隔离与观察台布局紧凑化](2026-11-22_0830-observatory-o4-builder-isolation.md)
+- [2026-11-22 05:30 — O3：授权令牌与监督器](2026-11-22_0530-observatory-o3-mandate-supervisor.md)
+- [2026-11-22 03:00 — O2：观察台首页与“高级”抽屉](2026-11-22_0300-observatory-o2-home.md)
+- [2026-11-22 01:00 — O1：事件模式、CLI 适配器、事件存储](2026-11-22_0100-observatory-o1-events.md)
+- [2026-11-22 00:10 — 观察台总体方案（仅文档）](2026-11-22_0010-observatory-plan.md)
+- [2026-11-21 23:00 — 阶段 4：模型路由](2026-11-21_2300-stage4-model-router.md)
+- [2026-11-21 21:30 — 数据集 v2、锁定评测集 v2、独立性检查与发布门槛](2026-11-21_2130-dataset-v2-heldout-release-gate.md)
+- [2026-11-21 20:00 — 阶段 3：模型分级、多步计划、本机只读信息工具](2026-11-21_2000-stage3-local-model-grading-plans-readtools.md)
+- [2026-11-21 18:30 — 阶段 2：文件管理器、指令栏、批准卡片、撤销](2026-11-21_1830-stage2-file-manager-command-bar.md)
+- [2026-11-21 17:30 — 修复基线测试与安装预检 lsblk 字段缺失](2026-11-21_1730-fix-baseline-tests-installer-probe.md)
+- [2026-11-21 17:00 — 阶段 1：基础文件工具与路线文档](2026-11-21_1700-file-tools-stage1.md)
 - [2026-11-21 15:35 — 镜像验收前置 CI 语法修复](2026-11-21_1535-boot-ci-preflight-gate.md)
 - [2026-11-21 15:20 — 修复安装预检 Python 语法错误与 CI 阻断](2026-11-21_1520-installer-ci-syntax-fix.md)
 - [2026-11-21 15:05 — M1 安装预检签名检测与防误判加固](2026-11-21_1505-installer-signature-hardening.md)
@@ -91,3 +103,5 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 12:04 — ISO/QEMU 同分支取消过时自动构建，减少 CI 计算资源](2026-11-21_1204-os-qemu-ci-superseded-build-cancellation.md)
 
 - [2026-11-21 12:10 — 模型独立 held-out、真实 QEMU 指标与 Windows 历史完整投影](2026-11-21_121000-model-heldout-windows-history.md)
+- [2026-11-21 08:07 — VS Code 风格前端外壳与 AIWS Code 启动接口](2026-11-21_080728-vscode-style-shell-and-ide-api.md)
+- [2026-11-21 08:13 — 代码结构整理、README 重写（系统定位）与发行准备](2026-11-21_081324-structure-readme-release-prep.md)

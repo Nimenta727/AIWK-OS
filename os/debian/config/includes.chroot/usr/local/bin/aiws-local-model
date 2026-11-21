@@ -29,6 +29,12 @@ if ! command -v llama-server >/dev/null 2>&1; then
    echo 'llama-server is unavailable inside this guest' >&2; exit 1
 fi
 # Never access host GPU; model API is strictly loopback inside guest.
-exec llama-server --model "$model" --alias aiws-local \
-  --host 127.0.0.1 --port 18080 --ctx-size 4096 \
+# The small gate owns the public model port (18080): it starts llama-server on the internal loopback port 18081
+# only when a real request arrives and stops it again after an idle period, so an unused model costs no RAM.
+idle="${AIWS_MODEL_IDLE_SECONDS:-300}"
+case "$idle" in ''|*[!0-9]*) idle=300 ;; esac
+if [ "$idle" -lt 30 ] || [ "$idle" -gt 86400 ]; then idle=300; fi
+exec python3 /usr/local/lib/aiws/aiws_model_gate.py --listen-port 18080 --child-port 18081 --idle-seconds "$idle" -- \
+  llama-server --model "$model" --alias aiws-local \
+  --host 127.0.0.1 --port 18081 --ctx-size 4096 \
   --gpu-layers 0 --parallel 1

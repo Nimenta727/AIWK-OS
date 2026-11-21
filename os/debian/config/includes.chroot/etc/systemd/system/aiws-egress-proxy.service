@@ -1,0 +1,29 @@
+[Unit]
+Description=AIWS builder egress allowlist proxy (HTTPS CONNECT, domain allowlist, public addresses only)
+After=network.target aiws-builder-firewall.service systemd-sysusers.service
+Wants=aiws-builder-firewall.service
+[Service]
+Type=simple
+User=aiws-egress
+Group=aiws-egress
+ExecStart=/usr/bin/python3 /usr/local/lib/aiws/aiws_egress_proxy.py --allow /etc/aiws/egress-allow.conf --port 3128 --log /var/lib/aiws-egress/egress.jsonl
+Restart=on-failure
+RestartSec=3
+StateDirectory=aiws-egress
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+MemoryMax=256M
+TasksMax=64
+[Install]
+WantedBy=multi-user.target

@@ -4,14 +4,21 @@ import {BrainCircuit,CheckCircle2,ChevronRight,Clock3,Play,Plus,RefreshCw,Shield
 type Capability={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type StageDraft={key:string;label:string;tool:string;path:string;query:string;dependsOn:string};
 type TaskHeader={id:string;title:string;goal:string;created_at:number};
-type Stage={id:string;stage_key:string;label:string;tool:string;state:string;approval:number;dependsOn:string[];error:string|null;result:unknown};
+type Stage={id:string;stage_key:string;label:string;tool:string;arguments:Record<string,string>;state:string;approval:number;dependsOn:string[];error:string|null;result:unknown};
 type WindowsHistory={sourceSha256:string;executable:boolean;requiresToolMapping:boolean;
  evidence:{graphMode:boolean;stages:Array<{key:string;windowsStatus:string;windowsAgent:string;
   windowsRequiresApproval:boolean;windowsApprovalGranted:boolean}>;planRevisionSha256:string[];
  artifactRefs:Array<{kind:string;sha256:string}>;originalExecutionRecordCount:number}};
 type TaskDetail={task:TaskHeader;stages:Stage[];windowsImport?:WindowsHistory};
 type ModelStatus={configured:boolean;online:boolean;cloudFallback:boolean;model:string;automaticExecution:boolean;cpuOnly:boolean;weightsPresent:boolean};
-type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean;refused?:boolean};
+type Step={tool:string;arguments:Record<string,string>;reason:string;grade?:string};
+type Bilingual={zh:string;en:string};
+type Decision={route:string;agent:string;rule:string;reason:Bilingual;forbidden:string[];externalAllowed:boolean;externalEnabled:boolean;
+ providers:Record<string,{enabled:boolean;installed:boolean}>;requiresConsent:boolean};
+type FollowUp={escalate:boolean;final:boolean;action:string;agent?:string;reason?:Bilingual};
+type RouteInfo={decision:Decision;followUp?:FollowUp;error?:string;refused?:boolean};
+type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean;refused?:boolean;grade?:string;steps?:Step[]};
+const READ_ONLY=new Set(['workspace.tree','file.read','file.stat','file.trashList','code.search','git.inspect','runtime.detect','browser.local_text','platform.inspect','code.symbols','code.references','code.dependencies','code.platformApis','system.info','network.status','download.list','download.progress']);
 
 async function request<T>(url:string,opts?:RequestInit):Promise<T>{
  const r=await fetch('/api/v1'+url,{cache:'no-store',credentials:'omit',...opts});
@@ -35,6 +42,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
  const [instruction,setInstruction]=useState('');
  const [model,setModel]=useState<ModelStatus|null>(null);
  const [proposal,setProposal]=useState<Proposal|null>(null);
+ const [routeInfo,setRouteInfo]=useState<RouteInfo|null>(null);
+ const [routeCfg,setRouteCfg]=useState<{externalEnabled:boolean}|null>(null);
  const [error,setError]=useState('');
  const [busy,setBusy]=useState(false);
  const headers={'Content-Type':'application/json','X-AIWS-CSRF':csrf};
@@ -42,7 +51,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   try{
    const rows=await request<{tasks:TaskHeader[]}>('/tasks');
    setTaskList(rows.tasks);
-   if(focus==='model')setModel(await request<ModelStatus>('/model/status'));
+   if(focus==='model'){setModel(await request<ModelStatus>('/model/status'));
+    setRouteCfg((await request<{config:{externalEnabled:boolean}}>('/route/config')).config);}
   }catch(e){setError(String(e));}
  },[focus]);
  useEffect(()=>{void update();},[update]);
@@ -86,6 +96,17 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    await request('/tasks/'+detail.task.id+'/stages/'+stage.stage_key+'/'+action,{
     method:'POST',headers,body:'{}'
    });
+   await open(detail.task.id);
+  }catch(e){setError(String(e));}
+  finally{setBusy(false);}
+ };
+ const approveAndRun=async(stage:Stage)=>{
+  if(!detail||busy||!csrf)return;
+  setBusy(true);setError('');
+  try{
+   const base='/tasks/'+detail.task.id+'/stages/'+stage.stage_key+'/';
+   await request(base+'approve',{method:'POST',headers,body:'{}'});
+   await request(base+'dispatch',{method:'POST',headers,body:'{}'});
    await open(detail.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
@@ -136,19 +157,31 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   if(!csrf||busy||!model?.online||!instruction.trim())return;
   setBusy(true);setError('');
   try{
-   // The model proposes ONE read-only tool. The server persists a pending,
-   // audited DAG but never executes it without a separate user action.
-   const item=await request<TaskDetail|{refused:true;proposal:Proposal}>('/model/plan',{
+   // The model proposes one tool or an ordered plan. The server persists an audited DAG:
+   // local read-only stages run automatically; file-changing stages wait for approval.
+   setRouteInfo(null);
+   const item=await request<TaskDetail|{refused:true;proposal:Proposal;decision:Decision;followUp:FollowUp}|
+    {routed:string;decision:Decision;followUp?:FollowUp;error?:string}>('/model/plan',{
     method:'POST',headers,body:JSON.stringify({instruction})
    });
-   if('refused' in item){setProposal(item.proposal);return;}
+   if('refused' in item){setProposal(item.proposal);setRouteInfo({decision:item.decision,followUp:item.followUp,refused:true});return;}
+   if('routed' in item){setRouteInfo({decision:item.decision,followUp:item.followUp,error:item.error});return;}
    await update();
    await open(item.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
+ const createHandoff=async(agent:string)=>{
+  if(!csrf||busy||!instruction.trim())return;
+  setBusy(true);setError('');
+  try{
+   const out=await request<{task:{id:string}}>('/route/handoff',{method:'POST',headers,body:JSON.stringify({instruction,agent})});
+   await update();await open(out.task.id);
+  }catch(e){setError(String(e));}
+  finally{setBusy(false);}
+ };
  const addProposal=()=>{
-  if(!proposal||proposal.tool==='refuse')return;
+  if(!proposal||proposal.tool==='refuse'||proposal.steps)return;
   setTitle(instruction.slice(0,100));
   setGoal(proposal.reason);
   setDrafts([{key:'step1',label:proposal.reason.slice(0,140),tool:proposal.tool,
@@ -169,18 +202,35 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
       onClick={()=>void toggleModel(false)}>{tr('申请关闭模型（需审核）','Request model disable approval')}</button>
      <span className="aiws-os-muted">{model?.weightsPresent?tr('已发现客户机权重','Guest weights found'):tr('尚未安装客户机 GGUF 权重','Guest GGUF weights not provisioned')}</span>
     </div>
-   <p>{tr('模型只提出工作区只读操作建议，不执行，也不自动调用云端。CPU 模式可用；权重需要在客户机内单独安装。',
-    'The optional offline model only suggests read-only guest tools. No execution or cloud fallback; guest model weights are provisioned separately.')}</p>
+   <p>{tr('模型完全在本机离线运行，不联网、不下载、不调用云端。它可以读取系统与网络状态、查看下载进度，并提出文件整理计划：只读步骤自动执行，任何会改动文件的步骤都要你逐项批准，删除只会进回收站。',
+    'The model runs fully offline on this machine: no network, no downloading, no cloud. It can read system and network state, check download progress and plan file organisation. Read-only steps run automatically; every file change needs your approval, and deleting only moves to trash.')}</p>
    <label>{tr('希望 AI 完成什么？','What should the local assistant plan?')}
     <textarea value={instruction} onChange={e=>setInstruction(e.target.value)} rows={3} maxLength={1000}
-     placeholder={tr('例如：查看项目中的 C# 文件结构','e.g. Inspect my guest C# project layout')}/></label>
+     placeholder={tr('例如：看看下载进度，把已完成的下载移到 isos 文件夹','e.g. Check download progress and move finished downloads into isos/')}/></label>
    <button type="button" className="aiws-os-primary" disabled={!model?.online||!csrf||busy||!instruction.trim()}
     onClick={()=>void suggest()}><BrainCircuit size={16}/>{tr('生成本地工具建议','Suggest a local tool')}</button>
    <button type="button" disabled={!model?.online||!csrf||busy||!instruction.trim()}
     onClick={()=>void createOfflinePlan()}>{tr('生成并保存待审核任务','Create a pending audited task')}</button>
+   <p className="aiws-os-muted">{routeCfg?.externalEnabled?
+    tr('外部官方 CLI 已在 routes.json 启用：仅在你确认后生成交接文件，AIWS 不会自动调用它们。','External official CLIs are enabled in routes.json: a handoff file is only prepared after your consent; AIWS never launches them.'):
+    tr('外部模型默认关闭，所有请求只在本机离线处理（可在 ~/.config/aiws/routes.json 启用交接）。','External models are off by default: everything stays on this machine (enable handoff in ~/.config/aiws/routes.json).')}</p>
+   {routeInfo&&<div className="aiws-os-proposal" role="status" data-aiws="route-card">
+    <strong>{tr('路由决定','Routing decision')}: {routeInfo.decision.route}{routeInfo.decision.agent!=='local'?' → '+routeInfo.decision.agent:''}</strong>
+    <p>{english?routeInfo.decision.reason.en:routeInfo.decision.reason.zh}</p>
+    {routeInfo.decision.forbidden.length>0&&<p className="aiws-os-muted">{tr('命中受限类别：','Restricted categories: ')}{routeInfo.decision.forbidden.join(', ')}</p>}
+    {routeInfo.error&&<p className="aiws-os-muted">{routeInfo.error}</p>}
+    {routeInfo.followUp?.reason&&<p>{english?routeInfo.followUp.reason.en:routeInfo.followUp.reason.zh}</p>}
+    {(routeInfo.decision.route==='external'||routeInfo.followUp?.action==='propose-handoff')&&routeInfo.decision.externalAllowed&&
+     <><p className="aiws-os-muted">{tr('将写入工作区 handoff/ 的文件只含指令和文件名，不含文件内容或凭据；写入本身需要你批准。','The file written to handoff/ holds only your instruction and file names: no contents or credentials; writing it needs your approval.')}</p>
+      <button type="button" disabled={busy||!csrf} onClick={()=>void createHandoff(routeInfo.followUp?.agent||routeInfo.decision.agent)}>
+       {tr('生成交接文件（需批准）','Prepare handoff file (needs approval)')}</button></>}
+    {Object.entries(routeInfo.decision.providers).map(([name,p])=><span key={name} className="aiws-os-muted"> {name}: {p.enabled?tr('已启用','enabled'):tr('未启用','disabled')} / {p.installed?tr('已安装','installed'):tr('本机未安装','not installed here')} </span>)}
+   </div>}
    {proposal&&<div className="aiws-os-proposal">
-    <strong>{proposal.tool}</strong><p>{proposal.reason}</p>
-    <pre>{JSON.stringify(proposal.arguments,null,2)}</pre>
+    <strong>{proposal.steps?tr('多步计划','Multi-step plan')+' ('+proposal.steps.length+')':proposal.tool}</strong><p>{proposal.reason}</p>
+    {proposal.steps?<ol>{proposal.steps.map((s,i)=><li key={i}><code>{s.tool}</code> {JSON.stringify(s.arguments)} — {s.reason}
+      <em> [{READ_ONLY.has(s.tool)?tr('只读，自动执行','read-only, runs automatically'):tr('需你批准','needs your approval')}]</em></li>)}</ol>:
+     <pre>{JSON.stringify(proposal.arguments,null,2)}</pre>}
     <p className="aiws-os-muted">{tr('尚未执行，需先确认计划并提交任务。','Not executed; review and create a task first.')}</p>
     {proposal.tool==='refuse'?<p role="status">{tr('越权请求已拒绝；不会建立可执行任务','Out-of-scope request refused; no executable task created')}</p>:
      <button type="button" onClick={addProposal}>{tr('复制建议到任务草稿','Copy suggestion into draft')}</button>}
@@ -249,10 +299,14 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    {detail.stages.map(s=><div className="aiws-os-stage-status" key={s.id}>
     <div><strong>{s.stage_key}: {s.label}</strong><span>{s.state.toUpperCase()}</span></div>
     <p>{s.tool}{s.dependsOn.length?' ← '+s.dependsOn.join(', '):''}</p>
+    {!READ_ONLY.has(s.tool)&&<pre className="aiws-os-result" aria-label={tr('将要执行的参数','Arguments to be executed')}>{JSON.stringify(s.arguments,null,2)}</pre>}
     {s.error&&<p className="aiws-os-error">{s.error}</p>}
     {s.result!==null&&<pre className="aiws-os-result">{JSON.stringify(s.result,null,2)}</pre>}
     {(s.state==='pending'||s.state==='interrupted')&&s.approval===0?
-      <button type="button" disabled={busy} onClick={()=>void command(s,'approve')}><ShieldCheck size={15}/>{tr('批准客体写操作','Approve guest write')}</button>:
+      <><button type="button" disabled={busy} onClick={()=>void command(s,'approve')}><ShieldCheck size={15}/>{tr('批准客体写操作','Approve guest write')}</button>
+       {s.dependsOn.every(k=>detail.stages.find(x=>x.stage_key===k)?.state==='completed')&&
+        <button type="button" className="aiws-os-primary" disabled={busy} onClick={()=>void approveAndRun(s)}>
+         <Play size={15}/>{tr('批准并运行','Approve & run')}</button>}</>:
       (s.state==='pending'||s.state==='interrupted')?
        <button type="button" className="aiws-os-primary" disabled={busy} onClick={()=>void command(s,'dispatch')}>
         <Play size={15}/>{tr('运行客户机阶段','Run guest stage')}</button>:null}

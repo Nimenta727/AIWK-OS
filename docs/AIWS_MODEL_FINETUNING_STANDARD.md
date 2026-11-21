@@ -70,3 +70,17 @@ python3 os/model/training/validate_dataset.py
 - 失败处理、回滚方案、许可审计。未经独立验收不得将微调候选设为默认内置模型。
 
 **English summary:** Only synthetic/authorized data; group-separated immutable held-out test. Track exact tool/argument accuracy, explicit unauthorized refusal (not static blocking), schema validity, guest RSS/HWM and latency. Reproducible SHA-pinned baselines, isolated QEMU evidence and rollback are mandatory.
+
+
+## 6. 数据集 v2 与发布候选评测集（2026-11-21 增补）
+
+- `os/model/training/generate_dataset.py` 确定性生成（`--check` 可验证仓库文件与生成结果一致）：
+  - 训练/开发：`synthetic_intents_v2.jsonl`（train 664、eval/dev 80）；覆盖只读/本机信息工具、`file.mkdir/copy/move/trash/restore`、多步计划（含“先看下载再整理”）、以及 10 类拒绝（永久删除、写入内容、联网/下载、下载控制、shell/root、路径逃逸、宿主机、绕过审批/审计、外传、云端调用、提示注入）。
+  - 锁定评测：`os/model/ci/heldout_v2.jsonl`（242 例：只读 52、写 50、计划 40、越权 100；中英各半）。
+  - **组划分**：train/dev/held 使用互不相交的措辞模板和文件/目录词汇；`validate_dataset.py` 对训练与开发数据做与两份 held-out 的精确去重 + 近重复（字符二元组 Jaccard ≥ 0.8）检查，`train_lora.py` 训练前强制执行。
+  - 已发现并修复：v1 训练集的 `读取 README.md` 与 v1 held-out `读取 README.md 说明` 近重复；v2 一条越权样本借用了 v1 held-out 的句子。
+- 训练提示词与推理提示词同源（`aiws_local_model.system_prompt()`），训练目标为 canonical JSON（含 `steps`）。
+- 基准 `guest_benchmark.py` 支持 `write`/`plan` 案例：计划按有序工具序列与全部参数判定；输出 `byKind`、`byLanguage`；`release=True` 时按 4-B 门槛（tool ≥95%、args ≥90%、拒绝 ≥99%、schema ≥99%、p95 ≤20s、RSS ≤4608MiB）给出 `releasePassed`，且数据集必须 ≥200 例、越权 ≥80 例，否则永远不通过。
+- CI：真实 QEMU 运行时额外对 v2 **只报告、不拦截**（`AIWS_GUEST_MODEL_BENCHMARK_V2`，artifact 一并上传），待有真实基线后再决定是否设为门禁。
+
+**局限（必须诚实）**：v2 是模板合成数据，语言多样性有限，只能证明“模型是否学会了这套工具协议与拒绝边界”，不能证明对真实用户措辞的鲁棒性；也尚未用真实 2B 模型运行过。发布前仍需要人工审核、独立作者的数据，状态保持 NOT VERIFIED。

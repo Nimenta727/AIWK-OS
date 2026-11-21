@@ -1,0 +1,73 @@
+#!/bin/sh
+# AIWS Code launcher. Starts the local AIWS Code web server (loopback only, connection-token protected) if it is not
+# already running and opens it in an app window. Usage: aiws-code [--server-only] [FOLDER]
+# Runs as the ordinary guest user. The server shuts itself down after the last window closes (resource saving).
+set -eu
+if [ "$(id -u)" -eq 0 ]; then echo 'AIWS Code must not run as root' >&2; exit 1; fi
+root="${AIWS_CODE_ROOT:-/opt/aiws-code}"
+port="${AIWS_CODE_PORT:-18090}"   # fixed in production: the webview endpoint in product.json points at http://*.localhost:18090 (override only for tests)
+server_only=0
+if [ "${1:-}" = "--server-only" ]; then server_only=1; shift; fi
+folder="${1:-${AIWS_WORKSPACE:-$HOME/.local/share/aiws/projects}}"
+if [ ! -x "$root/bin/aiws-code-server" ] || [ ! -f "$root/out/server-main.js" ]; then
+  echo 'AIWS Code is not installed in this image. Build it with os/ide/build-aiws-code.sh (see os/ide/README.md).' >&2
+  exit 3
+fi
+case "$folder" in /*) ;; *) echo 'The folder must be an absolute path' >&2; exit 2 ;; esac
+if [ ! -d "$folder" ] || [ -L "$folder" ]; then echo "Not a regular folder: $folder" >&2; exit 2; fi
+
+state="$HOME/.local/share/aiws-code"
+runtime="${XDG_RUNTIME_DIR:-$state}"
+mkdir -p -m 0700 "$state" "$state/server-data/data/User" "$state/extensions"
+token_file="$runtime/aiws-code.token"
+umask 0077
+
+ready() { python3 - "$port" <<'PY'
+import socket, sys
+try:
+    socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=0.5).close()
+except OSError:
+    sys.exit(1)
+PY
+}
+
+# Sane defaults for a programmer's offline workstation; written only once so the user's own edits are never overwritten.
+settings="$state/server-data/data/User/settings.json"
+if [ ! -f "$settings" ]; then
+  cat > "$settings" <<'JSON'
+{
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  "workbench.enableExperiments": false,
+  "chat.disableAIFeatures": true,
+  "files.autoSave": "afterDelay",
+  "editor.fontFamily": "'JetBrains Mono', 'Fira Code', 'Hack', monospace",
+  "editor.fontLigatures": true,
+  "terminal.integrated.fontFamily": "'JetBrains Mono', 'Hack', monospace"
+}
+JSON
+fi
+
+if ! ready; then
+  if [ ! -s "$token_file" ]; then
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$token_file"
+  fi
+  chmod 600 "$token_file"
+  nohup "$root/bin/aiws-code-server" --host 127.0.0.1 --port "$port" --connection-token-file "$token_file" \
+    --server-data-dir "$state/server-data" --extensions-dir "$state/extensions" --telemetry-level off \
+    --enable-remote-auto-shutdown --default-folder "$folder" >> "$state/server.log" 2>&1 &
+  i=0
+  while ! ready; do
+    i=$((i + 1)); [ "$i" -gt 120 ] && { echo 'AIWS Code did not start in time; see ~/.local/share/aiws-code/server.log' >&2; exit 4; }
+    sleep 0.5
+  done
+fi
+[ "$server_only" -eq 1 ] && exit 0
+
+token="$(cat "$token_file")"
+enc="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$folder")"
+browser="$(command -v chromium || command -v chromium-browser || true)"
+if [ -z "$browser" ]; then echo "Open http://127.0.0.1:$port/?folder=$enc in a browser (token is in $token_file)" >&2; exit 5; fi
+exec "$browser" --no-first-run --user-data-dir="$state/chromium-profile" --app="http://127.0.0.1:$port/?tkn=$token&folder=$enc"

@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import stat
 import unittest
+from buildsrc import build_text
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "os/debian/config"
@@ -81,7 +82,7 @@ class AiwsOsContract(unittest.TestCase):
         self.assertIn("firmware: [bios, uefi]", workflow)
 
     def test_independent_broker_is_packaged_and_required(self):
-        build = (ROOT / "os/debian/build.sh").read_text()
+        build = build_text()
         agent = (CONFIG / "includes.chroot/etc/systemd/user/aiws-agent.service").read_text()
         broker = (CONFIG / "includes.chroot/etc/systemd/user/aiws-permission-broker.service").read_text()
         boot = (CONFIG / "includes.chroot/usr/local/bin/aiws-boot-smoke").read_text()

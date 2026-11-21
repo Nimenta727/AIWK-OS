@@ -4,27 +4,94 @@ The model is ONLY a constrained guest-tool suggestion service. It cannot call
 tools itself, access files, run commands, or make HTTP requests to the host.
 The sole model URL is hardcoded IPv4 guest loopback with proxies disabled.
 """
+import collections
+import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import threading
+import time
 import urllib.error
 import urllib.request
+
+from aiws_toolplane import READ_TOOLS as PLANE_READ_TOOLS
 
 HOST = "127.0.0.1"
 PORT = 18080
 MODEL_ALIAS = "aiws-local"
 MAX_INTENT = 1000
-READ_TOOLS = frozenset({
-    "workspace.tree", "file.read", "code.search", "git.inspect", "runtime.detect",
-    "browser.local_text", "platform.inspect", "code.symbols", "code.references",
-    "code.dependencies", "code.platformApis",
-})
+MAX_STEPS = 8
+# The model is local-only and offline. It may *propose* these classes; it never executes.
+# READ: run automatically once proposed (local, read-only, no network access).
+# WRITE: always become pending DAG stages that need an explicit user approval.
+# file.replace is deliberately not proposable: a small model must not author file contents.
+READ_TOOLS = frozenset(PLANE_READ_TOOLS)
+MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore"})
+FINGERPRINTED = frozenset({"file.copy", "file.move", "file.trash"})
+TRASH_ID = re.compile(r"^[a-f0-9]{32}$")
+# Token thrift (step O5): small outputs by default, a larger budget only when the request looks multi-step,
+# and a single retry only if the server reports the answer was cut off (finish_reason == "length").
+TOKENS_SINGLE, TOKENS_PLAN, TOKENS_RETRY = 192, 512, 640
+MULTI_STEP_CUE = re.compile(r"然后|并且|接着|之后|再把|先.{0,20}再|同时|以及|；|;|\bthen\b|\bafter that\b|\band then\b|\bfirst\b.{0,40}\bthen\b", re.I)
+RESULT_CACHE_MAX = 64
+MODEL_CONFIG_DEFAULT = {"constrainedOutput": "json_object", "cachePrompt": True, "resultCacheSeconds": 600}
+
+def max_tokens_for(instruction):
+    return TOKENS_PLAN if MULTI_STEP_CUE.search(instruction) else TOKENS_SINGLE
+
+def load_model_config(path=None):
+    """~/.config/aiws/model.json: strict; any problem falls back to the safe defaults (plain JSON mode)."""
+    path = Path(path) if path is not None else Path.home() / ".config/aiws/model.json"
+    config = dict(MODEL_CONFIG_DEFAULT)
+    if path.is_symlink() or not path.is_file():
+        return config
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.stat().st_size <= 1024 else None
+    except (OSError, ValueError):
+        return config
+    if not isinstance(data, dict) or set(data) - set(config):
+        return config
+    if data.get("constrainedOutput", "json_object") in ("json_object", "json_schema"):
+        config["constrainedOutput"] = data.get("constrainedOutput", "json_object")
+    if isinstance(data.get("cachePrompt"), bool):
+        config["cachePrompt"] = data["cachePrompt"]
+    seconds = data.get("resultCacheSeconds")
+    if isinstance(seconds, int) and not isinstance(seconds, bool) and 0 <= seconds <= 3600:
+        config["resultCacheSeconds"] = seconds
+    return config
+
+def system_prompt():
+    """The one system prompt used for inference AND for building training examples."""
+    return (
+        "You are the AIWS OS guest-local planning assistant. You run fully offline on this "
+        "machine and have no network access. Reply with exactly one JSON object. "
+        "For one action use keys tool, arguments, reason. For several ordered actions use "
+        "keys steps (a list of at most 8 objects, each with tool, arguments, reason) and reason. "
+        "You are NOT an executor; every proposal is reviewed by the user. "
+        "Read-only tools: " + ", ".join(sorted(READ_TOOLS)) + ". "
+        "File tools (the user must approve each): " + ", ".join(sorted(MODEL_WRITE_TOOLS)) + ". "
+        "Never include expectedSha256; the system computes it. Never write file contents. "
+        "download.list and download.progress only READ existing download information; "
+        "you cannot start, pause, resume or fetch a download, and you cannot access the internet. "
+        "Never use shell, root, networking, kernel mutation, host file paths, "
+        "hypervisor control, device passthrough or cloud calls. "
+        "All paths must be relative to a dedicated guest project workspace. "
+        "Use the smallest possible tool arguments. Do not quote or reveal secrets. "
+        "If a request requires host access, guest root, arbitrary commands, permanent deletion, "
+        "writing file contents, going online or downloading, privilege escalation, approval bypass, "
+        "or audit suppression, reply with tool='refuse', arguments={}, and a short refusal reason. "
+        "Do not silently replace such a request with an unrelated tool."
+    )
 
 class LocalModelError(ValueError):
     pass
 
+class _SchemaRejected(Exception):
+    pass
+
 class LocalPlanner:
-    def __init__(self, enabled=None, port=PORT, request_timeout=40):
+    def __init__(self, enabled=None, port=PORT, request_timeout=40, config=None):
         # The port is internal/test-only. Neither API clients nor model content
         # may choose an inference URL or point the connection at the host.
         marker = Path.home() / ".config/aiws/local-model-enabled"
@@ -38,6 +105,11 @@ class LocalPlanner:
         self.request_timeout = request_timeout
         self.url = "http://" + HOST + ":" + str(port)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self._tls = threading.local()
+        self.config = config if config is not None else load_model_config()
+        self._cache = collections.OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._schema_ok = True            # flips to False for the process lifetime if the server rejects json_schema
 
     def status(self):
         marker=Path.home()/".config/aiws/local-model-enabled"
@@ -58,7 +130,16 @@ class LocalPlanner:
             try:
                 with self.opener.open(self.url + "/health", timeout=1.5) as response:
                     status["online"] = response.status == 200
-            except (OSError, urllib.error.URLError, TimeoutError):
+                    health = json.loads(response.read(4096) or b"{}")
+                if isinstance(health, dict) and health.get("gate") is True:
+                    status["gate"] = {"loaded": bool(health.get("loaded"))}
+                    if status["gate"]["loaded"]:           # details only while loaded; asking never loads the model
+                        with self.opener.open(self.url + "/gate/status", timeout=1.5) as response:
+                            info = json.loads(response.read(4096) or b"{}")
+                        for key in ("rssMiB", "peakRssMiB", "lastColdStartSeconds", "coldStarts", "idleUnloads", "requests"):
+                            if isinstance(info.get(key), (int, float)) and not isinstance(info.get(key), bool):
+                                status["gate"][key] = info[key]
+            except (OSError, urllib.error.URLError, TimeoutError, ValueError):
                 pass
         return status
 
@@ -74,26 +155,68 @@ class LocalPlanner:
             if args != {}:
                 raise LocalModelError("Refusal must not contain tool arguments")
             return {"tool": "refuse", "arguments": {}, "reason": reason,
-                    "requiresReview": False, "executed": False,
-                    "source": "local-model", "refused": True}
-        if not isinstance(tool, str) or tool not in READ_TOOLS:
-            raise LocalModelError("Model tried a non-read-only or host tool")
+                    "requiresReview": False, "requiresApproval": False, "executed": False,
+                    "source": "local-model", "refused": True, "grade": "refuse"}
+        if not isinstance(tool, str) or (tool not in READ_TOOLS and tool not in MODEL_WRITE_TOOLS):
+            raise LocalModelError("Model tried a tool outside its read/file-operation allowance")
         specs = {x["name"]: x["inputSchema"] for x in catalog()}
         spec = specs[tool]
+        write = tool in MODEL_WRITE_TOOLS
         if not isinstance(args, dict) or any(k not in spec["properties"] for k in args):
             raise LocalModelError("Model proposal contains unknown tool arguments")
-        if any(k not in args for k in spec["required"]):
+        if "expectedSha256" in args:
+            # The controller computes fingerprints from the real file; a model must not supply one.
+            raise LocalModelError("Model must not supply expectedSha256")
+        required = [k for k in spec["required"] if k != "expectedSha256"]
+        if any(k not in args for k in required):
             raise LocalModelError("Model proposal omitted required arguments")
         if any(not isinstance(v, str) or len(v) > 512 for v in args.values()):
             raise LocalModelError("Model tool arguments must be bounded strings")
-        for k in ("path",):
+        for k in ("path", "to"):
             if k in args:
                 p = Path(args[k])
-                if not args[k] or p.is_absolute() or ".." in p.parts or "\\" in args[k]:
+                if (not args[k] or p.is_absolute() or ".." in p.parts or "\\" in args[k]
+                        or any(part in (".git", ".ssh", ".aiws-trash") for part in p.parts)):
                     raise LocalModelError("Model attempted to escape guest workspace")
+        if "trashId" in args and not TRASH_ID.fullmatch(args["trashId"]):
+            raise LocalModelError("Invalid trash id")
         return {"tool": tool, "arguments": args, "reason": reason,
-                "requiresReview": True, "executed": False, "source": "local-model",
-                "refused": False}
+                "requiresReview": True, "requiresApproval": write, "executed": False,
+                "source": "local-model", "refused": False,
+                "grade": "write" if write else "read"}
+
+    @staticmethod
+    def validate_any(proposal):
+        """A single proposal, or a plan: {"steps": [<proposal>...<=8], "reason": str}."""
+        if not isinstance(proposal, dict) or "steps" not in proposal:
+            return LocalPlanner.validate(proposal)
+        if set(proposal) != {"steps", "reason"}:
+            raise LocalModelError("A plan must contain exactly steps and reason")
+        steps, reason = proposal["steps"], proposal["reason"]
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 500:
+            raise LocalModelError("Invalid plan rationale")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_STEPS:
+            raise LocalModelError("A plan needs 1-%d steps" % MAX_STEPS)
+        checked = []
+        for step in steps:
+            item = LocalPlanner.validate(step)
+            if item["refused"]:
+                raise LocalModelError("A plan cannot contain refusal steps")
+            checked.append(item)
+        return {"tool": "plan", "steps": checked, "reason": reason, "arguments": {},
+                "requiresReview": True,
+                "requiresApproval": any(s["grade"] == "write" for s in checked),
+                "executed": False, "source": "local-model", "refused": False,
+                "grade": "write" if any(s["grade"] == "write" for s in checked) else "read"}
+
+    @staticmethod
+    def canonical(proposal):
+        """Strip validated metadata back to the raw model shape for independent revalidation."""
+        if "steps" in proposal:
+            return {"steps": [LocalPlanner.canonical(s) for s in proposal["steps"]],
+                    "reason": proposal["reason"]}
+        return {"tool": proposal["tool"], "arguments": dict(proposal["arguments"]),
+                "reason": proposal["reason"]}
 
     @staticmethod
     def context_message(context):
@@ -134,49 +257,159 @@ class LocalPlanner:
             + encoded
         )
 
-    def suggest(self, instruction, context=None):
-        if not self.status()["configured"]:
-            raise LocalModelError("No local model configured; deterministic guest tools remain available")
-        if not isinstance(instruction, str) or not (1 <= len(instruction) <= MAX_INTENT):
-            raise LocalModelError("Intent must contain 1-1000 characters")
-        system = (
-            "You are the AIWS OS guest-local planning assistant. Reply with exactly "
-            "one JSON object with keys tool, arguments, reason. You are NOT an executor. "
-            "Only recommend read-only guest tools: "
-            + ", ".join(sorted(READ_TOOLS)) + ". "
-            "Never use shell, root, networking, kernel mutation, host file paths, "
-            "hypervisor control, device passthrough or cloud calls. "
-            "All paths must be relative to a dedicated guest project workspace. "
-            "Use the smallest possible tool arguments. Do not quote or reveal secrets. "
-            "If a request requires host access, guest root, arbitrary commands, file writes, "
-            "network exfiltration, privilege escalation, approval bypass, or audit suppression, "
-            "reply with tool='refuse', arguments={}, and a short refusal reason. "
-            "Do not silently replace such a request with an unrelated inspection tool. "
-            "For allowed guest read-only requests, propose exactly one catalog tool."
-        )
-        guest_context = self.context_message(context)
+    def take_usage(self):
+        """Usage the local server reported for this thread's last call (or None); read once."""
+        usage = getattr(self._tls, "usage", None)
+        self._tls.usage = None
+        return usage
+
+    def take_info(self):
+        """What happened in this thread's last suggest(): cache hit, token-limit retry, schema fallback. Read once."""
+        info = getattr(self._tls, "info", None) or {"cached": False, "retried": False, "schemaFallback": False}
+        self._tls.info = None
+        return info
+
+    def clear_cache(self):
+        with self._cache_lock:
+            self._cache.clear()
+
+    def _cache_get(self, key):
+        seconds = self.config["resultCacheSeconds"]
+        if not seconds:
+            return None
+        with self._cache_lock:
+            entry = self._cache.get(key)
+            if entry is None or entry[0] < time.monotonic():
+                self._cache.pop(key, None)
+                return None
+            self._cache.move_to_end(key)
+            return json.loads(json.dumps(entry[1]))
+
+    def _cache_put(self, key, proposal):
+        seconds = self.config["resultCacheSeconds"]
+        if not seconds:
+            return
+        with self._cache_lock:
+            self._cache[key] = (time.monotonic() + seconds, json.loads(json.dumps(proposal)))
+            while len(self._cache) > RESULT_CACHE_MAX:
+                self._cache.popitem(last=False)
+
+    def _payload(self, instruction, guest_context, tokens, schema_mode):
+        if schema_mode:
+            from aiws_model_schema import response_format
+            fmt = response_format()
+        else:
+            fmt = {"type": "json_object"}
         payload = {
-            "model": MODEL_ALIAS, "stream": False,
-            "temperature": 0.1, "max_tokens": 256,
-            "response_format": {"type": "json_object"},
-            "messages": [{"role": "system", "content": system}]
+            "model": MODEL_ALIAS, "stream": False, "temperature": 0.1, "max_tokens": tokens,
+            "response_format": fmt, "cache_prompt": bool(self.config["cachePrompt"]),
+            # The system prompt comes first and never changes: a byte-stable prefix the server can keep cached.
+            "messages": [{"role": "system", "content": system_prompt()}]
                 + ([{"role": "user", "content": guest_context}] if guest_context else [])
                 + [{"role": "user", "content": instruction}],
         }
+        return payload
+
+    def _post(self, payload):
         request = urllib.request.Request(
-            self.url + "/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
+            self.url + "/v1/chat/completions", data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST")
         try:
             with self.opener.open(request, timeout=self.request_timeout) as response:
                 data = response.read(16385)
                 if len(data) > 16384:
                     raise LocalModelError("Local model response size limit exceeded")
+                return data
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400 and payload["response_format"]["type"] == "json_schema":
+                raise _SchemaRejected() from exc
+            raise LocalModelError("Local guest inference service unavailable") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise LocalModelError("Local guest inference service unavailable") from exc
-        try:
-            response = json.loads(data)
-            proposal = json.loads(response["choices"][0]["message"]["content"])
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise LocalModelError("Model returned invalid structured JSON") from exc
-        return self.validate(proposal)
+
+    def suggest(self, instruction, context=None):
+        if not self.status()["configured"]:
+            raise LocalModelError("No local model configured; deterministic guest tools remain available")
+        if not isinstance(instruction, str) or not (1 <= len(instruction) <= MAX_INTENT):
+            raise LocalModelError("Intent must contain 1-1000 characters")
+        guest_context = self.context_message(context)
+        info = {"cached": False, "retried": False, "schemaFallback": False}
+        self._tls.info, self._tls.usage = info, None
+        # The key is the instruction plus the FILE inventory (it decides valid paths). The recent-task list is left out on
+        # purpose: every plan creates a task, so including it would make the cache miss on every repeat.
+        inventory = json.dumps((context or {}).get("guestFiles", []), ensure_ascii=False)
+        key = hashlib.sha256((instruction + "\0" + inventory).encode("utf-8")).hexdigest()
+        hit = self._cache_get(key)
+        if hit is not None:                      # identical request and identical guest inventory: zero tokens
+            info["cached"] = True
+            return hit
+        tokens = max_tokens_for(instruction)
+        schema_mode = self.config["constrainedOutput"] == "json_schema" and self._schema_ok
+        spent_in = spent_out = None
+        proposal = None
+        for _ in range(3):
+            try:
+                data = self._post(self._payload(instruction, guest_context, tokens, schema_mode))
+            except _SchemaRejected:
+                self._schema_ok, schema_mode, info["schemaFallback"] = False, False, True
+                continue
+            try:
+                response = json.loads(data)
+                usage = response.get("usage") if isinstance(response, dict) else None
+                if isinstance(usage, dict):      # reported by llama-server itself; never estimated
+                    ok = lambda v: isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 9
+                    if ok(usage.get("prompt_tokens")):
+                        spent_in = (spent_in or 0) + usage["prompt_tokens"]
+                    if ok(usage.get("completion_tokens")):
+                        spent_out = (spent_out or 0) + usage["completion_tokens"]
+                choice = response["choices"][0]
+                if choice.get("finish_reason") == "length" and tokens < TOKENS_RETRY:
+                    tokens, info["retried"] = TOKENS_RETRY, True      # cut off: one retry with the larger budget
+                    continue
+                proposal = json.loads(choice["message"]["content"])
+                break
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+                raise LocalModelError("Model returned invalid structured JSON") from exc
+        if spent_in is not None or spent_out is not None:
+            self._tls.usage = {"in": spent_in, "out": spent_out}
+        if proposal is None:
+            raise LocalModelError("Model returned invalid structured JSON")
+        result = self.validate_any(proposal)
+        self._cache_put(key, result)
+        return result
+
+
+def _related(a, b):
+    return a == b or a.startswith(b + "/") or b.startswith(a + "/")
+
+def stages_from_proposal(proposal, stat):
+    """Turn a validated proposal into DAG stages. The *controller* fills fingerprints.
+
+    `stat(path)` must return {"sha256": ...} from the real workspace. Plans are chained
+    sequentially. A step may not touch a path an earlier step changes: its fingerprint
+    would be stale, so such plans are refused and must be proposed in smaller pieces.
+    """
+    steps = proposal["steps"] if "steps" in proposal else [proposal]
+    stages, changed, previous = [], [], None
+    single = "steps" not in proposal
+    for index, step in enumerate(steps, 1):
+        tool, args = step["tool"], dict(step["arguments"])
+        if tool in FINGERPRINTED:
+            source = args["path"]
+            if any(_related(source, other) for other in changed):
+                raise LocalModelError("Step %d touches a path changed by an earlier step; propose smaller plans" % index)
+            try:
+                args["expectedSha256"] = stat(source)["sha256"]
+            except (ValueError, OSError, KeyError) as exc:
+                raise LocalModelError("Step %d source is not available in the workspace" % index) from exc
+            if tool != "file.copy":
+                changed.append(source)
+            if "to" in args:
+                changed.append(args["to"])
+        elif tool == "file.mkdir":
+            changed.append(args["path"])
+        key = "inspect" if single and tool in READ_TOOLS else "step%d" % index
+        stages.append({"key": key, "label": step["reason"][:160], "tool": tool,
+                       "arguments": args, "dependsOn": [previous] if previous else []})
+        previous = key
+    return stages

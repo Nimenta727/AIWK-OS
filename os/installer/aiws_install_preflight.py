@@ -57,7 +57,7 @@ def inspect_environment():
     try:
         raw = subprocess.run(
             ["lsblk", "--json", "--bytes", "--output",
-             "PATH,TYPE,SIZE,RM,MOUNTPOINT,MODEL"],
+             "PATH,TYPE,SIZE,RM,MOUNTPOINT,MOUNTPOINTS,FSTYPE,PTTYPE,PTUUID,UUID,MODEL"],
             check=True, capture_output=True, text=True, timeout=10)
         report["candidateUnpartitionedDisks"] = inspect_devices(json.loads(raw.stdout))
     except (OSError, ValueError, subprocess.SubprocessError) as exc:

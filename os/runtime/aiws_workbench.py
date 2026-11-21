@@ -10,25 +10,30 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import socket
+import subprocess
 import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
-from aiws_toolplane import audit, catalog, invoke
+from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_model_registry import GuestModelRegistry
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
-from aiws_local_model import LocalPlanner, LocalModelError
-import subprocess
+from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
+from aiws_events import EventStore, EventError, SAFE_NAME, make_event
+from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
+import aiws_observatory
+from aiws_mandate import MandateStore, MandateError
+from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
+from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 
 HOST = "127.0.0.1"
 PORT = 17640
-READ_ONLY = frozenset({"workspace.tree", "file.read", "code.search", "git.inspect",
-                       "runtime.detect", "browser.local_text", "platform.inspect",
-                       "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
-GUEST_WRITES = frozenset({"file.replace"})
+READ_ONLY = PLANE_READ_TOOLS
+GUEST_WRITES = FILE_WRITE_TOOLS
 # No direct guest write through transient /jobs: use approved durable DAG.
 EXPOSED = READ_ONLY
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
@@ -64,6 +69,138 @@ class Controller:
             self.tasks = GuestTaskStore(state_home / "aiws", singleton=False)
             self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
+        self.events = EventStore(state_home / "aiws-observatory")
+        self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
+        self.supervisor = Supervisor(self.mandates, self.events, self.workspace)
+        if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
+            self._seed_demo()
+
+    def _seed_demo(self):
+        """Development only: replay SYNTHETIC fixtures so the observatory can be seen without a real CLI."""
+        folder = Path(__file__).resolve().parents[1] / "verify" / "fixtures" / "cli"
+        existing = {s["session"] for s in self.events.sessions(200)}
+        for name, cls, session in (("claude_basic", ClaudeStreamAdapter, "demo-claude"),
+                                   ("codex_basic", CodexJsonAdapter, "demo-codex"),
+                                   ("codex_failed", CodexJsonAdapter, "demo-codex-failed")):
+            if session not in existing and (folder / (name + ".jsonl")).is_file():
+                replay(folder / (name + ".jsonl"), cls(session), self.events)
+
+    def _emit(self, agent, prefix, kind, **fields):
+        """Observability must never break a request: failures are swallowed."""
+        try:
+            self.events.append(make_event(time.time(), agent, prefix + "-" + time.strftime("%Y%m%d"), kind, **fields))
+        except (EventError, OSError, ValueError, __import__("sqlite3").Error):
+            pass
+
+    def _emit_local_call(self, outcome):
+        info = self.model.take_info()
+        usage = self.model.take_usage()
+        if info["cached"]:                       # answered from the result cache: zero tokens, which is a fact, not "unknown"
+            self._emit("local", "local", "message", detail="cache-hit")
+            return
+        tokens = ({"in": usage["in"], "out": usage["out"], "cacheRead": None, "cacheWrite": None,
+                   "source": "reported", "scope": "delta"} if usage else {"source": "unknown", "scope": "delta"})
+        self._emit("local", "local", "usage", tokens=tokens)
+        notes = ("+retry" if info["retried"] else "") + ("+schema-fallback" if info["schemaFallback"] else "")
+        self._emit("local", "local", "message", detail=(outcome + notes)[:60])
+
+    # ---- AIWS Code (the IDE) ----
+    IDE_LAUNCHER = "/usr/local/bin/aiws-code"
+    IDE_ENV = ("HOME", "PATH", "LANG", "DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
+               "DBUS_SESSION_BUS_ADDRESS", "AIWS_CODE_ROOT", "AIWS_CODE_PORT")
+
+    def ide_status(self):
+        root = Path(os.environ.get("AIWS_CODE_ROOT", "/opt/aiws-code"))
+        installed = (root / "bin/aiws-code-server").is_file() and (root / "out/server-main.js").is_file()
+        port = int(os.environ.get("AIWS_CODE_PORT", "18090"))
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.3).close()
+            running = True
+        except OSError:
+            running = False
+        version = None
+        try:
+            version = json.loads((root / "PROVENANCE.json").read_text(encoding="utf-8")).get("upstreamTag")
+        except (OSError, ValueError, AttributeError):
+            pass
+        launcher = getattr(self, "ide_launcher", self.IDE_LAUNCHER)
+        return {"installed": installed, "launcherPresent": Path(launcher).is_file(), "running": running,
+                "version": version if isinstance(version, str) and len(version) <= 32 else None, "port": port}
+
+    def ide_open(self):
+        """Start AIWS Code (fixed command, no user-supplied arguments). Already running: nothing is started."""
+        status = self.ide_status()
+        if not status["installed"] or not status["launcherPresent"]:
+            raise SupervisorError("AIWS Code is not installed in this image (see os/ide/README.md)")
+        if status["running"]:
+            return {"started": False, "running": True}
+        now = time.monotonic()
+        if now - getattr(self, "_ide_last", -10) < 5:
+            return {"started": False, "running": False, "starting": True}
+        self._ide_last = now
+        env = {k: os.environ[k] for k in self.IDE_ENV if k in os.environ}
+        env["AIWS_WORKSPACE"] = str(self.workspace)
+        subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
+        return {"started": True, "running": False}
+
+    # ---- builder (official CLI under a user mandate) ----
+    @staticmethod
+    def _mandate_view(m):
+        keys = ("id", "provider", "projectDir", "allowedTools", "permissionMode", "maxTurns", "tokenBudget",
+                "wallClockMinutes", "needApprovalFor", "requireMetering", "expires", "state", "used")
+        return {k: m[k] for k in keys}
+
+    def builder_overview(self):
+        try:
+            config = load_builder_config()
+        except SupervisorError:
+            config = {"enabled": False, "envAllow": []}
+        providers = {name: {"installed": shutil.which(name) is not None} for name in ("claude", "codex")}
+        return {"enabled": config["enabled"], "providers": providers,
+                "mandates": [self._mandate_view(m) for m in self.mandates.active()],
+                "status": self.supervisor.status()}
+
+    def builder_grant(self, payload):
+        if not load_builder_config()["enabled"]:
+            raise PermissionError("The builder is disabled (enable it in ~/.config/aiws/builder.json)")
+        return self._mandate_view(self.mandates.grant(payload))
+
+    def builder_start(self, mandate_id, prompt):
+        return self.supervisor.start(mandate_id, prompt)
+
+    def observatory(self):
+        overview = self.tasks.overview()
+        sessions = self.events.sessions(30)
+        try:
+            router = load_config()
+        except RouterError:
+            router = {"externalEnabled": False}
+        recent = [{"ts": a["ts"], "source": "task", "label": a["action"] + (" · " + a["tool"] if a["tool"] else ""),
+                   "status": "error" if a["action"].endswith("failed") else "ok"} for a in overview["activity"]]
+        for e in self.events.recent(12):
+            recent.append({"ts": e["ts"], "source": e["agent"],
+                           "label": e["kind"] + (" · " + e["tool"] if e.get("tool") else ""),
+                           "status": e.get("status", "ok")})
+        recent.sort(key=lambda x: -x["ts"])
+        try:
+            builder_enabled = load_builder_config()["enabled"]
+        except SupervisorError:
+            builder_enabled = False
+        status = self.supervisor.status()
+        active = status["active"]
+        mandates = self.mandates.active()
+        in_use = next((m for m in mandates if active and m["id"] == active["mandateId"]), mandates[0] if mandates else None)
+        run_approvals = ([{"runId": active["runId"], **{k: active["pending"][k] for k in ("category", "tool", "detail")}}]
+                         if active and active["pending"] else [])
+        builder = {"state": ("disabled" if not builder_enabled else active["state"] if active else "idle"),
+                   "enabled": builder_enabled, "runId": active["runId"] if active else None,
+                   "turns": active["turns"] if active else 0}
+        return aiws_observatory.build_summary(
+            sessions=sessions, overview=overview, audit=self.tasks.verify_audit(), model=self.model.status(),
+            router=router, demo=any(s["session"].startswith("demo-") for s in sessions), recent_events=recent[:16],
+            builder=builder, run_approvals=run_approvals,
+            budget=aiws_observatory.budget_view(in_use, active["usedInput"] if active else 0, active["usedOutput"] if active else 0))
 
     def health(self):
         agent_health = self.agent.request("health") if self.agent is not None else {}
@@ -189,8 +326,10 @@ class Controller:
             else:
                 tree=invoke("workspace.tree", {"path": "."})
             rows=self.tasks.list()
-            files=[str(f)[:96] for f in tree.get("files", [])[:24]
-                   if isinstance(f, str) and 0 < len(f) <= 96]
+            folders=[str(d)[:94] + "/" for d in tree.get("dirs", [])[:8]
+                     if isinstance(d, str) and 0 < len(d) <= 94]
+            files=folders + [str(f)[:96] for f in tree.get("files", [])[:24 - len(folders)]
+                             if isinstance(f, str) and 0 < len(f) <= 96]
             tasks=[{"id":str(t["id"])[:48], "title":str(t["title"])[:80]}
                    for t in rows[:8] if isinstance(t, dict)
                    and isinstance(t.get("id"), str)
@@ -205,24 +344,109 @@ class Controller:
         return self.model.suggest(
             instruction, context=self.local_guest_context() if configured else None)
 
+    def route_decision(self, instruction):
+        """Side-effect free: no model call, no task, no network. Rules only."""
+        return classify(instruction, load_config())
+
+    @staticmethod
+    def _route_record(decision):
+        keys = ("route", "rule", "agent", "instructionSha256", "forbidden", "externalAllowed", "externalEnabled")
+        return {k: decision[k] for k in keys}
+
     def model_plan(self, instruction):
-        """Persist but do not execute a validated, read-only local model plan."""
-        proposal = self.local_suggest(instruction)
+        """Route first (rules), then persist a validated local model plan. Read-only leading
+        stages run automatically; every file-changing stage waits for an explicit approval."""
+        decision = self.route_decision(instruction)
+        self._emit("router", "router", "message", detail=("%s/%s" % (decision["route"], decision["rule"]))[:60])
+        if decision["route"] != "local":
+            # Not a local-model task: nothing is sent anywhere; the user decides what to do next.
+            return {"routed": decision["route"], "decision": decision, "executed": False}
+        try:
+            proposal = self.local_suggest(instruction)
+        except LocalModelError as exc:
+            message = str(exc)
+            self._emit_local_call("failed")
+            outcome = "unavailable" if ("unavailable" in message.lower() or "No local model" in message) else "invalid"
+            return {"routed": "local-failed", "decision": decision, "outcome": outcome,
+                    "followUp": after_local(decision, outcome), "error": message[:200], "executed": False}
+        self._emit_local_call("refused" if proposal["tool"] == "refuse" else "planned")
         if proposal["tool"] == "refuse":
-            # Explicit refusals are terminal decisions, never DAG tool nodes.
-            return {"refused": True, "proposal": proposal, "executed": False}
+            # Explicit refusals are terminal decisions, never DAG tool nodes, never escalated.
+            return {"refused": True, "proposal": proposal, "executed": False,
+                    "decision": decision, "followUp": after_local(decision, "refused")}
         if self.agent is not None:
-            # Production: independent systemd user Agent revalidates the model
-            # output, owns durable state and records prompt/proposal hashes.
-            return self.tasks.model_plan(instruction, proposal)
-        stage = {"key": "inspect", "label": proposal["reason"][:160],
-                 "tool": proposal["tool"], "arguments": proposal["arguments"],
-                 "dependsOn": []}
-        saved = self.tasks.create(
-            ("Local proposal: " + proposal["tool"])[:160], proposal["reason"], [stage])
-        self.tasks.record_model_proposal(
-            saved["task"]["id"], "aiws-local", instruction, proposal)
-        return self.tasks.get(saved["task"]["id"])
+            # Production: independent systemd user Agent revalidates the raw model output,
+            # computes fingerprints, owns durable state and records prompt/proposal hashes.
+            doc = self.tasks.model_plan(instruction, LocalPlanner.canonical(proposal))
+        else:
+            stages = stages_from_proposal(proposal, lambda p: invoke("file.stat", {"path": p}))
+            title = ("Local plan: %d steps" % len(stages)) if "steps" in proposal \
+                else ("Local proposal: " + proposal["tool"])
+            saved = self.tasks.create(title[:160], proposal["reason"], stages)
+            self.tasks.record_model_proposal(
+                saved["task"]["id"], "aiws-local", instruction, proposal)
+            doc = self.tasks.get(saved["task"]["id"])
+        try:
+            doc = self.tasks.route(doc["task"]["id"], self._route_record(decision)) if self.agent is not None \
+                else self.tasks.record_route(doc["task"]["id"], self._route_record(decision))
+        except TaskError:
+            pass   # routing evidence is best effort; the plan itself is already durable
+        self._autorun_reads(doc["task"]["id"])
+        return doc
+
+    def create_handoff(self, instruction, agent):
+        """Prepare (never send) an external-CLI handoff file. Needs config, a permitted request
+        and, afterwards, explicit approval of the file-writing stages."""
+        config = load_config()
+        decision = classify(instruction, config)
+        if agent not in ("claude", "codex", "dual"):
+            raise ValueError("Unknown external agent")
+        wanted = ("claude", "codex") if agent == "dual" else (agent,)
+        if (not config["externalEnabled"] or not decision["externalAllowed"]
+                or any(not config["providers"].get(name) for name in wanted)):
+            raise PermissionError("External handoff is not permitted for this request or configuration")
+        tree = self.file_tools.invoke("workspace.tree", {"path": "."}) if self.file_tools is not None \
+            else invoke("workspace.tree", {"path": "."})
+        handoff = build_handoff(instruction, agent, decision, [f for f in tree.get("files", []) if isinstance(f, str)])
+        try:
+            (self.file_tools.invoke("file.stat", {"path": "handoff"}) if self.file_tools is not None
+             else invoke("file.stat", {"path": "handoff"}))
+            folder_exists = True
+        except (ValueError, OSError):
+            folder_exists = False
+        saved = self.tasks.create(("Handoff for " + agent)[:160],
+                                  "Prepare a reviewable handoff file for an official CLI. Nothing is sent.",
+                                  handoff_stages(handoff, folder_exists))
+        record = {**self._route_record(decision), "route": "external", "rule": "L2-handoff", "agent": agent}
+        try:
+            self.tasks.route(saved["task"]["id"], record) if self.agent is not None \
+                else self.tasks.record_route(saved["task"]["id"], record)
+        except TaskError:
+            pass
+        return {"task": saved["task"], "stages": saved["stages"], "handoff": {
+            "path": handoff["path"], "sha256": handoff["sha256"], "dataShared": handoff["dataShared"]}}
+
+    def _autorun_reads(self, task_id):
+        """Run the leading local read-only stages; stop at the first stage that needs approval."""
+        def work():
+            try:
+                for stage in self.tasks.get(task_id)["stages"]:
+                    if stage["tool"] not in PLANE_READ_TOOLS:
+                        return
+                    if stage["state"] != "pending":
+                        continue
+                    self.dispatch_stage(task_id, stage["stage_key"])
+                    deadline = time.time() + 60
+                    state = "queued"
+                    while time.time() < deadline and state in ("queued", "running"):
+                        time.sleep(0.1)
+                        state = next(s["state"] for s in self.tasks.get(task_id)["stages"]
+                                     if s["stage_key"] == stage["stage_key"])
+                    if state != "completed":
+                        return
+            except Exception:  # background convenience must never take the server down
+                return
+        threading.Thread(target=work, daemon=True, name="aiws-autorun").start()
 
     def import_windows(self, payload):
         if not isinstance(payload,dict) or set(payload)!={"task"}:
@@ -308,6 +532,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(503, {"error": str(exc)[:240]})
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path in ("/api/v1/workspace/stat", "/api/v1/workspace/trash"):
+            from urllib.parse import parse_qs
+            if path.endswith("/stat"):
+                paths = parse_qs(urlsplit(self.path).query).get("path", [])
+                if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
+                    return self.reply(400, {"error": "One bounded guest-workspace path required"})
+                tool, args = "file.stat", {"path": paths[0]}
+            else:
+                tool, args = "file.trashList", {}
+            try:
+                result = (app.file_tools.invoke(tool, args)
+                          if app.file_tools is not None else invoke(tool, args))
+                if app.file_tools is None:
+                    audit(tool, args, True)
+                return self.reply(200, result)
+            except AgentUnavailable as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
+            except (ValueError, OSError, PermissionError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/workspace/file":
             from urllib.parse import parse_qs
             paths = parse_qs(urlsplit(self.path).query).get("path", [])
@@ -360,6 +603,32 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, app.guest_ops.execute("kernel.inspect", {}))
             except (PermissionError, ValueError, OSError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/observatory":
+            try:
+                return self.reply(200, app.observatory())
+            except (AgentUnavailable, AgentError) as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
+        if path == "/api/v1/observatory/events":
+            from urllib.parse import parse_qs
+            query = parse_qs(urlsplit(self.path).query)
+            session = (query.get("session") or [""])[0]
+            try:
+                after = int((query.get("after") or ["0"])[0])
+            except ValueError:
+                return self.reply(400, {"error": "after must be an integer"})
+            if not SAFE_NAME.match(session) or after < 0:
+                return self.reply(400, {"error": "A valid session id is required"})
+            return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/ide":
+            return self.reply(200, app.ide_status())
+        if path == "/api/v1/builder":
+            return self.reply(200, app.builder_overview())
+        if path == "/api/v1/route/config":
+            try:
+                config = load_config()
+            except RouterError as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+            return self.reply(200, {"config": config, "file": "~/.config/aiws/routes.json", "editableInUi": False})
         if path == "/api/v1/model/status":
             return self.reply(200, app.model.status())
         if path == "/api/v1/health":
@@ -402,7 +671,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/tasks/import/windows") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open") and not (
+                len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
+                    (route[3] == "mandates" and route[5] == "revoke") or
+                    (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -437,6 +709,35 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/ide/open":
+                if payload:
+                    raise ValueError("No arguments allowed")
+                result = app.ide_open()
+            elif path == "/api/v1/builder/mandates":
+                result = app.builder_grant(payload)
+            elif path == "/api/v1/builder/runs":
+                if set(payload) != {"mandateId", "prompt"}:
+                    raise ValueError("Expected mandateId and prompt")
+                result = app.builder_start(payload["mandateId"], payload["prompt"])
+            elif route[:3] == ["api", "v1", "builder"]:
+                if payload:
+                    raise ValueError("No arguments allowed")
+                if route[3] == "mandates":
+                    result = app._mandate_view(app.mandates.revoke(route[4]))
+                elif route[5] == "stop":
+                    app.supervisor.stop(route[4])
+                    result = {"stopped": True}
+                else:
+                    app.supervisor.decide(route[4], route[5] == "approve")
+                    result = {"decided": route[5]}
+            elif path == "/api/v1/route":
+                if set(payload) != {"instruction"}:
+                    raise ValueError("Expected instruction")
+                result = app.route_decision(payload["instruction"])
+            elif path == "/api/v1/route/handoff":
+                if set(payload) != {"instruction", "agent"}:
+                    raise ValueError("Expected instruction and agent")
+                result = app.create_handoff(payload["instruction"], payload["agent"])
             elif path == "/api/v1/model/plan":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")
@@ -457,6 +758,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(503, {"error": str(exc)[:240]})
         except PermissionError as exc:
             return self.reply(403, {"error": str(exc)[:240]})
+        except SupervisorError as exc:
+            return self.reply(409, {"error": str(exc)[:240]})
         except (ValueError, KeyError, TypeError) as exc:
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)

@@ -19,13 +19,9 @@ import time
 from aiws_guest_boundary import require_guest_runtime
 from aiws_guest_ops import READ_TOOLS as GUEST_READ, TOOLS as GUEST_TOOLS, validate as validate_guest
 from aiws_tasks import WRITE_TOOLS, TOOLS as STAGE_TOOLS
-from aiws_toolplane import catalog as tool_catalog
+from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS
 
-DIRECT_READ = frozenset({
-    "workspace.tree", "file.read", "code.search", "git.inspect",
-    "runtime.detect", "browser.local_text", "platform.inspect",
-    "code.symbols", "code.references", "code.dependencies", "code.platformApis"
-}) | GUEST_READ
+DIRECT_READ = PLANE_READ_TOOLS | GUEST_READ
 MAX_TASK_WRITES = 8
 MAX_RECENT_WRITES = 24
 RECENT_SECONDS = 3600

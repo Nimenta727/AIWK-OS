@@ -115,5 +115,36 @@ class StandaloneAgentTests(unittest.TestCase):
                 "key":"host","label":"Bad","tool":"host.exec",
                 "arguments":{},"dependsOn":[]}]})
 
+    def test_agent_builds_fingerprinted_plan_from_raw_model_output_only(self):
+        import hashlib
+        raw={"steps":[{"tool":"system.info","arguments":{},"reason":"check"},
+                      {"tool":"file.move","arguments":{"path":"source.txt","to":"moved.txt"},
+                       "reason":"rename"}],"reason":"rename the file"}
+        doc=self.client.request("task.model",{"instruction":"rename source","proposal":raw})
+        self.assertEqual([s["tool"] for s in doc["stages"]],["system.info","file.move"])
+        self.assertEqual(doc["stages"][1]["arguments"]["expectedSha256"],
+                         hashlib.sha256(b"Guest only").hexdigest())
+        self.assertEqual(doc["stages"][1]["approval"],0)          # needs explicit approval
+        self.assertEqual(doc["stages"][1]["dependsOn"],["step1"])
+        self.assertTrue((self.workspace/"source.txt").exists())   # nothing executed
+        # A model-supplied fingerprint, a non-canonical (already validated) dict, or a
+        # file the Agent cannot see must all be refused.
+        bad=[{"tool":"file.move","arguments":{"path":"source.txt","to":"x","expectedSha256":"0"*64},"reason":"r"},
+             {"tool":"file.stat","arguments":{"path":"source.txt"},"reason":"r","requiresReview":True},
+             {"tool":"file.trash","arguments":{"path":"missing.txt"},"reason":"r"}]
+        for proposal in bad:
+            with self.assertRaises(AgentError):
+                self.client.request("task.model",{"instruction":"x","proposal":proposal})
+
+    def test_new_local_read_tools_pass_agent_and_broker(self):
+        (self.workspace/"downloads").mkdir()
+        (self.workspace/"downloads"/"a.iso").write_bytes(b"1234")
+        listing=self.client.request("tool.read",{"tool":"download.list","arguments":{}})
+        self.assertEqual(listing["downloads"][0]["path"],"downloads/a.iso")
+        self.assertIn("memory",self.client.request("tool.read",{"tool":"system.info","arguments":{}}))
+        self.assertFalse(self.client.request("tool.read",{"tool":"network.status","arguments":{}})["activeProbe"])
+        with self.assertRaises(AgentError):
+            self.client.request("tool.read",{"tool":"download.start","arguments":{"url":"https://example.com"}})
+
 if __name__=="__main__":
     unittest.main()

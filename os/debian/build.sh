@@ -30,11 +30,17 @@ case "${AIWS_OS_PROFILE:-full}" in
   smoke)
     # Real bootable XFCE+Agent+React ISO with fewer optional compilers.
     cp -- "$repo/os/debian/profiles/smoke.list.chroot" "$out/config/package-lists/aiws-desktop.list.chroot"
+    rm -f -- "$out/config/package-lists/aiws-devtools.list.chroot"   # the developer toolchain belongs to the full profile only
     ;;
   *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
 esac
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
-cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$repo/os/runtime/aiws_guest_boundary.py" "$repo/os/runtime/aiws_tasks.py" "$repo/os/runtime/aiws_local_model.py" "$repo/os/runtime/aiws_guest_ops.py" "$repo/os/runtime/aiws_model_registry.py" "$repo/os/runtime/aiws_agent_service.py" "$repo/os/runtime/aiws_agent_client.py" "$repo/os/runtime/aiws_permission_broker.py" "$repo/os/runtime/aiws_boot_slots.py" "$repo/os/runtime/aiws_windows_compat.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+# Runtime modules come from os/runtime/MODULES (single source of truth; checked by test_runtime_manifest.py)
+while IFS= read -r module; do
+  case "$module" in ''|'#'*) continue;; esac
+  case "$module" in aiws_*.py) ;; *) echo "Bad entry in os/runtime/MODULES: $module" >&2; exit 2;; esac
+  cp -a -- "$repo/os/runtime/$module" "$out/config/includes.chroot/usr/local/lib/aiws/$module"
+done < "$repo/os/runtime/MODULES"
 cp -- "$repo/os/verify/aiws_guest_lifecycle_smoke.py" "$out/config/includes.chroot/usr/local/lib/aiws/aiws_guest_lifecycle_smoke.py"
 ui="$repo/desktop/AIWorkstation.Frontend/dist"
 if [[ ! -s "$ui/index.html" ]]; then
@@ -82,11 +88,38 @@ if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF || -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
       "$out/config/includes.chroot/usr/local/lib/aiws/guest_benchmark.py"
     install -m 0444 "$repo/os/model/ci/heldout_v1.jsonl" \
       "$out/config/includes.chroot/usr/local/lib/aiws/aiws_model_heldout.jsonl"
+    install -m 0444 "$repo/os/model/ci/heldout_v2.jsonl" \
+      "$out/config/includes.chroot/usr/local/lib/aiws/aiws_model_heldout_v2.jsonl"
     mkdir -p "$out/config/includes.chroot/etc/aiws"
     printf 'AIWS_MODEL_CI_ONLY=1\n' \
       > "$out/config/includes.chroot/etc/aiws/guest-model-acceptance"
     echo "Strict real-model guest QEMU acceptance enabled for disposable CI only."
   fi
+fi
+
+# Builder lane (step O4): root-run self-test, correct modes for sudoers/firewall files.
+install -d -m 0755 "$out/config/includes.chroot/usr/local/sbin"
+install -m 0755 "$repo/os/builder/aiws_builder_selftest.py" "$out/config/includes.chroot/usr/local/sbin/aiws-builder-selftest"
+chmod 0440 "$out/config/includes.chroot/etc/sudoers.d/aiws-builder"
+chmod 0644 "$out/config/includes.chroot/etc/aiws/builder-firewall.nft" "$out/config/includes.chroot/etc/aiws/egress-allow.conf"
+# AIWS Code (Code - OSS based IDE): launcher, icons and, only if a verified tarball is supplied, the program itself.
+install -d -m 0755 "$out/config/includes.chroot/usr/share/icons/hicolor/256x256/apps" "$out/config/includes.chroot/usr/share/icons/hicolor/scalable/apps"
+install -m 0644 "$repo/os/ide/branding/icon-256.png" "$out/config/includes.chroot/usr/share/icons/hicolor/256x256/apps/aiws-code.png"
+install -m 0644 "$repo/os/ide/branding/aiws-code.svg" "$out/config/includes.chroot/usr/share/icons/hicolor/scalable/apps/aiws-code.svg"
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-code"
+if [[ -v AIWS_CODE_TARBALL ]]; then
+  [[ "${AIWS_CODE_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || { echo "ERROR: AIWS_CODE_SHA256 must be the tarball's SHA-256" >&2; exit 2; }
+  [[ -f "$AIWS_CODE_TARBALL" && ! -L "$AIWS_CODE_TARBALL" ]] || { echo "ERROR: AIWS_CODE_TARBALL must be a plain local file" >&2; exit 2; }
+  [[ "$(sha256sum -- "$AIWS_CODE_TARBALL" | cut -d' ' -f1)" == "$AIWS_CODE_SHA256" ]] || { echo "ERROR: AIWS Code checksum mismatch" >&2; exit 2; }
+  command -v zstd >/dev/null || { echo "Missing build dependency: zstd" >&2; exit 1; }
+  mkdir -p -- "$out/config/includes.chroot/opt/aiws-code"
+  zstd -dc -- "$AIWS_CODE_TARBALL" | tar -x --strip-components=1 -C "$out/config/includes.chroot/opt/aiws-code"
+  for legal in LICENSE.txt ThirdPartyNotices.txt AIWS-NOTICE.md; do
+    [[ -s "$out/config/includes.chroot/opt/aiws-code/$legal" ]] || { echo "ERROR: $legal is missing from the AIWS Code package: refusing to ship without the license files" >&2; exit 2; }
+  done
+  echo "AIWS Code included in the image (verified SHA-256)."
+else
+  echo "NOTE: no AIWS_CODE_TARBALL given: the image contains the launcher but not the editor itself."
 fi
 
 chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-broker" \

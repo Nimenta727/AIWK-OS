@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"c-123","model":"claude-example","tools":["Bash","Edit"]}
+{"type":"assistant","message":{"id":"msg_1","content":[{"type":"text","text":"SENTINEL-TEXT-ONE I will run the tests"},{"type":"tool_use","id":"tu_1","name":"Bash","input":{"command":"export API_KEY=sk-abc123 && npm test"}}],"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":500,"cache_creation_input_tokens":0}}}
+{"type":"assistant","message":{"id":"msg_1","content":[{"type":"tool_use","id":"tu_1b","name":"Read","input":{"file_path":"src/app.js"}}],"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":500,"cache_creation_input_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_1","content":"SENTINEL-TOOL-OUTPUT","is_error":false},{"type":"tool_result","tool_use_id":"tu_1b","content":"x","is_error":true}]}}
+{"type":"stream_event","event":{"type":"content_block_delta"}}
+{"type":"assistant","message":{"id":"msg_2","content":[{"type":"text","text":"SENTINEL-TEXT-TWO done"}],"usage":{"input_tokens":150,"output_tokens":40,"cache_read_input_tokens":600}}}
+{"type":"result","subtype":"success","is_error":false,"session_id":"c-123","num_turns":2,"total_cost_usd":0.0123,"usage":{"input_tokens":250,"output_tokens":60,"cache_read_input_tokens":1100,"cache_creation_input_tokens":0}}
