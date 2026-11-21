@@ -10,10 +10,44 @@ for cmd in sgdisk mkfs.fat mcopy mmd qemu-system-x86_64 xorriso; do
   command -v "$cmd" >/dev/null || { echo "Missing CI boot dependency: $cmd" >&2; exit 1; }
 done
 test -s "$iso"
-bootefi="$(find /usr/lib/systemd/boot/efi /usr/share/systemd/boot/efi -name 'systemd-bootx64.efi' -type f 2>/dev/null | head -n 1)"
-ovmf_code="$(find /usr/share/OVMF -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' | head -n 1)"
-ovmf_vars="$(find /usr/share/OVMF -name 'OVMF_VARS_4M.fd' -o -name 'OVMF_VARS.fd' | head -n 1)"
-test -s "$bootefi" && test -s "$ovmf_code" && test -s "$ovmf_vars"
+# Avoid find | head with pipefail when a distro-specific search directory is
+# absent. Ubuntu 26.10 also ships signed .efi variants on some runners.
+bootefi=""
+for file in \
+  /usr/lib/systemd/boot/efi/systemd-bootx64.efi \
+  /usr/lib/systemd/boot/efi/systemd-bootx64.efi.signed \
+  /usr/share/systemd/boot/efi/systemd-bootx64.efi \
+  /usr/lib/systemd/boot/efi/systemd-bootx64.efi.stub; do
+  if [[ -s "$file" ]]; then bootefi="$file"; break; fi
+done
+ovmf_code=""
+ovmf_vars=""
+for folder in /usr/share/OVMF /usr/share/ovmf /usr/share/qemu; do
+  for pair in 4M normal; do
+    if [[ "$pair" == "4M" ]]; then
+      candidate_code="$folder/OVMF_CODE_4M.fd"
+      candidate_vars="$folder/OVMF_VARS_4M.fd"
+    else
+      candidate_code="$folder/OVMF_CODE.fd"
+      candidate_vars="$folder/OVMF_VARS.fd"
+    fi
+    if [[ -s "$candidate_code" && -s "$candidate_vars" ]]; then
+      ovmf_code="$candidate_code"
+      ovmf_vars="$candidate_vars"
+      break
+    fi
+  done
+  [[ -n "$ovmf_code" ]] && break
+done
+if [[ -z "$bootefi" || -z "$ovmf_code" || -z "$ovmf_vars" ]]; then
+  echo "AIWS_AB_PRECHECK_FAIL: systemd-boot/OVMF firmware pair not found" >&2
+  for folder in /usr/lib/systemd/boot/efi /usr/share/systemd/boot/efi /usr/share/OVMF /usr/share/ovmf /usr/share/qemu; do
+    if [[ -d "$folder" ]]; then ls -la "$folder" | head -n 80 >&2 || true; fi
+  done
+  exit 1
+fi
+printf 'AIWS_AB_FIRMWARE: loader=%s code=%s vars=%s\n' "$bootefi" "$ovmf_code" "$ovmf_vars"
+
 cp "$ovmf_vars" "$out/ovmf-vars.fd"
 xorriso -osirrox on -indev "$iso" -extract /live "$out/live"
 kernel="$(find "$out/live" -maxdepth 1 -type f -name 'vmlinuz*' | head -n 1)"
