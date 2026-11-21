@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AIWS Code
+GenericName=Code Editor
+Comment=Source code editor and IDE (open-source build for AIWS OS)
+Exec=/usr/local/bin/aiws-code
+Icon=aiws-code
+Terminal=false
+Categories=Development;IDE;TextEditor;
+Keywords=code;editor;ide;programming;
+StartupNotify=true

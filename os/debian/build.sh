@@ -97,6 +97,26 @@ install -d -m 0755 "$out/config/includes.chroot/usr/local/sbin"
 install -m 0755 "$repo/os/builder/aiws_builder_selftest.py" "$out/config/includes.chroot/usr/local/sbin/aiws-builder-selftest"
 chmod 0440 "$out/config/includes.chroot/etc/sudoers.d/aiws-builder"
 chmod 0644 "$out/config/includes.chroot/etc/aiws/builder-firewall.nft" "$out/config/includes.chroot/etc/aiws/egress-allow.conf"
+# AIWS Code (Code - OSS based IDE): launcher, icons and, only if a verified tarball is supplied, the program itself.
+install -d -m 0755 "$out/config/includes.chroot/usr/share/icons/hicolor/256x256/apps" "$out/config/includes.chroot/usr/share/icons/hicolor/scalable/apps"
+install -m 0644 "$repo/os/ide/branding/icon-256.png" "$out/config/includes.chroot/usr/share/icons/hicolor/256x256/apps/aiws-code.png"
+install -m 0644 "$repo/os/ide/branding/aiws-code.svg" "$out/config/includes.chroot/usr/share/icons/hicolor/scalable/apps/aiws-code.svg"
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-code"
+if [[ -v AIWS_CODE_TARBALL ]]; then
+  [[ "${AIWS_CODE_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || { echo "ERROR: AIWS_CODE_SHA256 must be the tarball's SHA-256" >&2; exit 2; }
+  [[ -f "$AIWS_CODE_TARBALL" && ! -L "$AIWS_CODE_TARBALL" ]] || { echo "ERROR: AIWS_CODE_TARBALL must be a plain local file" >&2; exit 2; }
+  [[ "$(sha256sum -- "$AIWS_CODE_TARBALL" | cut -d' ' -f1)" == "$AIWS_CODE_SHA256" ]] || { echo "ERROR: AIWS Code checksum mismatch" >&2; exit 2; }
+  command -v zstd >/dev/null || { echo "Missing build dependency: zstd" >&2; exit 1; }
+  mkdir -p -- "$out/config/includes.chroot/opt/aiws-code"
+  zstd -dc -- "$AIWS_CODE_TARBALL" | tar -x --strip-components=1 -C "$out/config/includes.chroot/opt/aiws-code"
+  for legal in LICENSE.txt ThirdPartyNotices.txt AIWS-NOTICE.md; do
+    [[ -s "$out/config/includes.chroot/opt/aiws-code/$legal" ]] || { echo "ERROR: $legal is missing from the AIWS Code package: refusing to ship without the license files" >&2; exit 2; }
+  done
+  echo "AIWS Code included in the image (verified SHA-256)."
+else
+  echo "NOTE: no AIWS_CODE_TARBALL given: the image contains the launcher but not the editor itself."
+fi
+
 chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-broker" \
   "$out/config/includes.chroot/usr/local/bin/aiws-agent" \
   "$out/config/includes.chroot/usr/local/bin/aiws-session" \
