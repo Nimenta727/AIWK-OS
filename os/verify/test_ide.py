@@ -149,7 +149,10 @@ class BrandingTests(unittest.TestCase):
         for forbidden in ("microsoft", "visual studio", "vscode", "vs code"):
             self.assertNotIn(forbidden, svg.lower().replace("not derived from any microsoft or third-party logo", ""))
         self.assertIn("Original AIWS artwork", svg)
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow is not installed; the SVG checks above still ran")
         self.assertEqual(Image.open(IDE / "branding/icon-512.png").size, (512, 512))
         self.assertEqual(Image.open(IDE / "branding/icon-192.png").size, (192, 192))
         self.assertEqual(Image.open(IDE / "branding/icon-256.png").size, (256, 256))

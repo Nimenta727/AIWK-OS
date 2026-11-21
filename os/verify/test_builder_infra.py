@@ -84,6 +84,8 @@ class FirewallTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile("w", suffix=".nft") as f:
             f.write(self.ruleset("nobody")); f.flush()
             r = subprocess.run(["nft", "-c", "-f", f.name], capture_output=True, text=True)
+            if r.returncode != 0 and "Operation not permitted" in r.stderr:
+                self.skipTest("nft needs CAP_NET_ADMIN even for a dry run; not available in this environment")
             self.assertEqual(r.returncode, 0, r.stderr)
 
     @unittest.skipUnless(can_netns(), "needs root, unshare -n and nft (real kernel test)")

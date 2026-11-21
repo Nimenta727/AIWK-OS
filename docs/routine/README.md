@@ -109,3 +109,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 12:12 — 工具审批机制底层：app.launch 审批 + 桌面启动器 + 声明式外部只读工具](2026-11-21_121203-tool-approval-foundation.md)
 - [2026-11-21 12:26 — 数据集 v3：集成工具（app.launch、doc.text、ext.* 及新拒绝类）](2026-11-21_122636-dataset-v3-integrated-tools.md)
 - [2026-11-21 12:38 — 旧代码移入 Git 历史、文档归档、前端精简](2026-11-21_123828-legacy-removal-docs-history.md)
+- [2026-11-21 12:46 — 发行工作流、README 重写、CI 修复](2026-11-21_124605-release-workflow-readme-ci-fixes.md)

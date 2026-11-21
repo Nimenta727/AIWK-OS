@@ -10,7 +10,7 @@
 | Code - OSS（microsoft/vscode 源码） | AIWS Code 编辑器 | MIT，版权归 Microsoft Corporation 等 | 仅按固定提交在构建时获取；构建产物必须附带上游 `LICENSE.txt` 与 `ThirdPartyNotices.txt`（`build.sh` 缺失即拒绝）；不使用其商标、图标、市场、更新/遥测服务。见 `os/ide/NOTICE.md` |
 | Open VSX（扩展注册表，服务端） | AIWS Code 的扩展来源 | 注册表由 Eclipse Foundation 运营；各扩展各有许可 | 仅作为可配置的网络端点；不内置任何扩展 |
 | llama.cpp | 本地小模型推理 | MIT | 运行时按需获取/调用，不在仓库内 |
-| 模型权重（GGUF，如 Qwen 系列） | 本地小模型 | **以各模型卡片为准，发行前必须逐项确认** | 权重不入库；是否可再分发待确认 |
+| Qwen3.5-2B（Alibaba Qwen，Q4_K_M GGUF 量化，来源 SoAIHQ/Qwen3.5-2B-GGUF） | 本地小模型 | **Apache-2.0**（2026-11-21 核对 Hugging Face 模型卡：原模型与 GGUF 仓库均声明 apache-2.0，原模型仓库含 Apache-2.0 LICENSE 全文） | 权重不入库；测试版 ISO 随附 `QWEN-LICENSE.txt` 并记录 sha256；量化版由第三方社区制作，仅按其声明的许可分发 |
 | Debian 13 软件包（内核、gcc、Python、Node.js、Go、Rust、JDK、clang 等） | 系统与开发工具链 | 各包各自许可（GPL/LGPL/MPL/Apache/MIT 等混合） | 只写入**包名**，由构建时的 Debian 镜像下载；对外分发 ISO 前须满足源码提供等义务 |
 | Linux 内核 | 系统内核 | GPL-2.0-only | 来自 Debian 包 |
 | React、React DOM | 前端 | MIT | npm 依赖 |
@@ -27,6 +27,6 @@
 
 1. 为前端补 `package-lock.json`，并对 npm 依赖树生成许可清单。
 2. 对最终 ISO/镜像生成 SBOM（例如对 squashfs 内的 dpkg 数据库导出），核对每个包的许可与「是否需要提供源码」。
-3. 逐项确认本地模型权重的许可是否允许分发或必须由用户自行下载。
+3. ~~模型权重许可~~ 已核对为 Apache-2.0（见上表）；仍应在每次更换权重/量化来源时重新核对。
 4. ~~根 NOTICE~~ 已补（`NOTICE`）。仓库所有提交均来自仓库所有者的账户（含其委托的助手提交），LICENSE 由所有者本人于 2026-11-21 添加为 Apache-2.0，此前仓库内没有任何 LICENSE 文件，故不存在“已按 MIT 发布”的授权需要保留；README 中过去的 MIT 说法已更正。若将来接受外部贡献，需要贡献者协议或逐个确认授权。
 5. 实际构建 AIWS Code 后，核对产物里确有上游 `LICENSE.txt` 与 `ThirdPartyNotices.txt`。
