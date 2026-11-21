@@ -167,6 +167,25 @@ jobs:
             '
           ls -la out/aiws-os/*.iso out/aiws-os/*.packages 2>/dev/null || ls -la out/aiws-os
           (cd out/aiws-os && sha256sum -c live-image-amd64.hybrid.iso.sha256)
+      - name: Prove the ISO really contains the model weights, llama-server and AIWS Code
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get install -y --no-install-recommends squashfs-tools xorriso
+          iso=out/aiws-os/live-image-amd64.hybrid.iso
+          mkdir -p "$RUNNER_TEMP/content"
+          xorriso -osirrox on -indev "$iso" -extract /live/filesystem.squashfs "$RUNNER_TEMP/content/fs.squashfs"
+          fs="$RUNNER_TEMP/content/fs.squashfs"
+          got="$(unsquashfs -cat "$fs" usr/local/share/aiws/model-preload/aiws-local.gguf | sha256sum | cut -d' ' -f1)"
+          echo "model inside ISO: $got"
+          test "$got" = "$MODEL_SHA256"
+          unsquashfs -cat "$fs" usr/local/share/aiws/model-preload/manifest.json
+          llama="$(unsquashfs -cat "$fs" usr/local/bin/llama-server | sha256sum | cut -d' ' -f1)"
+          test "$llama" = "$(cut -d' ' -f1 inputs/llama/llama-server.sha256)"
+          for f in opt/aiws-code/LICENSE.txt opt/aiws-code/ThirdPartyNotices.txt opt/aiws-code/AIWS-NOTICE.md opt/aiws-code/PROVENANCE.json; do
+            test -n "$(unsquashfs -cat "$fs" "$f" | head -c 1)" || { echo "missing in ISO: $f"; exit 1; }
+          done
+          unsquashfs -cat "$fs" opt/aiws-code/PROVENANCE.json
+          echo "CONTENT_CHECK=pass" >> "$GITHUB_ENV"
       - name: Boot the ISO in QEMU and require the AIWS boot smoke marker
         timeout-minutes: 60
         run: |
@@ -232,10 +251,11 @@ jobs:
             echo "- 观察台 + VS Code 风格工作台（\`workbench\`）、Agent、Permission Broker、审批 DAG、模型网关与路由"
             echo "- 开发工具链：Python、Node.js/TypeScript、Go、Rust、Java、Ruby、PHP、Lua、C/C++ 等及常用 CLI 工具"
             echo "- AIWS Code：Code - OSS ${AIWS_CODE_TAG:-1.147.0} 重新品牌化构建（MIT；保留上游许可与声明）"
-            echo "- 本地模型：Qwen3.5-2B Q4_K_M（Apache-2.0），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**默认不启用，需要你在工作台里手动开启**"
+            echo "- 本地模型：Qwen3.5-2B Q4_K_M（Apache-2.0），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**已随镜像提供，默认不加载**：在工作台的「本地 AI 助手」页点“申请启用模型”并批准即可使用（建议虚拟机内存 ≥ 6 GB）"
             echo
             echo "## 验证状态（如实）"
             echo "- ✅ 构建期：校验和、GGUF 魔数、AIWS Code 许可文件齐全检查、工作台测试通过"
+            echo "- ✅ 从成品 ISO 里读回：模型权重 sha256 与官方值一致；llama-server 与构建产物一致；AIWS Code 的 LICENSE / ThirdPartyNotices / 来源记录都在镜像里"
             echo "- ✅ QEMU 启动到 \`AIWS_BOOT_SMOKE_PASS\`（加速方式见 Actions 日志）"
             echo "- ❓ **未验证**：真实硬件/Secure Boot、模型在本镜像里的真实质量、官方 CLI（Claude Code / Codex）真实端到端、AIWS Code 在镜像内的完整可用性、桌面程序启动"
             echo "- 安全边界是应用层（同 UID 的 Broker），**不是内核强制隔离**"
