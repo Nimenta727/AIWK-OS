@@ -34,7 +34,7 @@ case "${AIWS_OS_PROFILE:-full}" in
   *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
 esac
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
-cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$repo/os/runtime/aiws_guest_boundary.py" "$repo/os/runtime/aiws_tasks.py" "$repo/os/runtime/aiws_local_model.py" "$repo/os/runtime/aiws_guest_ops.py" "$repo/os/runtime/aiws_model_registry.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$repo/os/runtime/aiws_guest_boundary.py" "$repo/os/runtime/aiws_tasks.py" "$repo/os/runtime/aiws_local_model.py" "$repo/os/runtime/aiws_guest_ops.py" "$repo/os/runtime/aiws_model_registry.py" "$repo/os/runtime/aiws_agent_service.py" "$repo/os/runtime/aiws_agent_client.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
 ui="$repo/desktop/AIWorkstation.Frontend/dist"
 if [[ ! -s "$ui/index.html" ]]; then
   echo "ERROR: Build the shared React workbench first (cd desktop/AIWorkstation.Frontend && npm install && npm run build)." >&2
@@ -42,7 +42,8 @@ if [[ ! -s "$ui/index.html" ]]; then
 fi
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
 cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
-chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-session" \
+chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-agent" \
+  "$out/config/includes.chroot/usr/local/bin/aiws-session" \
   "$out/config/includes.chroot/usr/local/bin/aiws-toolctl" \
   "$out/config/includes.chroot/usr/local/bin/aiws-workbench" \
   "$out/config/includes.chroot/usr/local/bin/aiws-open-workbench" \

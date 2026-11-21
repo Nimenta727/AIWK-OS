@@ -19,6 +19,7 @@ from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_model_registry import GuestModelRegistry
+from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError
 import subprocess
 
@@ -51,13 +52,21 @@ class Controller:
                 raise PermissionError("AIWS state directory must live inside the guest user's home")
             state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
             protect_guest_workspace(state_home.resolve(strict=True))
-        self.tasks = GuestTaskStore(state_home / "aiws", singleton=singleton)
-        self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
+        self.agent = AgentClient() if singleton else None
+        if self.agent is not None:
+            self.agent.request("health")
+            self.tasks = TaskProxy(self.agent)
+            self.guest_ops = ReadOnlySystemProxy(self.agent)
+        else:
+            # Embedded testing mode, never enabled in a real guest service.
+            self.tasks = GuestTaskStore(state_home / "aiws", singleton=False)
+            self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
 
     def health(self):
         return {"system": "AIWS OS", "mode": "linux-guest",
-                "agent": "persistent-guest-dag", "llmConnected": self.model.status()["online"],
+                "agent": "systemd-user-agent" if self.agent else "embedded-test-agent",
+                "agentIndependentService": self.agent is not None, "llmConnected": self.model.status()["online"],
                 "agentPrivileged": False, "guestOnly": True,
                 "workspace": str(self.workspace),
                 "desktopInstalled": bool(shutil.which("xfce4-session")),
@@ -155,6 +164,8 @@ class Controller:
     def model_plan(self, instruction):
         """Convert a validated local model proposal to a pending DAG, never execute."""
         proposal = self.model.suggest(instruction)
+        if self.agent is not None:
+            return self.tasks.model_plan(instruction, proposal)
         key = "inspect"
         stage = {"key": key, "label": proposal["reason"][:160],
                  "tool": proposal["tool"], "arguments": proposal["arguments"],
@@ -172,6 +183,8 @@ class Controller:
         return self.tasks.create(payload["title"], payload["goal"], payload["stages"])
 
     def dispatch_stage(self, task_id, stage_key):
+        if self.agent is not None:
+            return self.tasks.dispatch(task_id, stage_key)
         action = self.tasks.dispatch(task_id, stage_key)
         self.pool.submit(self._run_stage, action)
         return self.tasks.get(task_id)
@@ -249,9 +262,15 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/audit/verify":
-            return self.reply(200, app.tasks.verify_audit())
+            try:
+                return self.reply(200, app.tasks.verify_audit())
+            except (AgentUnavailable, AgentError) as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
         if path == "/api/v1/tasks":
-            return self.reply(200, {"tasks": app.tasks.list()})
+            try:
+                return self.reply(200, {"tasks": app.tasks.list()})
+            except (AgentUnavailable, AgentError) as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
         if path.startswith("/api/v1/tasks/"):
             parts = path.strip("/").split("/")
             if len(parts) == 4:
@@ -259,6 +278,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, app.tasks.get(parts[3]))
                 except TaskError as exc:
                     return self.reply(404, {"error": str(exc)})
+                except (AgentUnavailable, AgentError) as exc:
+                    return self.reply(503, {"error": str(exc)[:240]})
+                except (AgentUnavailable, AgentError) as exc:
+                    return self.reply(503, {"error": str(exc)[:240]})
             if len(parts) == 5 and parts[4] == "audit":
                 try:
                     return self.reply(200, {"events": app.tasks.audit(parts[3])})
@@ -367,6 +390,8 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("No arguments allowed for dispatch")
                 result = app.dispatch_stage(route[3], route[5])
+        except AgentUnavailable as exc:
+            return self.reply(503, {"error": str(exc)[:240]})
         except PermissionError as exc:
             return self.reply(403, {"error": str(exc)[:240]})
         except (ValueError, KeyError, TypeError) as exc:

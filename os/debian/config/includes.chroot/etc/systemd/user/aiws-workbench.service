@@ -1,6 +1,7 @@
 [Unit]
 Description=AIWS OS user workbench and read-only Agent controller
-After=graphical-session.target
+After=graphical-session.target aiws-agent.service
+Requires=aiws-agent.service
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/aiws-workbench
