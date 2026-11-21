@@ -31,8 +31,9 @@ def inspect_devices(lsblk):
             continue
         # A disk already holding partitions or mountpoints must never be
         # presented as a candidate by this read-only preflight.
-        if item.get("children") or item.get("mountpoint") or item.get("mountpoints") or item.get("fstype") or item.get("pttype")
-                or item.get("ptuuid") or item.get("uuid"):
+        if any(item.get(key) for key in (
+                "children", "mountpoint", "mountpoints", "fstype",
+                "pttype", "ptuuid", "uuid")):
             continue
         # Even a disk with no visible signatures may contain important data.
         result.append({"device": name, "sizeBytes": size,
