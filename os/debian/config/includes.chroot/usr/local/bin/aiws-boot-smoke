@@ -67,6 +67,13 @@ if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
     emit "AIWS_BOOT_SMOKE_FAIL: workbench-gui-clicks-or-dag"
     exit 1
 fi
+# Verify the guest system is resilient to UI and durable Agent user-unit
+# restarts, and task/audit evidence survives across both processes.
+if ! runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 \
+    python3 /usr/local/lib/aiws/aiws_guest_lifecycle_smoke.py; then
+    emit "AIWS_BOOT_SMOKE_FAIL: guest-agent-lifecycle-recovery"
+    exit 1
+fi
 if [ -f /etc/aiws/guest-model-acceptance ]; then
     if ! runuser -u user -- env DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 \
         python3 /usr/local/lib/aiws/aiws_model_guest_smoke.py; then
