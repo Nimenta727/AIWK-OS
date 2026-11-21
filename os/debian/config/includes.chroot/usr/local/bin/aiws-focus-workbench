@@ -1,0 +1,6 @@
+#!/bin/sh
+# Bring the workbench window to the front (bound to Super+Home). Quietly does nothing if it is not running.
+command -v xdotool >/dev/null 2>&1 || exit 0
+id=$(xdotool search --onlyvisible --class chromium 2>/dev/null | head -n 1 || true)
+[ -n "$id" ] && xdotool windowactivate "$id" >/dev/null 2>&1 || true
+exit 0

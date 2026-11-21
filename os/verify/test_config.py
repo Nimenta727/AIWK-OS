@@ -17,18 +17,18 @@ class AiwsOsContract(unittest.TestCase):
     def test_shell_2_native_launcher_and_input_contract(self):
         full = (CONFIG / "package-lists/aiws-desktop.list.chroot").read_text()
         smoke = (ROOT / "os/debian/profiles/smoke.list.chroot").read_text()
-        for package in ("xfce4-appfinder", "xfce4-notifyd", "fcitx5", "fcitx5-chinese-addons"):
+        for package in ("fcitx5", "fcitx5-chinese-addons", "openbox", "x11-xserver-utils"):
             self.assertIn(package, full.split())
             self.assertIn(package, smoke.split())
         shell = (CONFIG / "includes.chroot/usr/local/bin/aiws-session").read_text()
         self.assertIn("XMODIFIERS=@im=fcitx", shell)
         xml = (CONFIG / "includes.chroot/usr/local/share/aiws/shell/openbox.xml").read_text()
-        for shortcut in ("W-space", "W-Return", "W-e", "W-b", "W-i", "A-Tab"):
+        for shortcut in ("W-Return", "W-e", "W-b", "W-i", "W-Home", "A-Tab", "A-F4"):
             self.assertIn(shortcut, xml)
 
     def test_live_package_list_supplies_desktop_and_languages(self):
         packages = set((CONFIG / "package-lists/aiws-desktop.list.chroot").read_text().split())
-        for package in ("xfce4", "lightdm", "firefox-esr", "geany", "python3",
+        for package in ("lightdm", "firefox-esr", "geany", "python3",
                         "nodejs", "openjdk-21-jdk", "rustc", "golang-go", "clang", "git"):
             self.assertIn(package, packages)
 
@@ -67,7 +67,13 @@ class AiwsOsContract(unittest.TestCase):
         smoke = (CONFIG / "includes.chroot/usr/local/bin/aiws-boot-smoke").read_text()
         firmware = (ROOT / "os/kernel/ci/firmware-iso-boot.sh").read_text()
         workflow = (ROOT / ".github/workflows/aiws-os-image-boot.yml").read_text()
-        self.assertIn("xfce4-panel --disable-wm-check", shell)
+        # The workbench is the desktop: no panel, no app menu, no title bars may come back.
+        self.assertNotIn("xfce4-panel", shell)
+        self.assertNotIn("xfce4-panel", smoke)
+        for forbidden in ("xfce4", "xfce4-appfinder", "xfce4-notifyd", "xfce4-panel"):
+            self.assertNotIn(forbidden, (CONFIG / "package-lists/aiws-desktop.list.chroot").read_text().split())
+        self.assertIn("<decor>no</decor>", (CONFIG / "includes.chroot/usr/local/share/aiws/shell/openbox.xml").read_text())
+        self.assertIn("--start-fullscreen", browser)
         self.assertIn("openbox --config-file", shell)
         self.assertIn("--app=http://127.0.0.1:17640/", browser)
         self.assertNotIn("--kiosk", browser)

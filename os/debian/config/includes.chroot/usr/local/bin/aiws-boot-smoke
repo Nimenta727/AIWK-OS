@@ -16,14 +16,14 @@ for i in $(seq 1 65); do
     fi
     sleep 2
 done
-if [ "$desktop" -ne 1 ] || ! pgrep -x xfce4-panel >/dev/null; then
+if [ "$desktop" -ne 1 ] || ! pgrep -x openbox >/dev/null; then
     emit "AIWS_BOOT_SMOKE_FAIL: display-manager-or-aiws-shell-not-running"
     exit 1
 fi
 health=0
 for i in $(seq 1 35); do
     if curl --fail --silent --noproxy '*' --max-time 2 http://127.0.0.1:17640/api/v1/health |
-        python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["uiBundled"] and d["guestOnly"] and d["toolCount"] >= 10'; then
+        python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["uiBundled"] and d["guestOnly"] and d["toolCount"] >= 10' 2>/dev/null; then
         health=1
         break
     fi

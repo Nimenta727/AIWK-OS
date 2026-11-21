@@ -106,3 +106,14 @@ button.aiws-sh-status-item:hover{background:rgba(255,255,255,.18)}
 .aiws-sh-urlbar input{flex:1;min-width:0;background:var(--c-bg);border:1px solid var(--c-border);border-radius:3px;padding:4px 8px}
 .aiws-sh-icon{border:0;background:none;cursor:pointer;color:var(--c-muted);padding:4px;border-radius:3px;display:grid;place-items:center}
 .aiws-sh-icon:hover:not(:disabled){background:var(--c-surface-3);color:var(--c-text)}.aiws-sh-icon:disabled{opacity:.35;cursor:default}
+
+/* System controls (display / input / network / power): plain forms, no decoration. */
+.aiws-sc{display:grid;gap:12px;max-width:640px;margin-bottom:24px}
+.aiws-sc header{display:flex;justify-content:space-between;align-items:center}.aiws-sc h2{margin:0;font-size:15px}
+.aiws-sc section{border:1px solid var(--c-border);border-radius:8px;padding:12px 14px;background:var(--c-surface)}
+.aiws-sc h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px}
+.aiws-sc label,.aiws-sc form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.aiws-sc ul{margin:0 0 8px;padding-left:18px;font-size:12px;color:var(--c-muted)}
+.aiws-sc-note{border:1px solid var(--c-border);border-radius:6px;padding:8px 10px;font-size:12px}
+.aiws-sc-hint{font-size:12px;color:var(--c-muted);margin:8px 0 0}
+.aiws-sc-confirm{display:flex;gap:8px;align-items:center}

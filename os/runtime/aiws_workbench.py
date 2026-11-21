@@ -27,6 +27,7 @@ from aiws_events import EventStore, EventError, SAFE_NAME, make_event
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
 import aiws_apps
+import aiws_system
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -72,6 +73,7 @@ class Controller:
             self.tasks = GuestTaskStore(state_home / "aiws", singleton=False)
             self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
+        self.system = aiws_system.SystemControls()
         self.events = EventStore(state_home / "aiws-observatory")
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
         self.supervisor = Supervisor(self.mandates, self.events, self.workspace)
@@ -146,6 +148,27 @@ class Controller:
         subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
         return {"started": True, "running": False}
+
+    def system_op(self, kind, payload):
+        """Display / input method / network / power. Strict per-operation payloads, a shared 2 s rate limit."""
+        now = time.monotonic()
+        if now - getattr(self, "_sys_last", -10) < 2:
+            raise ValueError("Too many system operations; wait a moment")
+        self._sys_last = now
+        shapes = {"display": {"output", "mode"}, "input": {"name"}, "network": {"ssid", "password"},
+                  "power": {"action", "confirm"}}
+        if kind not in shapes or not set(payload) <= shapes[kind] or not payload:
+            raise ValueError("Unexpected fields for this system operation")
+        try:
+            if kind == "display":
+                return self.system.display_set(payload.get("output"), payload.get("mode"))
+            if kind == "input":
+                return self.system.ime_set(payload.get("name"))
+            if kind == "network":
+                return self.system.network_connect(payload.get("ssid"), payload.get("password"))
+            return self.system.power(payload.get("action"), payload.get("confirm"))
+        except aiws_system.SystemError_ as exc:
+            raise SupervisorError(str(exc))
 
     def apps_launch(self, ident):
         if ident == "aiws-code":
@@ -223,7 +246,7 @@ class Controller:
                 "llmConnected": self.model.status()["online"],
                 "agentPrivileged": False, "guestOnly": True,
                 "workspace": str(self.workspace),
-                "desktopInstalled": bool(shutil.which("xfce4-session")),
+                "desktopInstalled": bool(shutil.which("openbox")),
                 "displayManagerInstalled": bool(shutil.which("lightdm")),
                 "uiBundled": (self.ui / "index.html").is_file(),
                 "toolCount": len(EXPOSED) + len(GUEST_OP_TOOLS), "tasksPersistent": True,
@@ -675,6 +698,8 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(session) or after < 0:
                 return self.reply(400, {"error": "A valid session id is required"})
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/system":
+            return self.reply(200, app.system.status())
         if path == "/api/v1/ide":
             return self.reply(200, app.ide_status())
         if path == "/api/v1/apps":
@@ -732,7 +757,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -772,6 +797,8 @@ class Handler(BaseHTTPRequestHandler):
                 if set(payload) != {"id"}:
                     raise ValueError("Expected the application id only")
                 result = app.apps_launch(payload["id"])
+            elif path.startswith("/api/v1/system/"):
+                result = app.system_op(path.rsplit("/", 1)[1], payload)
             elif path == "/api/v1/ide/open":
                 if payload:
                     raise ValueError("No arguments allowed")

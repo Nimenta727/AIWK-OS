@@ -113,3 +113,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 13:00 — 移除残留的 Windows 相关代码；修复启动冒烟的界面选择器](2026-11-21_130053-remove-remaining-windows-code.md)
 - [2026-11-21 13:40 — 发行关卡打通：AIWS Code 首次构建成功、启动冒烟根因修复、模型入镜像校验](2026-11-21_134058-release-gates-fixed.md)
 - [2026-11-21 14:40 — 发布测试版 v0.2.0-preview.1（ISO 含模型权重与 AIWS Code）](2026-11-21_144022-v0.2.0-preview.1-published.md)
+- [2026-11-21 19:05 — P1/P2：CSRF 根因修复、去桌面外壳、系统控制面板](2026-11-21_190500-p1-p2-csrf-kiosk-system-controls.md)

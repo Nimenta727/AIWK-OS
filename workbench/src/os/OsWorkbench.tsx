@@ -7,7 +7,8 @@ import type {Command,Tab} from './Shell';
 import FileViewer from './FileViewer';
 import BrowserView from './BrowserView';
 import useObservatoryData from './useObservatoryData';
-import {api} from './api';
+import {api,onCsrfChange,refreshCsrf} from './api';
+import SystemControls from './SystemControls';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
 import {closeTab,cycleTab,fileTabId,fileTitle,flattenTree,isEditableTarget,loadPrefs,matchKey,openTab,savePrefs} from '../model/shell.mjs';
 import GuestFiles from './GuestFiles';
@@ -83,12 +84,13 @@ export default function OsWorkbench(){
  const loadIde=useCallback(async()=>{try{setIde(await api<IdeState>('/ide'));}catch{setIde(null);}},[]);
  useEffect(()=>{
   let live=true;
-  void Promise.all([api<Snapshot>('/snapshot'),api<{csrf:string}>('/session')])
-   .then(([state,session])=>{if(live){setSnapshot(state);setCsrf(session.csrf);}})
+  const off=onCsrfChange(t=>{if(live)setCsrf(t);});
+  void Promise.all([api<Snapshot>('/snapshot'),refreshCsrf()])
+   .then(([state,token])=>{if(live){setSnapshot(state);setCsrf(token);}})
    .catch(e=>{if(live)setError(String(e));})
    .finally(()=>{if(live)setStarting(false);});
   void loadTree();void loadIde();void loadApps();
-  return()=>{live=false;};
+  return()=>{live=false;off();};
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[]);
  useEffect(()=>{
@@ -247,6 +249,7 @@ export default function OsWorkbench(){
      {job.result!==null&&<pre className="aiws-os-result">{JSON.stringify(job.result,null,2)}</pre>}</section>}
    </div>}
    {(page==='plans'||page==='local')&&<GuestTaskStudio csrf={csrf} english={english} capabilities={tools} focus={page==='local'?'model':'tasks'}/>}
+   {page==='system'&&<SystemControls english={english}/>}
    {page==='system'&&<GuestSystemConsole csrf={csrf} english={english} onPlanCreated={()=>openView('plans')}/>}
   </div>;
  };

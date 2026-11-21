@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs in the live-build binary stage (cwd = binary tree). Makes the boot menu auto-continue and request
+# a 1080p console instead of waiting forever at a 640x480 menu. Never fails the build: a missing file is skipped.
+set -eu
+for f in isolinux/*.cfg boot/grub/*.cfg; do
+  [ -f "$f" ] || continue
+  case "$f" in
+    isolinux/*) sed -i -E 's/^([[:space:]]*)timeout[[:space:]]+[0-9]+/\1timeout 30/I' "$f"
+                grep -qiE '^[[:space:]]*timeout' "$f" || true ;;
+    boot/grub/*) sed -i -E 's/^([[:space:]]*)set timeout=[0-9]+/\1set timeout=3/' "$f" ;;
+  esac
+done

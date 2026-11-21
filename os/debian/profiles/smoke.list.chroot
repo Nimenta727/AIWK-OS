@@ -5,7 +5,7 @@ live-boot
 live-config
 systemd-sysv
 xorg
-xfce4
+
 lightdm
 xfce4-terminal
 chromium
@@ -22,17 +22,17 @@ chromium-driver
 python3-selenium
 
 # Native interactive Shell and UTF-8 clipboard acceptance
-xfce4-panel
 thunar
 xclip
 fonts-noto-cjk
 
 # Shell 2.0 integration smoke
-xfce4-appfinder
-xfce4-notifyd
+
+
 fcitx5
 fcitx5-chinese-addons
 
 # Builder lane (step O4): firewall for the sandbox user, ACLs for the project folder, sudo to switch user
 nftables
 acl
+x11-xserver-utils

@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Guest-local shortcuts; no commands from untrusted web text. -->
+<!-- Bare window manager for the AIWS shell: no decorations, every window fills the screen, one workspace.
+     Programs started from the workbench open full-screen; Alt+Tab switches, Alt+F4 closes, Super+Home returns
+     to the workbench. No keybinding runs text taken from a web page. -->
 <openbox_config xmlns="http://openbox.org/3.4/rc">
   <focus><focusNew>yes</focusNew><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
-  <desktops><number>2</number></desktops>
+  <desktops><number>1</number></desktops>
+  <theme><name>Clearlooks</name><keepBorder>no</keepBorder></theme>
+  <applications>
+    <application class="*"><decor>no</decor><maximized>yes</maximized></application>
+  </applications>
   <keyboard>
     <keybind key="W-Return"><action name="Execute"><command>xfce4-terminal</command></action></keybind>
-    <keybind key="W-space"><action name="Execute"><command>xfce4-appfinder</command></action></keybind>
     <keybind key="W-b"><action name="Execute"><command>firefox-esr</command></action></keybind>
     <keybind key="W-i"><action name="Execute"><command>geany</command></action></keybind>
     <keybind key="W-e"><action name="Execute"><command>thunar</command></action></keybind>
+    <keybind key="W-Home"><action name="Execute"><command>/usr/local/bin/aiws-focus-workbench</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
-    <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>
+    <keybind key="A-F4"><action name="Close"/></keybind>
   </keyboard>
 </openbox_config>

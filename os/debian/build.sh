@@ -23,7 +23,7 @@ mkdir -p -- "$out"
 cd -- "$out"
 lb config --distribution trixie --architectures amd64 --binary-images iso-hybrid \
   --debian-installer none --archive-areas main --linux-flavours amd64 \
-  --bootappend-live "boot=live components console=ttyS0,115200n8"
+  --bootappend-live "boot=live components console=ttyS0,115200n8 video=1920x1080"
 cp -a -- "$repo/os/debian/config/." "$out/config/"
 case "${AIWS_OS_PROFILE:-full}" in
   full) ;;
