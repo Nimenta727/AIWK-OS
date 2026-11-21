@@ -105,9 +105,7 @@ class Controller:
         with self.lock:
             self.records[identifier]["status"] = "running"
         try:
-            result = (self.guest_ops.execute(tool, args,
-                                            approved=action["approvalGranted"])
-                      if tool in GUEST_OP_TOOLS else invoke(tool, args))
+            result = invoke(tool, args)
             encoded = json.dumps(result, ensure_ascii=False)
             if len(encoded) > 65536:
                 result = {"preview": encoded[:32000], "truncated": True}
@@ -183,7 +181,12 @@ class Controller:
         try:
             self.tasks.started(taskid, key)
             tool, args = action["tool"], action["arguments"]
-            result = invoke(tool, args)
+            if tool in GUEST_OP_TOOLS:
+                # Every system/kernel stage goes through the approved durable DAG.
+                result = self.guest_ops.execute(
+                    tool, args, approved=action["approvalGranted"])
+            else:
+                result = invoke(tool, args)
             encoded = json.dumps(result, ensure_ascii=False)
             if len(encoded) > 65536:
                 result = {"truncated": True, "preview": encoded[:32000]}

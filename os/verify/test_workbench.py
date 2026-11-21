@@ -174,6 +174,53 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(self.request("POST","/api/v1/tasks",
             {"title":"Unsafe plan","goal":"","stages":[invalid]},hdr)[0],400)
 
+    def test_approved_kernel_stage_routes_through_guest_ops(self):
+        token=self.request("GET","/api/v1/session")[1]["csrf"]
+        hdr={"X-AIWS-CSRF":token}
+        stage={"key":"kernel","label":"Guest candidate","tool":"kernel.stage",
+               "arguments":{"path":"candidate.fragment","expectedSha256":"a"*64},
+               "dependsOn":[]}
+        status,doc=self.request("POST","/api/v1/tasks",
+            {"title":"Kernel dispatch regression","goal":"","stages":[stage]},hdr)
+        self.assertEqual(status,202,doc)
+        tid=doc["task"]["id"]
+        uri="/api/v1/tasks/"+tid+"/stages/kernel/"
+        self.assertEqual(self.request("POST",uri+"dispatch",{},hdr)[0],400)
+        self.assertEqual(self.request("POST",uri+"approve",{},hdr)[0],202)
+        with patch.object(self.server.application.guest_ops,"execute",
+             return_value={"deployed":False,"status":"staged","id":"test"} ) as runner:
+            self.assertEqual(self.request("POST",uri+"dispatch",{},hdr)[0],202)
+            result=None
+            for _ in range(150):
+                _,result=self.request("GET","/api/v1/tasks/"+tid)
+                if result["stages"][0]["state"] not in ("queued","running"):
+                    break
+                time.sleep(.01)
+        self.assertEqual(result["stages"][0]["state"],"completed",result)
+        self.assertIs(result["stages"][0]["result"]["deployed"],False)
+        runner.assert_called_once_with("kernel.stage",
+            {"path":"candidate.fragment","expectedSha256":"a"*64},approved=True)
+
+    def test_guest_service_in_dag_denied_without_vm_marker(self):
+        token=self.request("GET","/api/v1/session")[1]["csrf"]
+        hdr={"X-AIWS-CSRF":token}
+        stage={"key":"inspect","label":"User service","tool":"service.inspect",
+               "arguments":{"service":"aiws-workbench.service"},"dependsOn":[]}
+        status,doc=self.request("POST","/api/v1/tasks",
+            {"title":"Guest service guard","goal":"","stages":[stage]},hdr)
+        self.assertEqual(status,202,doc)
+        tid=doc["task"]["id"]
+        self.assertEqual(self.request("POST","/api/v1/tasks/"+tid+
+            "/stages/inspect/dispatch",{},hdr)[0],202)
+        result=None
+        for _ in range(150):
+            _,result=self.request("GET","/api/v1/tasks/"+tid)
+            if result["stages"][0]["state"] not in ("queued","running"):
+                break
+            time.sleep(.01)
+        self.assertEqual(result["stages"][0]["state"],"failed",result)
+        self.assertIn("guest image marker",result["stages"][0]["error"].lower())
+
     def test_local_model_proposal_becomes_pending_audited_task(self):
         csrf=self.request("GET","/api/v1/session")[1]["csrf"]
         hdr={"X-AIWS-CSRF":csrf}
