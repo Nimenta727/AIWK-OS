@@ -173,6 +173,22 @@ class Controller:
                                    "arguments":{"service":"aiws-local-model.service"},
                                    "dependsOn":[]}])
 
+    def model_plan(self, instruction):
+        """Persist but do not execute a validated, read-only local model plan."""
+        proposal = self.model.suggest(instruction)
+        if self.agent is not None:
+            # Production: independent systemd user Agent revalidates the model
+            # output, owns durable state and records prompt/proposal hashes.
+            return self.tasks.model_plan(instruction, proposal)
+        stage = {"key": "inspect", "label": proposal["reason"][:160],
+                 "tool": proposal["tool"], "arguments": proposal["arguments"],
+                 "dependsOn": []}
+        saved = self.tasks.create(
+            ("Local proposal: " + proposal["tool"])[:160], proposal["reason"], [stage])
+        self.tasks.record_model_proposal(
+            saved["task"]["id"], "aiws-local", instruction, proposal)
+        return self.tasks.get(saved["task"]["id"])
+
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
             raise TaskError("Expected title, goal and stages")

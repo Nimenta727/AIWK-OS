@@ -1,5 +1,8 @@
 """Safety and evaluation checks of the optional local inference gateway."""
 import json
+import os
+import tempfile
+from unittest.mock import patch
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sys
@@ -48,6 +51,20 @@ class LocalPlannerTests(unittest.TestCase):
         self.assertFalse(disabled.status()["online"])
         with self.assertRaises(LocalModelError):
             disabled.suggest("list files")
+
+    def test_guest_toggle_flag_changes_runtime_status_without_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory)
+            with patch("aiws_local_model.Path.home",return_value=home), \
+                 patch.dict(os.environ,{"AIWS_LOCAL_MODEL_ENABLED":""}):
+                dynamic=LocalPlanner(port=self.httpd.server_port)
+                self.assertFalse(dynamic.status()["configured"])
+                flag=home/".config/aiws/local-model-enabled"
+                flag.parent.mkdir(parents=True,exist_ok=True)
+                flag.write_text("1\n",encoding="ascii")
+                self.assertTrue(dynamic.status()["configured"])
+                flag.unlink()
+                self.assertFalse(dynamic.status()["configured"])
 
     def test_read_only_suggestion_not_execution(self):
         result=self.model.suggest("List my guest workspace files")

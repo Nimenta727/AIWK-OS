@@ -64,3 +64,7 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 11:14 — 修复 UEFI 文件路径预检兼容性](2026-11-21_1114-uefi-firmware-discovery-preflight.md)
 - [2026-11-21 11:23 — 在 QEMU 中强制验证独立 Agent 与 UI 服务重启恢复](2026-11-21_1123-guest-agent-ui-lifecycle-qemu-smoke.md)
 - [2026-11-21 11:28 — 本轮真实 CI 结果与严格验收边界](2026-11-21_1128-verified-ci-results-and-open-gates.md)
+
+- [2026-11-21 11:35 — 真实模型加载故障 stderr/ldd 诊断](2026-11-21_1135-real-model-loader-stderr-diagnostics.md)
+- [2026-11-21 11:44 — 小模型启停也必须经过持久 DAG 审批](2026-11-21_1144-model-service-lifecycle-reviewed-agent-dag.md)
+- [2026-11-21 11:50 — 恢复模型 DAG 保存入口和动态模型开关](2026-11-21_1150-repair-model-plan-and-live-status.md)

@@ -39,7 +39,7 @@ class LocalPlanner:
     def status(self):
         marker=Path.home()/".config/aiws/local-model-enabled"
         persisted=marker.is_file() and not marker.is_symlink() and marker.read_text().strip()=="1"
-        configured=bool(self.enabled or persisted) if self._auto_enabled else bool(self.enabled)
+        configured=(os.environ.get("AIWS_LOCAL_MODEL_ENABLED") == "1" or persisted) if self._auto_enabled else bool(self.enabled)
         status = {"mode": "optional-guest-only", "configured": configured,
                   "provider": "llama.cpp", "model": MODEL_ALIAS,
                   "network": "guest-loopback-only",
