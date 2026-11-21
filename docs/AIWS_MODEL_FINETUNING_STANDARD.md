@@ -8,7 +8,7 @@
 1. 模型只能在隔离、无外网的 Linux guest 内通过固定 127.0.0.1:18080 llama.cpp 服务调用。禁止访问宿主机、共享文件夹、设备、QMP、root、外网或凭据。
 2. 模型不拥有执行权。返回恰好包含 tool、arguments、reason 的一个 JSON 对象；只读工具仍须经独立 schema/allowlist 验证、人工确认及 Linux Agent 的持久 DAG。
 3. 遇到宿主文件访问、shell/root、写入受保护资源、权限提升、绕过审批、关闭审计或外传：必须明确返回 tool="refuse"、arguments={}、简短 reason。**不允许用不相关的只读工具伪装成拒绝。** refusal 无法形成可执行 DAG。
-4. 原 Windows WorkTask/Plan/AgentRun/ExecutionRecord 导入仅为历史证据，绝不自动转换为可执行工具或训练语料。
+4. 任何历史任务记录都不得自动转换为可执行工具或训练语料。
 5. 严禁收集客户私有代码、提示词、会话、OAuth/API 密钥、SSH 密钥或真实宿主目录做微调。仅允许合成/已获书面授权数据，记录来源、许可、用途、保留与撤销政策。
 
 ## 2. 数据格式、划分、去重 / Data contract
@@ -59,7 +59,7 @@ python3 os/model/training/validate_dataset.py
 
 每份结果必须记录：代码提交 SHA、ISO SHA、原模型/adapter/GGUF SHA、llama.cpp 提交与 CLI、数据集 SHA 和分组数、设备/虚拟化/ctx/线程、冷启动时延、p50/p95/max、VmRSS/VmHWM、正确率/明确拒绝率/schema、错误类型、每条案例 ID。无实际 run、失败、取消或没有串口收据，状态只能是 NOT VERIFIED。
 
-还要验收 Windows 历史导入不可执行、重启 Agent 后审计一致性、模型关闭时纯确定性工具仍可用、guest 不可访问 host。LoRA/量化版本切换前必须停用服务，核验 SHA 和许可证；出现回归立即切回原 SHA-pinned 模型。
+还要验收重启 Agent 后审计一致性、模型关闭时纯确定性工具仍可用、guest 不可访问 host。LoRA/量化版本切换前必须停用服务，核验 SHA 和许可证；出现回归立即切回原 SHA-pinned 模型。
 
 ## 6. 外部贡献者交接清单 / Contributor deliverables
 
@@ -111,3 +111,7 @@ python3 os/model/training/validate_dataset.py
 1. 仍是模板合成数据；本地模型**还没有用 v3 训练**（没有真实 LoRA/权重），也没有真实推理基线。现在放开的是“模型可以提议”的通路和评测基线，不是质量。
 2. 在 v3 上的真实模型表现完全未知，尤其是 `ext.sqlite` 的 SQL 生成和 rg 正则里的转义。
 3. 把“打开终端并执行命令”设为拒绝，是因为 `app.launch` 不接受任何参数；模型把它错判成 `app.launch {terminal}` 会静默丢掉命令部分——留出集里有这类样本专门度量。
+
+## 8. 移除 C#/Swift 代码智能工具后的 v1 数据调整（2026-11-21）
+
+随着 Windows/macOS 相关的运行时代码一并移出（`platform.inspect`、`project.scaffold`、`code.symbols`、`code.references`、`code.dependencies`、`code.platformApis` 不再存在），v1 数据里引用这些工具的行已无意义，已删除：`synthetic_intents.jsonl` 18→15 行，`heldout_v1.jsonl` 26→22 行。v2/v3 数据不涉及这些工具，未受影响（`generate_dataset*.py --check` 仍成立）。模型的工具目录与输出 schema 随之缩小（也省 token）。

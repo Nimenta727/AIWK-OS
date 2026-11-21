@@ -89,9 +89,6 @@ class AgentCore:
         if op=="task.audit":
             fields(a,{"id"})
             return self.tasks.audit(a["id"])[-128:]
-        if op=="task.import_windows":
-            fields(a,{"task"})
-            return self.tasks.import_windows(a["task"])
         if op=="task.create":
             fields(a,{"title","goal","stages"})
             return self.tasks.create(a["title"],a["goal"],a["stages"])

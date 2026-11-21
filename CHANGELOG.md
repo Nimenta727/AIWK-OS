@@ -20,6 +20,9 @@
 - `os/runtime/MODULES`：运行时模块清单，由测试与 `build.sh` 共同使用，取代手写的长 `cp` 列表。
 - 文档：重写 README（定位）、`docs/THIRD_PARTY.md`、OS 预览发行说明。
 
+### 移除
+- Windows 相关的残留：旧任务历史导入（`aiws_windows_compat.py`、`/api/v1/tasks/import/windows`、界面入口）、跨平台源码模板与 C#/Swift 代码智能（`platform.inspect`、`project.scaffold`、`code.symbols/references/dependencies/platformApis` 共 6 个工具，及 `dotnet/swift` 探测）。操作系统是主线，这些都随旧工作台留在 Git 历史里。模型的工具目录与输出 schema 随之缩小。
+
 ### 变更
 - 本地模型输出 schema 用 `$defs` 让每个工具只描述一次（13 KB，原约 21 KB，低于网关 20 KB 限制并留有余量）。
 - 前端数据获取收敛到共享轮询 hook（页面隐藏时不轮询）；旧样式的硬编码颜色改为主题变量。

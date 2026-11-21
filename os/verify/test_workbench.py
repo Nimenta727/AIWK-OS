@@ -62,19 +62,19 @@ class WorkbenchTests(unittest.TestCase):
         self.assertFalse(health["agentPrivileged"])
         status, html = self.request("GET", "/")
         self.assertEqual(status, 200)
-        self.assertNotIn(b"os-bridge.js", html)                       # one UI only: no Windows/Linux mode switch any more
+        self.assertNotIn(b"os-bridge.js", html)                       # one UI only: no mode switch
         self.assertEqual(self.request("GET", "/assets/main.js")[0], 200)
         self.assertEqual(self.request("GET", "/../../etc/passwd")[0], 404)
         self.assertEqual(self.request("GET", "/api/v1/health", headers={"Host": "attacker.invalid"})[0], 403)
 
     def test_csrf_origin_and_read_only_enforcement(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
-        data = {"tool": "code.symbols", "arguments": {"query": "Example"}}
+        data = {"tool": "code.search", "arguments": {"query": "Example"}}
         self.assertEqual(self.request("POST", "/api/v1/jobs", data)[0], 403)
         h = {"X-AIWS-CSRF": csrf, "Origin": "https://attacker.invalid"}
         self.assertEqual(self.request("POST", "/api/v1/jobs", data, h)[0], 403)
         h = {"X-AIWS-CSRF": csrf}
-        for blocked in ("runtime.test", "project.scaffold", "browser.snapshot"):
+        for blocked in ("runtime.test", "browser.snapshot", "file.replace"):
             self.assertEqual(self.request("POST", "/api/v1/jobs",
                                           {"tool": blocked, "arguments": {}}, h)[0], 400)
         self.assertEqual(self.request("POST", "/api/v1/jobs", data, h)[0], 202)
@@ -323,33 +323,10 @@ class WorkbenchTests(unittest.TestCase):
         safe=self.server.application.model.context_message(context)
         self.assertLess(len(safe.encode("utf-8")),3000)
 
-    def test_windows_workflow_import_is_not_executable(self):
-        csrf=self.request("GET","/api/v1/session")[1]["csrf"]
-        h={"X-AIWS-CSRF":csrf}
-        worktask={"Id":"f"*32,"Title":"Windows retained task","GraphMode":False,
-                  "Steps":[{"Id":"e"*32,"Title":"Unmapped Windows agent",
-                            "Agent":"Codex","Status":"Completed","DependsOn":[],
-                            "RequiresApproval":True,"ApprovalGranted":True,
-                            "Instructions":"WIN_PRIVATE_PROMPT","Result":"WIN_PRIVATE_OUTPUT"}],
-                  "Unified":{"SchemaVersion":1,"Goal":"Review Windows migration",
-                             "Plans":[],"Artifacts":[],"AgentRuns":[]}}
-        self.assertEqual(self.request("POST","/api/v1/tasks/import/windows",
-                         {"task":worktask})[0],403)
-        status,doc=self.request("POST","/api/v1/tasks/import/windows",
-                                 {"task":worktask},h)
-        self.assertEqual(status,202,doc)
-        self.assertEqual(doc["stages"][0]["state"],"unmapped")
-        self.assertFalse(doc["windowsImport"]["executable"])
-        self.assertEqual(self.request("POST","/api/v1/tasks/"+"f"*32+
-                                      "/stages/"+"e"*32+"/dispatch",{},h)[0],400)
-        self.assertNotIn("WIN_PRIVATE_PROMPT",json.dumps(
-            self.request("GET","/api/v1/tasks/"+"f"*32)[1]))
-        self.assertTrue(self.request("GET","/api/v1/tasks/"+"f"*32+"/audit")[1]["events"])
-
     def test_async_result(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
         _, job = self.request("POST", "/api/v1/jobs",
-                              {"tool": "code.symbols", "arguments": {"query": "Example"}},
+                              {"tool": "code.search", "arguments": {"query": "Example"}},
                               {"X-AIWS-CSRF": csrf})
         result = None
         for _ in range(100):
@@ -358,8 +335,7 @@ class WorkbenchTests(unittest.TestCase):
                 break
             time.sleep(0.01)
         self.assertEqual(result["status"], "completed", result)
-        self.assertEqual(result["result"]["count"], 1)
-        self.assertFalse(result["result"]["semanticVerified"])
+        self.assertIn("matches", result["result"])
         self.assertEqual(self.request("GET", "/api/v1/jobs/not-a-job")[0], 404)
 
 if __name__ == "__main__":

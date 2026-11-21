@@ -6,6 +6,8 @@ import urllib.request
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 
 def main():
@@ -19,19 +21,6 @@ def main():
         "AIWS guest-only file manager acceptance fixture\n",encoding="utf-8")
     (workspace/"aiws-kernel.fragment").write_text(
         "CONFIG_VIRTIO=y\nCONFIG_SECCOMP=y\n",encoding="ascii")
-    (workspace/"aiws-windows-export.json").write_text(json.dumps({
-        "Id":"f"*32,"Title":"Windows AIWS imported smoke",
-        "GraphMode":True,"Steps":[
-            {"Id":"e"*32,"Title":"Windows Codex archive","Agent":"Codex",
-             "Status":"Completed","DependsOn":[],"RequiresApproval":True,
-             "ApprovalGranted":True,"Instructions":"SYNTHETIC_PRIVATE_INSTRUCTION"},
-            {"Id":"d"*32,"Title":"Windows human review","Agent":"Manual",
-             "Status":"Pending","DependsOn":["e"*32],
-             "RequiresApproval":False,"ApprovalGranted":False}
-        ],
-        "Unified":{"SchemaVersion":1,"Goal":"Test guest-only Windows work history",
-                   "Plans":[],"Artifacts":[],"AgentRuns":[]}
-    },ensure_ascii=False),encoding="utf-8")
     options=webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
@@ -43,9 +32,19 @@ def main():
         wait=WebDriverWait(browser,30)
         browser.set_page_load_timeout(30)
         browser.get("http://127.0.0.1:17640/")
-        wait.until(lambda b:b.find_elements(By.XPATH,"//nav//button[contains(.,'AI 文件管理')]"))
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-sh .aiws-sh-tabs"))
         print("AIWS_GUI_BROWSER: React workbench rendered",flush=True)
-        browser.find_element(By.XPATH,"//nav//button[contains(.,'AI 文件管理')]").click()
+
+        def go(label):
+            """Open a view through the command palette (Ctrl+Shift+P), the shell's one uniform way to navigate."""
+            ActionChains(browser).key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("p").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+            box=wait.until(lambda b:b.find_element(By.CSS_SELECTOR,".aiws-sh-palette input"))
+            box.send_keys(label)
+            wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-sh-palette li[role=option]"))
+            box.send_keys(Keys.ENTER)
+            wait.until(lambda b:not b.find_elements(By.CSS_SELECTOR,".aiws-sh-palette"))
+
+        go("AI 文件管理")
         wait.until(lambda b:b.find_elements(By.XPATH,
             "//div[contains(@class,'aiws-os-file-list')]//button[contains(.,'AIWS-GUEST-SMOKE.txt')]"))
         browser.find_element(By.XPATH,
@@ -53,7 +52,7 @@ def main():
         wait.until(lambda b:"guest-only file manager acceptance fixture" in
             b.find_element(By.CSS_SELECTOR,".aiws-os-file-detail pre").text)
         print("AIWS_GUI_BROWSER: guest file explorer click/read verified",flush=True)
-        browser.find_element(By.XPATH,"//nav//button[contains(.,'持久任务与 DAG')]").click()
+        go("持久任务")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio input"))
         browser.find_element(By.CSS_SELECTOR,".aiws-os-studio input").send_keys("GUI guest smoke")
         browser.find_element(By.CSS_SELECTOR,".aiws-os-studio textarea").send_keys("List guest workspace")
@@ -62,26 +61,11 @@ def main():
         browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
         wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
         print("AIWS_GUI_BROWSER: DAG stage executed",flush=True)
-        # Imported Windows JSON is opened by the GUEST browser file picker;
-        # no host filesystem mount/bridge or Windows command execution.
-        file_picker=browser.find_element(
-            By.CSS_SELECTOR,'input[data-aiws="windows-import"]')
-        file_picker.send_keys(str(workspace/"aiws-windows-export.json"))
-        wait.until(lambda b:b.find_elements(
-            By.CSS_SELECTOR,'[data-aiws="windows-import-history"]'))
-        history=browser.find_element(By.CSS_SELECTOR,'[data-aiws="windows-import-history"]')
-        assert "不可执行" in history.text,history.text
-        stages=browser.find_elements(By.CSS_SELECTOR,'.aiws-os-stage-status')
-        assert len(stages)==2, len(stages)
-        assert all("UNMAPPED" in s.text for s in stages)
-        assert not browser.find_elements(
-            By.XPATH,"//button[contains(.,'运行客户机阶段')]")
-        print("AIWS_GUI_BROWSER: Windows WorkTask selected and archived, unmapped/unexecutable",flush=True)
-        browser.find_element(By.XPATH,"//nav//button[contains(.,'本地 AI 助手')]").click()
+        go("本地 AI 助手")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
         assert "DISABLED" in browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text
         # A genuine guest-only *candidate* pipeline, not a running kernel edit.
-        browser.find_element(By.XPATH,"//nav//button[contains(.,'系统与安全')]").click()
+        go("系统与安全")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-system-console"))
         wait.until(lambda b:"CONFIG" not in b.find_element(By.CSS_SELECTOR,".aiws-os-system-console").text)
         browser.find_element(By.XPATH,"//button[contains(.,'提交候选验证和暂存审批')]").click()
@@ -123,7 +107,7 @@ def main():
                 By.CSS_SELECTOR,".aiws-os-studio").text[-2500:],flush=True)
             raise
         print("AIWS_GUI_BROWSER: kernel candidate approved/staged without deployment",flush=True)
-        print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed windows=imported-unmapped model=optional kernel=candidate-only",flush=True)
+        print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional kernel=candidate-only",flush=True)
 
 if __name__=="__main__":
     main()

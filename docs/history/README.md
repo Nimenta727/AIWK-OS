@@ -7,6 +7,7 @@
 > - Windows 构建/打包/Hyper-V 脚本：`scripts/`
 > - Windows 版前端（App 模式与全部相关组件）：`desktop/AIWorkstation.Frontend/src/{App.tsx,components,bridge.ts,styles.css}` 及相关纯逻辑与测试
 > - NixOS 实验配方：`flake.nix`、`os/platforms/nixos`
+> - Windows 任务历史导入、跨平台（WPF/SwiftUI/C#/Swift）源码模板与代码智能：`os/runtime/aiws_{windows_compat,crossplatform,codeintel}.py` 及其测试与文档
 > - 借用的 T3 Code UI 原语：`third_party/t3code`（含其 MIT 声明）
 >
 > 取回方式：`git show f6d5090:<路径>`，或 `git checkout f6d5090 -- <路径>`；浏览：`git ls-tree -r f6d5090 --name-only`。

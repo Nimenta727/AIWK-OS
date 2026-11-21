@@ -51,7 +51,7 @@ if ! curl --fail --silent --noproxy '*' --max-time 3 http://127.0.0.1:17640/api/
     emit "AIWS_BOOT_SMOKE_FAIL: workbench-not-using-independent-agent"
     exit 1
 fi
-if ! /usr/local/bin/aiws-toolctl --list | grep -q '"code.symbols"'; then
+if ! /usr/local/bin/aiws-toolctl --list | grep -q '"workspace.tree"'; then
     emit "AIWS_BOOT_SMOKE_FAIL: mcp-unavailable"
     exit 1
 fi

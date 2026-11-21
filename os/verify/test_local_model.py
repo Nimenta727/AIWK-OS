@@ -96,7 +96,7 @@ class LocalPlannerTests(unittest.TestCase):
         self.assertEqual(result["source"],"local-model")
 
     def test_host_kernel_and_shell_requests_rejected(self):
-        for tool in ["host.exec","system.kernel.write","file.replace","runtime.test","browser.snapshot","project.scaffold"]:
+        for tool in ["host.exec","system.kernel.write","file.replace","runtime.test","browser.snapshot"]:
             with self.assertRaises(LocalModelError):
                 LocalPlanner.validate({"tool":tool,"arguments":{},"reason":"not allowed"})
         for path in ["/etc/passwd","../../mnt/host","C:\\Users\\host"]:

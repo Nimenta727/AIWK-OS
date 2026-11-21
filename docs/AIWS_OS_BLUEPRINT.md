@@ -4,7 +4,7 @@
 
 ## 1. Product identity / 产品定位
 
-This is a **standalone Linux guest operating system**, not a Windows launcher. Windows AIWS remains a compatibility host. The target architecture is:
+This is a **standalone Linux operating system** for programmers (the earlier Windows workstation was retired; see history/). The target architecture is:
 
 ```text
 Host (Windows Hyper-V or hardened Linux KVM/libvirt)
@@ -56,7 +56,7 @@ Performance is an evidence problem: measure cold boot, memory pressure, VM exits
 | --- | --- | --- |
 | P0 current | Debian Live ISO recipe, GUI/tools, guest config, offline launch/tests | Static tests only; actual ISO build and boot pending |
 | P1 | Reproducible ISO/VM disk, signed/checksummed artifacts, boot smoke on KVM + Hyper-V | boot/graphics/input/IME/recovery evidence |
-| P2 | Port core Agent controller to Linux system daemon; embed React workbench into trusted desktop shell | same task data and API schema, no WPF dependency |
+| P2 | Port core Agent controller to Linux system daemon; embed React workbench into trusted desktop shell | same task data and API schema |
 | P3 | Versioned guest-only privileged execution broker + journal/audit + rollback | permission and interruption tests, root/session separation |
 | P4 | Pinned custom Debian kernel packages, trace/cgroup integration, safe fallback | kernel ABI/upgrade/boot tests and measurements |
 | P5 | Host side boundary validation, segmented online networking, mediated file import/export | VM isolation tests and expert review |

@@ -13,9 +13,7 @@ import subprocess
 import re
 import tempfile
 import uuid
-from aiws_crossplatform import inspect_project, scaffold_project
 from aiws_guest_boundary import protect_guest_workspace
-from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
 import time
 from urllib.parse import urlsplit
 import aiws_exttools
@@ -50,12 +48,6 @@ TOOL_SPECS = [
     ("runtime.test", "Execute a fixed language test command in the guest workspace; opt-in", {"language": "string"}),
     ("browser.local_text", "Extract text from an HTML document in the workspace", {"path": "string"}),
     ("browser.snapshot", "Headless Chromium DOM-text snapshot; disabled until exact origins are configured", {"url": "string"}),
-    ("platform.inspect", "Recognize Windows/macOS/Swift project sources without building", {"path": "string"}),
-    ("project.scaffold", "Create Windows WPF or macOS SwiftUI source template (opt-in; never overwrite)", {"name": "string", "template": "string"}),
-    ("code.symbols", "Read-only C#/Swift source symbol index; syntax-level candidates", {"path": "string", "query": "string"}),
-    ("code.references", "Find symbol definitions and unresolved cross-file identifier occurrences", {"symbol": "string", "path": "string"}),
-    ("code.dependencies", "Inspect MSBuild/NuGet, SwiftPM and XcodeGen declared dependencies without build", {"path": "string"}),
-    ("code.platformApis", "Find WPF/WinUI/interop and SwiftUI/AppKit/UIKit API usage evidence", {"path": "string"}),
 ]
 
 def catalog():
@@ -65,8 +57,7 @@ def catalog():
         required = (aiws_exttools.required(name) if name in aiws_exttools.EXT else
                     ["id"] if name == "app.launch" else
                     ["query"] if name == "code.search" else
-                    ["symbol"] if name == "code.references" else
-                    list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
+                    list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -74,7 +65,6 @@ def catalog():
 # Executables `runtime.detect` reports (path or null). Languages first, then build, debug, VCS and editors.
 DETECT_TOOLS = (
     "python3", "pipx", "node", "npm", "tsc", "go", "rustc", "cargo", "javac", "java", "mvn", "ruby", "php", "lua5.4",
-    "dotnet", "swift", "sourcekit-lsp", "xcodegen",
     "cc", "gcc", "g++", "clang", "clangd", "cmake", "make", "ninja", "meson",
     "gdb", "valgrind", "shellcheck", "sqlite3", "psql",
     "git", "gh", "rg", "jq", "tmux", "nvim", "vim", "aiws-code", "chromium", "chromedriver",
@@ -83,8 +73,7 @@ DETECT_TOOLS = (
 # Single source of truth for tool classes. Every other module imports these.
 READ_TOOLS = frozenset({
     "workspace.tree", "file.read", "file.stat", "tools.list", "doc.text", "file.trashList", "code.search", "git.inspect",
-    "runtime.detect", "browser.local_text", "platform.inspect", "code.symbols",
-    "code.references", "code.dependencies", "code.platformApis",
+    "runtime.detect", "browser.local_text",
     "system.info", "network.status", "download.list", "download.progress",
 }) | aiws_exttools.names()
 # Desktop launches are write-class: they always become pending DAG stages that need the user's approval, and they are
@@ -774,18 +763,6 @@ def invoke(name, arguments):
         return {"path": arguments["path"], "text": _extract(_text_file(_path(root, arguments["path"])))}
     if name == "browser.snapshot":
         return _browser(root, arguments)
-    if name == "platform.inspect":
-        return inspect_project(root, arguments.get("path", "."), _path)
-    if name == "project.scaffold":
-        return scaffold_project(root, arguments)
-    if name == "code.symbols":
-        return code_symbols(root, arguments, _path)
-    if name == "code.references":
-        return code_references(root, arguments, _path)
-    if name == "code.dependencies":
-        return code_dependencies(root, arguments, _path)
-    if name == "code.platformApis":
-        return code_platform_apis(root, arguments, _path)
     raise AssertionError("Unreachable tool dispatch")
 
 def audit(name, arguments, ok):

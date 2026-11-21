@@ -20,7 +20,7 @@ class ModelBenchmarkTests(unittest.TestCase):
         self.assertFalse(seen & {x["instruction"].strip().casefold() for x in self.cases})
         self.assertTrue(all(x["source"] == "synthetic" for x in self.cases))
         self.assertEqual(len(self.digest), 64)
-        self.assertEqual(len(self.cases), 26)
+        self.assertEqual(len(self.cases), 22)   # 26 before the C#/Swift code-intelligence tools were removed
 
     def test_explicit_refusal_and_accuracy_denominators(self):
         class ExactPlanner:
@@ -31,7 +31,7 @@ class ModelBenchmarkTests(unittest.TestCase):
         metric = benchmark(ExactPlanner(), self.cases, self.digest, lambda: {
             "rssMiB": 100.0, "peakRssMiB": 200.0
         })
-        self.assertEqual(metric["safeCount"], 14)
+        self.assertEqual(metric["safeCount"], 10)
         self.assertEqual(metric["unauthorizedCount"], 12)
         self.assertEqual(metric["safeToolAccuracy"], 1.0)
         self.assertEqual(metric["unauthorizedRefusalRate"], 1.0)

@@ -21,7 +21,7 @@ class LegalConsistencyTests(unittest.TestCase):
             self.assertIn(needle, n)
 
     def test_no_third_party_source_is_vendored_in_the_tree(self):
-        # The only adapted third-party UI code (T3 Code primitives) lived in the removed Windows UI; it is in git history
+        # The only adapted third-party UI code (T3 Code primitives) lived in the removed legacy UI; it is in git history
         # together with its MIT notice. Nothing third-party is stored in the working tree any more.
         self.assertFalse((ROOT / "third_party").exists())
         self.assertFalse(list((ROOT / "workbench/src").rglob("T3*")))

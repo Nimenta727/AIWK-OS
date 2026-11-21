@@ -59,7 +59,7 @@ class SchemaTests(unittest.TestCase):
         entries = [resolve(s) for s in SCHEMA["oneOf"]]
         tools = {s["properties"]["tool"]["const"] for s in entries if "tool" in s["properties"]}
         self.assertEqual(tools, READ_TOOLS | MODEL_WRITE_TOOLS | {"refuse"})
-        for forbidden in ("file.replace", "browser.snapshot", "runtime.test", "project.scaffold", "download.start"):
+        for forbidden in ("file.replace", "browser.snapshot", "runtime.test", "download.start"):
             self.assertNotIn(forbidden, tools)
         text = json.dumps(SCHEMA)
         self.assertNotIn("expectedSha256", text)                  # the model can never even emit a fingerprint

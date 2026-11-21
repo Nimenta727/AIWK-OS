@@ -5,11 +5,7 @@ type Capability={name:string;description:string;inputSchema:{properties:Record<s
 type StageDraft={key:string;label:string;tool:string;path:string;query:string;dependsOn:string};
 type TaskHeader={id:string;title:string;goal:string;created_at:number};
 type Stage={id:string;stage_key:string;label:string;tool:string;arguments:Record<string,string>;state:string;approval:number;dependsOn:string[];error:string|null;result:unknown};
-type WindowsHistory={sourceSha256:string;executable:boolean;requiresToolMapping:boolean;
- evidence:{graphMode:boolean;stages:Array<{key:string;windowsStatus:string;windowsAgent:string;
-  windowsRequiresApproval:boolean;windowsApprovalGranted:boolean}>;planRevisionSha256:string[];
- artifactRefs:Array<{kind:string;sha256:string}>;originalExecutionRecordCount:number}};
-type TaskDetail={task:TaskHeader;stages:Stage[];windowsImport?:WindowsHistory};
+type TaskDetail={task:TaskHeader;stages:Stage[]};
 type ModelStatus={configured:boolean;online:boolean;cloudFallback:boolean;model:string;automaticExecution:boolean;cpuOnly:boolean;weightsPresent:boolean};
 type Step={tool:string;arguments:Record<string,string>;reason:string;grade?:string};
 type Bilingual={zh:string;en:string};
@@ -108,26 +104,6 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    await request(base+'approve',{method:'POST',headers,body:'{}'});
    await request(base+'dispatch',{method:'POST',headers,body:'{}'});
    await open(detail.task.id);
-  }catch(e){setError(String(e));}
-  finally{setBusy(false);}
- };
- const importWindows=async(file:File|undefined)=>{
-  if(!file||!csrf||busy)return;
-  setBusy(true);setError('');
-  try{
-   // The browser file picker opens only guest-visible files. Nothing uploads
-   // to a cloud/host endpoint: the API origin is the guest loopback.
-   if(file.size>12000)throw new Error(tr(
-    '仅支持不超过 12 KB 的单个 Windows WorkTask 导出文件',
-    'One Windows WorkTask JSON export up to 12 KB is supported'));
-   const input=JSON.parse(await file.text()) as unknown;
-   const body=JSON.stringify({task:input});
-   if(new TextEncoder().encode(body).byteLength>16000)throw new Error(
-    tr('导出数据太大，请缩减单个历史任务','Export exceeds safe guest request limit'));
-   const imported=await request<TaskDetail>('/tasks/import/windows',{
-    method:'POST',headers,body});
-   await update();
-   await open(imported.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
@@ -268,16 +244,6 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
      onClick={()=>void create()}>{tr('保存任务与 DAG','Save task and DAG')}</button>
    </div>
   </section>
-  {focus==='tasks'&&<section className="aiws-os-card">
-   <h2>{tr('Windows 工作流历史导入','Import Windows workflow history')}</h2>
-   <p className="aiws-os-muted">{tr(
-    '请先在 Windows 中导出一个 WorkTask JSON，并通过客户机内部文件导入。原任务 ID、阶段依赖、审批历史和证据哈希会保留；导入阶段不可执行，需未来重新映射客户机工具。',
-    'Select a Windows WorkTask JSON exported into the guest. Original IDs, DAG, approval history and evidence hashes are retained. Imported stages are NOT executable until separately mapped to guest tools.')}</p>
-   <label>{tr('选择客户机中的 Windows WorkTask JSON（不超过 12 KB）','Select a guest-local WorkTask JSON (max 12 KB)')}
-    <input data-aiws="windows-import" type="file" accept=".json,application/json"
-     disabled={!csrf||busy} onChange={e=>{const file=e.target.files?.[0];e.target.value='';void importWindows(file);}}/>
-   </label>
-  </section>}
   <section className="aiws-os-card">
    <h2>{tr('客体持久任务','Guest persistent tasks')}</h2>
    {taskList.map(task=><button className="aiws-os-task" type="button" key={task.id} onClick={()=>void open(task.id)}>
@@ -286,16 +252,6 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   </section>
   {detail&&<section className="aiws-os-card">
    <h2>{detail.task.title}</h2><p>{detail.task.goal}</p>
-   {detail.windowsImport&&<div className="aiws-os-proposal" data-aiws="windows-import-history">
-    <strong>{tr('Windows 历史任务：不可执行','Imported Windows history: NOT EXECUTABLE')}</strong>
-    <p>{tr('原始步骤均处于 UNMAPPED 状态，没有权限运行或批准旧 Windows Agent 指令。',
-     'All original stages remain UNMAPPED and have no permission to dispatch or approve legacy Windows agent instructions.')}</p>
-    <p className="aiws-os-muted">Source SHA-256: {detail.windowsImport.sourceSha256.slice(0,24)}…</p>
-    {detail.windowsImport.evidence.stages.map(x=><p key={x.key} className="aiws-os-muted">
-      {x.key.slice(0,8)}… · {x.windowsAgent} · {x.windowsStatus}
-      {x.windowsRequiresApproval?' · '+tr('原需审批','Original approval required'):''}
-    </p>)}
-   </div>}
    {detail.stages.map(s=><div className="aiws-os-stage-status" key={s.id}>
     <div><strong>{s.stage_key}: {s.label}</strong><span>{s.state.toUpperCase()}</span></div>
     <p>{s.tool}{s.dependsOn.length?' ← '+s.dependsOn.join(', '):''}</p>

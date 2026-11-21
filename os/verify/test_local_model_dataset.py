@@ -11,7 +11,7 @@ class TrainingDataTest(unittest.TestCase):
     def test_examples_are_explicitly_synthetic_and_split(self):
         train,holdout=load_validate(TRAIN/"synthetic_intents.jsonl")
         self.assertGreaterEqual(len(train),10)
-        self.assertGreaterEqual(len(holdout),6)
+        self.assertGreaterEqual(len(holdout),5)
         self.assertTrue(all(row["expected"]["requiresReview"] == (row["expected"]["tool"] != "refuse")
                             for row in holdout.values()))
         self.assertEqual(sum(x["expected"]["tool"] == "refuse" for x in holdout.values()),2)

@@ -77,11 +77,6 @@ class GuestTaskStore:
         );
         CREATE INDEX IF NOT EXISTS task_stages_idx ON stages(task_id,created_at);
         CREATE INDEX IF NOT EXISTS task_audit_idx ON audit(task_id,seq);
-        CREATE TABLE IF NOT EXISTS windows_imports(
-            task_id TEXT PRIMARY KEY REFERENCES tasks(id),
-            source_sha256 TEXT NOT NULL UNIQUE,
-            evidence_json TEXT NOT NULL, imported_at INTEGER NOT NULL
-        );
         """)
         os.chmod(database, 0o600)
         if not self.verify_audit()["valid"]:
@@ -303,61 +298,7 @@ class GuestTaskStore:
                     item["result"] = None
                 values.append(item)
             response={"task": dict(task), "stages": values}
-            legacy=self.db.execute(
-                "SELECT source_sha256,evidence_json FROM windows_imports WHERE task_id=?",
-                (task_id,)).fetchone()
-            if legacy is not None:
-                evidence=json.loads(legacy["evidence_json"])
-                receipt=self.db.execute(
-                    "SELECT details FROM audit WHERE task_id=? AND "
-                    "action='windows.history_imported' ORDER BY seq LIMIT 1",
-                    (task_id,)).fetchone()
-                expected=hashlib.sha256(encode(evidence).encode("utf-8")).hexdigest()
-                if receipt is None or json.loads(receipt["details"]).get("evidenceSha256") != expected:
-                    raise TaskError("Imported Windows evidence checksum mismatch")
-                response["windowsImport"]={
-                    "sourceSha256":legacy["source_sha256"],
-                    "evidence":evidence,
-                    "requiresToolMapping":True,
-                    "executable":False
-                }
             return response
-
-    def import_windows(self, worktask):
-        """Retain Windows work history as NON-EXECUTABLE unmapped DAG stages.
-
-        Nothing in the imported payload is ever passed to a guest tool/command.
-        The imported stage identities, state provenance and SHA evidence remain
-        queryable through the SAME durable Agent, not a separate UI-only DB.
-        """
-        from aiws_windows_compat import convert_windows_task
-        safe=convert_windows_task(worktask)
-        tid, now=safe["taskId"], int(time.time())
-        with self.lock, self._transition():
-            if self.db.execute("SELECT 1 FROM tasks WHERE id=?",(tid,)).fetchone():
-                raise TaskError("Imported Windows task ID already exists")
-            self.db.execute(
-                "INSERT INTO tasks(id,title,goal,created_at,updated_at) VALUES(?,?,?,?,?)",
-                (tid,safe["title"],safe["goal"],now,now))
-            for ordinal, stage in enumerate(safe["stages"]):
-                self.db.execute(
-                    "INSERT INTO stages(id,task_id,stage_key,label,tool,args_json,"
-                    "depends_json,state,approval,created_at,ordinal) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    (stage["key"],tid,stage["key"],stage["label"],"windows.unmapped",
-                     "{}",encode(stage["dependsOn"]),"unmapped",0,now,ordinal))
-            evidence=safe["metadata"]
-            self.db.execute(
-                "INSERT INTO windows_imports(task_id,source_sha256,evidence_json,imported_at)"
-                " VALUES(?,?,?,?)",
-                (tid,evidence["sourceSha256"],encode(evidence),now))
-            self._event(tid,None,"windows.history_imported",{
-                "windowsTaskId":tid,"sourceSha256":evidence["sourceSha256"],
-                "stageCount":len(safe["stages"]),
-                "evidenceSha256":hashlib.sha256(encode(evidence).encode("utf-8")).hexdigest(),
-                "autoExecuted":False,
-                "toolMappingRequired":True,
-            })
-        return self.get(tid)
 
     ROUTE_KEYS = {"route", "rule", "agent", "instructionSha256", "forbidden", "externalAllowed", "externalEnabled"}
 

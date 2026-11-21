@@ -36,10 +36,9 @@ class ToolPlaneTests(unittest.TestCase):
         mcp_names={item["name"] for item in message["result"]["tools"]}
         self.assertTrue(mcp_names.issubset(names))
         self.assertIn("file.read", mcp_names)
-        self.assertIn("code.symbols", mcp_names)
+        self.assertIn("code.search", mcp_names)
         self.assertNotIn("file.replace", mcp_names)
         self.assertNotIn("runtime.test", mcp_names)
-        self.assertNotIn("project.scaffold", mcp_names)
         init = aiws_mcp.handle({"jsonrpc": "2.0", "id": 2, "method": "initialize"})
         self.assertIn("serverInfo", init["result"])
 

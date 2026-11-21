@@ -1,5 +1,5 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,BrainCircuit,ChevronDown,ChevronRight,Code2,Eye,File as FileIcon,Folder,FolderTree,Layers3,Globe,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun,Wrench} from 'lucide-react';
+import {useCallback,useEffect,useMemo,useState} from 'react';
+import {Activity,BrainCircuit,ChevronDown,ChevronRight,Eye,File as FileIcon,Folder,FolderTree,Layers3,Globe,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun,Wrench} from 'lucide-react';
 import './OsWorkbench.css';
 import './shell.css';
 import {ActivityBar,CommandPalette,Panel,SideBar,StatusBar,TabBar} from './Shell';
@@ -19,7 +19,7 @@ type Tool={name:string;description:string;inputSchema:{properties:Record<string,
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;brokerReady?:boolean;brokerScope?:string};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type View='browser'|'observatory'|'overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
+type View='browser'|'observatory'|'overview'|'files'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
 type TreeNode={name:string;path:string;type:'dir'|'file';children:TreeNode[]};
 type AppRow={id:string;kind:string;category:string;zh:string;en:string;installed:boolean;path:string|null;launchable:boolean};
@@ -29,7 +29,6 @@ const VIEWS:{id:View;zh:string;en:string;icon:typeof Activity}[]=[
  {id:'overview',zh:'系统概览',en:'System overview',icon:Layers3},
  {id:'browser',zh:'内置浏览器',en:'Preview browser',icon:Globe},
  {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
- {id:'code',zh:'代码智能',en:'Code Intelligence',icon:Code2},
  {id:'tasks',zh:'任务与证据',en:'Tasks & evidence',icon:BrainCircuit},
  {id:'plans',zh:'持久任务与 DAG',en:'Persistent DAG',icon:Layers3},
  {id:'local',zh:'本地 AI 助手',en:'Local AI assistant',icon:BrainCircuit},
@@ -56,12 +55,7 @@ export default function OsWorkbench(){
  const [csrf,setCsrf]=useState('');
  const [error,setError]=useState('');
  const [starting,setStarting]=useState(true);
- const [tool,setTool]=useState('code.symbols');
- const [path,setPath]=useState('.');
- const [query,setQuery]=useState('');
  const [job,setJob]=useState<Job|null>(null);
- const [submitting,setSubmitting]=useState(false);
- const pending=useRef(false);
  const [command,setCommand]=useState<{text:string;nonce:number}|null>(null);
  const [tree,setTree]=useState<TreeNode[]>([]);
  const [treeNote,setTreeNote]=useState('');
@@ -109,7 +103,6 @@ export default function OsWorkbench(){
  },[job,refresh]);
 
  const tools=useMemo(()=>snapshot?.capabilities||[],[snapshot]);
- const chosen=tools.find(t=>t.name===tool);
  const health=snapshot?.health;
  const summary=data.summary;
  const viewTitle=(v:View)=>{const m=VIEWS.find(x=>x.id===v)!;return english?m.en:m.zh;};
@@ -133,22 +126,6 @@ export default function OsWorkbench(){
    setAppNote(r.started?tr('正在启动…','Starting…'):tr('刚刚已经启动过，请稍等。','Already starting, please wait.'));
   }catch(e){setAppNote(String(e instanceof Error?e.message:e));}
  };
- const submitTool=async()=>{
-  if(pending.current||!csrf||!chosen)return;
-  const params:Record<string,string>={};
-  if(chosen.inputSchema.properties.path)params.path=path||'.';
-  if(chosen.inputSchema.properties.query)params.query=query;
-  if(chosen.inputSchema.properties.symbol)params.symbol=query;
-  if(chosen.inputSchema.properties.view)params.view='status';
-  if(chosen.inputSchema.required.some(k=>!params[k])){setError(tr('请填写必填参数','Please enter the required argument'));return;}
-  pending.current=true;setSubmitting(true);setError('');
-  try{
-   const result=await api<Job>('/jobs',{method:'POST',headers:{'Content-Type':'application/json','X-AIWS-CSRF':csrf},body:JSON.stringify({tool,arguments:params})});
-   setJob(result);openView('tasks');await refresh();
-  }catch(e){setError(String(e));}
-  finally{pending.current=false;setSubmitting(false);}
- };
-
  const selectActivity=(id:string)=>{
   if(sidebar&&activity===id){setSidebar(false);return;}
   setActivity(id);setSidebar(true);
@@ -221,7 +198,6 @@ export default function OsWorkbench(){
   if(activity==='ai')return <SideBar title={tr('AI','AI')}>
    <div className="aiws-sh-list">{tr('本地小模型只做中转与本机文件/系统操作，不联网。云端构建通过官方 CLI，在你授权的预算内进行。','The local model only relays and does local file/system work, offline. Cloud building goes through the official CLI within the budget you grant.')}</div>
    <button type="button" className="aiws-sh-row" onClick={()=>openView('local')}><BrainCircuit size={14}/>{tr('本地 AI 助手','Local AI assistant')}</button>
-   <button type="button" className="aiws-sh-row" onClick={()=>openView('code')}><Code2 size={14}/>{tr('代码智能（只读）','Code intelligence (read-only)')}</button>
    <div className="aiws-sh-section">{tr('代码编辑器','Code editor')}</div>
    <div className="aiws-sh-list">{ide?.installed?(ide.running?tr('AIWS Code 正在运行','AIWS Code is running'):tr('AIWS Code 已安装','AIWS Code is installed')):tr('AIWS Code 未安装在此镜像中','AIWS Code is not installed in this image')}</div>
    <button type="button" className="aiws-sh-btn" style={{margin:'2px 12px'}} disabled={!ide?.installed||!csrf} onClick={()=>void openIde()}>{tr('打开 AIWS Code','Open AIWS Code')}</button>
@@ -262,14 +238,6 @@ export default function OsWorkbench(){
      <p>{tr('自然语言 → 本地模型中转 → 审批 → 客户机工具 / 官方 CLI → 审计证据','Natural language → local relay model → approval → guest tools / official CLI → audit evidence')}</p></section>
    </div>}
    {page==='files'&&<GuestFiles csrf={csrf} english={english} command={command} onPlanCreated={()=>openView('plans')}/>}
-   {page==='code'&&<section className="aiws-os-card">
-    <h2>{tr('通过 Agent 调用代码能力','Call a code tool through the task controller')}</h2>
-    <label>{tr('能力','Capability')}<select value={tool} onChange={e=>setTool(e.target.value)}>{tools.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select></label>
-    {chosen?.inputSchema.properties.path&&<label>{tr('相对路径','Relative path')}<input value={path} onChange={e=>setPath(e.target.value)}/></label>}
-    {(chosen?.inputSchema.properties.query||chosen?.inputSchema.properties.symbol)&&<label>{chosen.inputSchema.properties.symbol?'Symbol':'Query'}<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ContentView"/></label>}
-    <p className="aiws-os-muted">{chosen?.description}</p>
-    <button type="button" className="aiws-os-primary" disabled={submitting||!chosen||!csrf} onClick={()=>void submitTool()}><Play size={16}/>{tr('提交只读任务','Run read-only task')}</button>
-   </section>}
    {page==='tasks'&&<div className="aiws-os-stack">
     <section className="aiws-os-card"><h2>{tr('任务队列','Task queue')}</h2>{snapshot?.jobs.length?snapshot.jobs.map(item=>
      <button type="button" className="aiws-os-task" key={item.id} onClick={()=>setJob(item)}><span>{item.tool}</span><strong>{item.status}</strong></button>)

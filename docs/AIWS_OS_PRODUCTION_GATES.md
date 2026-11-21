@@ -63,9 +63,8 @@ tamper-proof guest-root protection by default.
 
 ## A — bounded autonomy after enforcement
 
-The Linux Agent already uses a persistent SQLite DAG and user systemd unit;
-Windows plans, WorkItems, AgentRuns and evidence import as non-executable
-history without inherited approval. Preserve those invariants.
+The Linux Agent already uses a persistent SQLite DAG and user systemd unit.
+Preserve those invariants.
 
 Parallel model track: independent bilingual held-out prompts, explicit
 refusal rate, valid tool/argument selection, QEMU guest P95 latency and
@@ -81,7 +80,6 @@ tool calls, risk and retries, with fail-closed per-tool authorization.
 | Shell | XFCE panel, Openbox, normal app, X11 input/clipboard checks | Full Chinese IME, all desktop UX and real-world peripherals |
 | Broker | Separate same-UID policy server, Agent/MCP fail-closed route and tests (CI pending) | Truly mandatory OS isolation under separate worker credentials |
 | Model | Qwen3.5-2B guest benchmark harness | Accepted model results and robust autonomous loop |
-| Migration | Windows evidence imported as non-executable history | Complete native live DAG mapping and review of tools |
 | Release | Debian experimental CI recipe | Update/rollback/installer/license/SBOM/accessibility/hardware |
 
 Always report implementation, CI evidence, and physical acceptance separately.

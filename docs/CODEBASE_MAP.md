@@ -34,7 +34,7 @@ AIWK-OS/
 | `aiws_local_model.py` / `aiws_model_gate.py` / `aiws_model_schema.py` / `aiws_model_router.py` / `aiws_model_registry.py` | 本地模型：提议校验、懒启动与空闲卸载、受约束输出、规则→本地→官方 CLI 路由 | 离线；只提议 |
 | `aiws_events.py` / `aiws_observatory.py` | 事件库与观察台汇总（token 只统计提供方上报数字） | 只读；不触发模型调用 |
 | `aiws_mandate.py` / `aiws_supervisor.py` / `aiws_cli_adapters.py` / `aiws_egress_proxy.py` | 官方 CLI 一次性授权、监督与用户隔离、输出解析、域名白名单代理 | 不保存 API 密钥；预算超限即停 |
-| `aiws_codeintel.py` / `aiws_crossplatform.py` / `aiws_windows_compat.py` / `aiws_boot_slots.py` | 只读代码智能（C#/Swift 等）、跨平台源码模板、旧 Windows 任务历史的受限导入、启动槽位 | 原型；旧审批不继承 |
+| `aiws_boot_slots.py` | 启动槽位（A/B 候选）管理 | 原型 |
 
 新增运行时模块时**先把文件名加入 `os/runtime/MODULES`**；`test_runtime_manifest.py` 会在清单与目录不一致时失败。
 

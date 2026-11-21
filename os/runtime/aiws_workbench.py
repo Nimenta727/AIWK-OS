@@ -459,11 +459,6 @@ class Controller:
                 return
         threading.Thread(target=work, daemon=True, name="aiws-autorun").start()
 
-    def import_windows(self, payload):
-        if not isinstance(payload,dict) or set(payload)!={"task"}:
-            raise ValueError("Expected Windows exported WorkTask object in task field")
-        return self.tasks.import_windows(payload["task"])
-
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
             raise TaskError("Expected title, goal and stages")
@@ -737,7 +732,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -769,8 +764,6 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.submit(payload["tool"], payload["arguments"])
             elif path == "/api/v1/tasks":
                 result = app.create_plan(payload)
-            elif path == "/api/v1/tasks/import/windows":
-                result = app.import_windows(payload)
             elif path in ("/api/v1/model/enable", "/api/v1/model/disable"):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
