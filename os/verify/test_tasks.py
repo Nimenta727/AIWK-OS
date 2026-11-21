@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "runtime"))
@@ -79,6 +80,29 @@ class TaskStoreTests(unittest.TestCase):
           ("kernel.abandon",{"candidateId":"bad"})]:
             with self.assertRaises((TaskError,ValueError)):
                 self.store.create("Rejected","",[stage("s",tool=tool,args=args)])
+
+    def test_failed_audit_write_rolls_back_stage_mutation(self):
+        doc=self.store.create("Reliable guest stage","",[
+            stage("write",tool="file.replace",
+                  args={"path":"test.txt","text":"new","expectedSha256":""})])
+        tid=doc["task"]["id"]
+        with patch.object(self.store,"_event",side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store.approve(tid,"write")
+        self.assertEqual(self.store.get(tid)["stages"][0]["approval"],0)
+        self.assertTrue(self.store.verify_audit()["valid"])
+        self.store.approve(tid,"write")
+        with patch.object(self.store,"_event",side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store.dispatch(tid,"write")
+        self.assertEqual(self.store.get(tid)["stages"][0]["state"],"pending")
+        self.assertTrue(self.store.verify_audit()["valid"])
+        self.store.dispatch(tid,"write")
+        with patch.object(self.store,"_event",side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store.started(tid,"write")
+        self.assertEqual(self.store.get(tid)["stages"][0]["state"],"queued")
+        self.assertTrue(self.store.verify_audit()["valid"])
 
     def test_guest_restart_needs_new_write_approval(self):
         doc=self.store.create("Restart model","",[stage("restart",tool="service.restart",

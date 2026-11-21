@@ -5,6 +5,7 @@ host API or privileged operation. The unprivileged guest controller supplies a
 separate allowlisted tool runner.
 """
 from pathlib import Path
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -117,6 +118,19 @@ class GuestTaskStore:
         if not self.verify_audit()["valid"]:
             raise TaskError("Guest audit corruption; scheduling blocked")
 
+    @contextmanager
+    def _transition(self):
+        """Persist state change and its audit receipt in one SQLite transaction."""
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self._check_audit()
+            yield
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+        else:
+            self.db.execute("COMMIT")
+
     def _event(self, task_id, stage_id, action, details):
         timestamp = int(time.time())
         last = self.db.execute("SELECT entry_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
@@ -130,7 +144,7 @@ class GuestTaskStore:
         return digest
 
     def _recover_interrupted(self):
-        with self.lock:
+        with self.lock, self._transition():
             rows = self.db.execute(
                 "SELECT task_id,id,tool FROM stages WHERE state IN ('queued','running')").fetchall()
             for row in rows:
@@ -256,8 +270,7 @@ class GuestTaskStore:
         if not isinstance(prompt, str) or not isinstance(proposal, dict):
             raise TaskError("Invalid model provenance")
         self.get(task_id)
-        with self.lock:
-            self._check_audit()
+        with self.lock, self._transition():
             self._event(task_id, None, "model.proposed",
                         {"model": model_name,
                          "promptSha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
@@ -281,8 +294,7 @@ class GuestTaskStore:
         return row
 
     def approve(self, task_id, stage_key):
-        with self.lock:
-            self._check_audit()
+        with self.lock, self._transition():
             row = self._row(task_id, stage_key)
             if row["state"] not in ("pending", "interrupted") or row["tool"] not in WRITE_TOOLS:
                 raise TaskError("Only pending guest-write stages require approval")
@@ -292,8 +304,7 @@ class GuestTaskStore:
             return self.get(task_id)
 
     def dispatch(self, task_id, stage_key):
-        with self.lock:
-            self._check_audit()
+        with self.lock, self._transition():
             row = self._row(task_id, stage_key)
             if row["state"] not in ("pending", "interrupted"):
                 raise TaskError("Stage already queued/running/completed; cannot double dispatch")
@@ -311,8 +322,7 @@ class GuestTaskStore:
                     "approvalGranted": bool(row["approval"])}
 
     def started(self, task_id, stage_key):
-        with self.lock:
-            self._check_audit()
+        with self.lock, self._transition():
             row = self._row(task_id, stage_key)
             if row["state"] != "queued":
                 raise TaskError("Expected queued stage")
@@ -320,8 +330,7 @@ class GuestTaskStore:
             self._event(task_id, row["id"], "stage.running", {"key": stage_key})
 
     def finished(self, task_id, stage_key, result=None, error=None):
-        with self.lock:
-            self._check_audit()
+        with self.lock, self._transition():
             row = self._row(task_id, stage_key)
             if row["state"] != "running":
                 raise TaskError("Expected running stage")
