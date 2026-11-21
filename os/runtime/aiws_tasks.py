@@ -14,16 +14,9 @@ import threading
 import time
 from uuid import uuid4
 from aiws_guest_ops import TOOLS as GUEST_OP_TOOLS, WRITE_TOOLS as GUEST_OP_WRITES, validate as validate_guest_operation
-from aiws_toolplane import catalog as tool_catalog
+from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
 
-TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.replace", "file.stat", "file.trashList", "file.mkdir", "file.copy",
-    "file.move", "file.trash", "file.restore", "code.search",
-    "git.inspect", "runtime.detect", "browser.local_text", "platform.inspect",
-    "code.symbols", "code.references", "code.dependencies", "code.platformApis",
-}) | GUEST_OP_TOOLS
-FILE_WRITE_TOOLS = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
-                              "file.trash", "file.restore"})
+TOOLS = PLANE_READ_TOOLS | FILE_WRITE_TOOLS | GUEST_OP_TOOLS
 WRITE_TOOLS = FILE_WRITE_TOOLS | GUEST_OP_WRITES
 MAX_STAGES = 32
 

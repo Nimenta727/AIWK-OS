@@ -12,10 +12,10 @@ import socketserver
 import struct
 from aiws_guest_boundary import protect_guest_workspace, require_guest_runtime
 from aiws_guest_ops import GuestOperations, TOOLS as SYSTEM_TOOLS, READ_TOOLS
-from aiws_local_model import LocalPlanner
+from aiws_local_model import LocalPlanner, stages_from_proposal
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_permission_broker import BrokerClient, BrokerDenied
-from aiws_toolplane import invoke, audit, catalog as tool_catalog
+from aiws_toolplane import invoke, audit, catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS
 
 class AgentError(ValueError):
     pass
@@ -101,12 +101,14 @@ class AgentCore:
             fields(a,{"instruction","proposal"})
             if not isinstance(a["instruction"],str) or not 1<=len(a["instruction"])<=1000:
                 raise AgentError("Invalid bounded instruction")
-            proposal=LocalPlanner.validate(a["proposal"])
+            # Independent revalidation of the raw model shape. The Agent (not the model, not the
+            # UI) reads the real files and computes every fingerprint for approval-gated writes.
+            proposal=LocalPlanner.validate_any(a["proposal"])
             if proposal["tool"] == "refuse":
                 raise AgentError("Refusals cannot become executable Agent stages")
-            stage={"key":"inspect","label":proposal["reason"][:160],
-                   "tool":proposal["tool"],"arguments":proposal["arguments"],"dependsOn":[]}
-            task=self.tasks.create("Local proposal: "+proposal["tool"],proposal["reason"],[stage])
+            stages=stages_from_proposal(proposal,lambda p: invoke("file.stat",{"path":p}))
+            title=("Local plan: %d steps"%len(stages)) if "steps" in proposal else "Local proposal: "+proposal["tool"]
+            task=self.tasks.create(title,proposal["reason"],stages)
             self.tasks.record_model_proposal(task["task"]["id"],"aiws-local",
                                              a["instruction"],proposal)
             return self.tasks.get(task["task"]["id"])
@@ -115,9 +117,7 @@ class AgentCore:
             return self.tasks.verify_audit()
         if op=="tool.read":
             fields(a,{"tool","arguments"})
-            readonly={"workspace.tree","file.read","file.stat","file.trashList","code.search","git.inspect",
-                      "runtime.detect","browser.local_text","platform.inspect",
-                      "code.symbols","code.references","code.dependencies","code.platformApis"}
+            readonly=PLANE_READ_TOOLS
             if a["tool"] not in readonly:
                 raise AgentError("Direct guest tool IPC limited to read-only actions")
             if not isinstance(a["arguments"],dict):

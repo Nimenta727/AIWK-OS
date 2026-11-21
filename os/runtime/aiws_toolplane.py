@@ -5,6 +5,7 @@ Not an OS sandbox or a privileged broker. Host protection belongs to the hypervi
 import hashlib
 from html.parser import HTMLParser
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -27,6 +28,10 @@ MAX_TRASH_ITEMS = 500
 TOOL_SPECS = [
     ("workspace.tree", "List bounded workspace files without following symlinks", {"path": "string"}),
     ("file.read", "Read a UTF-8 file and its SHA-256", {"path": "string"}),
+    ("system.info", "Read-only local OS facts: kernel, uptime, load, memory, workspace disk usage", {}),
+    ("network.status", "Read-only LOCAL network state from the kernel (interfaces, addresses, route, DNS config, socket counts, throughput). Sends no packets", {}),
+    ("download.list", "List downloads in the workspace downloads/ folder with complete/partial state (reads files only; cannot download)", {}),
+    ("download.progress", "Progress of one partial download under downloads/: size, growth rate, percent if a .progress.json sidecar gives totalBytes", {"path": "string"}),
     ("file.stat", "Read type, size, mtime and SHA-256 (directories: bounded tree fingerprint)", {"path": "string"}),
     ("file.trashList", "List items in the reversible workspace trash (id, original path, type, time)", {}),
     ("file.mkdir", "Create one new directory; parent must exist; guest workspace write", {"path": "string"}),
@@ -55,10 +60,20 @@ def catalog():
         properties = {key: {"type": value} for key, value in fields.items()}
         required = (["query"] if name == "code.search" else
                     ["symbol"] if name == "code.references" else
-                    list(fields) if name in {"file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
+                    list(fields) if name in {"download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
+
+# Single source of truth for tool classes. Every other module imports these.
+READ_TOOLS = frozenset({
+    "workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
+    "runtime.detect", "browser.local_text", "platform.inspect", "code.symbols",
+    "code.references", "code.dependencies", "code.platformApis",
+    "system.info", "network.status", "download.list", "download.progress",
+})
+FILE_WRITE_TOOLS = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
+                              "file.trash", "file.restore"})
 
 def _workspace():
     value = os.environ.get("AIWS_WORKSPACE", "").strip()
@@ -192,6 +207,191 @@ def _trash_list(root, a):
             if len(items) >= MAX_TRASH_ITEMS:
                 break
     return {"items": items}
+
+def _proc(path, limit=262144):
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as stream:
+            return stream.read(limit)
+    except OSError:
+        return ""
+
+def _meminfo():
+    wanted = {"MemTotal": "totalBytes", "MemAvailable": "availableBytes",
+              "SwapTotal": "swapTotalBytes", "SwapFree": "swapFreeBytes"}
+    out = {v: None for v in wanted.values()}
+    for line in _proc("/proc/meminfo").splitlines():
+        key, _, rest = line.partition(":")
+        if key in wanted and rest.split():
+            try:
+                out[wanted[key]] = int(rest.split()[0]) * 1024
+            except ValueError:
+                pass
+    return out
+
+def _system_info(root, a):
+    name = None
+    for line in _proc("/etc/os-release", 8192).splitlines():
+        if line.startswith("PRETTY_NAME="):
+            name = line.split("=", 1)[1].strip().strip('"')[:120]
+    try:
+        uname = os.uname()
+        kernel = {"system": uname.sysname, "release": uname.release, "machine": uname.machine}
+    except AttributeError:
+        kernel = None
+    try:
+        uptime = float(_proc("/proc/uptime", 256).split()[0])
+    except (IndexError, ValueError):
+        uptime = None
+    try:
+        load = [round(x, 2) for x in os.getloadavg()]
+    except (AttributeError, OSError):
+        load = None
+    try:
+        usage = shutil.disk_usage(root)
+        disk = {"totalBytes": usage.total, "usedBytes": usage.used, "freeBytes": usage.free}
+    except OSError:
+        disk = None
+    return {"os": name, "kernel": kernel, "uptimeSeconds": uptime, "loadAverage": load,
+            "cpuCount": os.cpu_count(), "memory": _meminfo(), "workspaceDisk": disk}
+
+def _net_counters():
+    out = {}
+    for line in _proc("/proc/net/dev").splitlines()[2:]:
+        name, _, rest = line.partition(":")
+        fields = rest.split()
+        if len(fields) >= 16:
+            try:
+                out[name.strip()] = {"rxBytes": int(fields[0]), "rxErrors": int(fields[2]),
+                                     "txBytes": int(fields[8]), "txErrors": int(fields[10])}
+            except ValueError:
+                continue
+    return out
+
+def _local_ipv4():
+    found, last = [], None
+    for line in _proc("/proc/net/fib_trie").splitlines():
+        text = line.strip()
+        if text.startswith("|--"):
+            last = text[3:].strip()
+        elif text.startswith("/32 host LOCAL") and last and last not in found:
+            found.append(last)
+    return found[:16]
+
+def _default_route():
+    for line in _proc("/proc/net/route").splitlines()[1:]:
+        cols = line.split()
+        if len(cols) >= 3 and cols[1] == "00000000":
+            try:
+                raw = bytes.fromhex(cols[2])[::-1]
+                return {"interface": cols[0], "gateway": ".".join(str(b) for b in raw)}
+            except ValueError:
+                continue
+    return None
+
+def _socket_summary():
+    states = {"01": "established", "0A": "listening", "06": "timeWait"}
+    counts = {v: 0 for v in states.values()}
+    listening = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        for line in _proc(table).splitlines()[1:]:
+            cols = line.split()
+            if len(cols) < 4 or cols[3] not in states:
+                continue
+            counts[states[cols[3]]] += 1
+            if cols[3] == "0A":
+                try:
+                    listening.add(int(cols[1].rsplit(":", 1)[1], 16))
+                except (IndexError, ValueError):
+                    pass
+    return {"tcp": counts, "listeningPorts": sorted(listening)[:32]}
+
+def _network_status(root, a):
+    """Reads kernel-exported local state only. Opens no socket and sends no packet."""
+    first = _net_counters()
+    time.sleep(0.4)
+    second = _net_counters()
+    names = []
+    try:
+        names = sorted(os.listdir("/sys/class/net"))[:32]
+    except OSError:
+        pass
+    interfaces = []
+    for name in names:
+        state = _proc("/sys/class/net/" + name + "/operstate", 32).strip() or "unknown"
+        item = {"name": name, "state": state}
+        if name in first and name in second:
+            item.update(second[name])
+            item["rxBytesPerSecond"] = round((second[name]["rxBytes"] - first[name]["rxBytes"]) / 0.4)
+            item["txBytesPerSecond"] = round((second[name]["txBytes"] - first[name]["txBytes"]) / 0.4)
+        interfaces.append(item)
+    dns = [l.split()[1] for l in _proc("/etc/resolv.conf", 8192).splitlines()
+           if l.startswith("nameserver") and len(l.split()) > 1][:4]
+    return {"interfaces": interfaces, "ipv4Addresses": _local_ipv4(),
+            "defaultRoute": _default_route(), "dnsServers": dns,
+            "sockets": _socket_summary(), "activeProbe": False}
+
+DOWNLOAD_DIR = "downloads"
+PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".download", ".tmp", ".aria2")
+SIDECAR = ".progress.json"
+
+def _downloads_dir(root):
+    d = _path(root, DOWNLOAD_DIR, allow_missing=True)
+    return d if d.is_dir() and not d.is_symlink() else None
+
+def _download_state(directory, name):
+    if name.lower().endswith(PARTIAL_SUFFIXES):
+        return "partial"
+    return "partial" if (directory / (name + ".aria2")).exists() else "complete"
+
+def _download_list(root, a):
+    directory = _downloads_dir(root)
+    items = []
+    if directory is not None:
+        for entry in directory.iterdir():
+            if entry.is_symlink() or not entry.is_file() or entry.name.endswith(SIDECAR) \
+                    or entry.name.startswith("."):
+                continue
+            st = entry.stat()
+            items.append({"path": DOWNLOAD_DIR + "/" + entry.name[:200],
+                          "state": _download_state(directory, entry.name),
+                          "sizeBytes": st.st_size, "mtime": int(st.st_mtime)})
+        items.sort(key=lambda x: (-x["mtime"], x["path"]))
+    return {"directory": DOWNLOAD_DIR, "downloads": items[:200],
+            "partialCount": sum(1 for x in items if x["state"] == "partial"),
+            "canDownload": False}
+
+def _download_progress(root, a):
+    value = a["path"]
+    if not isinstance(value, str) or Path(value).parts[:1] != (DOWNLOAD_DIR,) or len(Path(value).parts) != 2:
+        raise ValueError("Path must be a file directly inside downloads/")
+    p = _path(root, value)
+    if p.is_symlink() or not p.is_file() or p.name.endswith(SIDECAR):
+        raise ValueError("Not a regular download file")
+    state = _download_state(p.parent, p.name)
+    size = p.stat().st_size
+    result = {"path": value, "state": state, "sizeBytes": size, "mtime": int(p.stat().st_mtime),
+              "bytesPerSecond": None, "totalBytes": None, "percent": None, "etaSeconds": None}
+    sidecar = p.parent / (p.name + SIDECAR)
+    if sidecar.is_file() and not sidecar.is_symlink() and sidecar.stat().st_size <= 4096:
+        try:
+            total = json.loads(sidecar.read_text(encoding="utf-8")).get("totalBytes")
+            if isinstance(total, int) and not isinstance(total, bool) and total > 0:
+                result["totalBytes"] = total
+        except (ValueError, OSError, AttributeError):
+            pass
+    if state == "partial":
+        time.sleep(0.5)
+        later = p.stat().st_size if p.exists() else size
+        result["bytesPerSecond"] = max(0, round((later - size) / 0.5))
+        size = later
+        result["sizeBytes"] = later
+    if result["totalBytes"]:
+        result["percent"] = min(100.0, round(size * 100.0 / result["totalBytes"], 1))
+        if state == "partial" and result["bytesPerSecond"]:
+            result["etaSeconds"] = max(0, math.ceil((result["totalBytes"] - size) / result["bytesPerSecond"]))
+    elif state == "complete":
+        result["percent"] = 100.0
+    return result
 
 def _guard_ops_path(value):
     if Path(value).parts[:1] == (TRASH,):
@@ -489,7 +689,9 @@ def invoke(name, arguments):
         return _file_read(root, arguments)
     if name == "file.replace":
         return _replace(root, arguments)
-    handler = {"file.stat": _stat, "file.trashList": _trash_list, "file.mkdir": _mkdir, "file.copy": _copy,
+    handler = {"system.info": _system_info, "network.status": _network_status,
+               "download.list": _download_list, "download.progress": _download_progress,
+               "file.stat": _stat, "file.trashList": _trash_list, "file.mkdir": _mkdir, "file.copy": _copy,
                "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
     if handler is not None:
         return handler(root, arguments)

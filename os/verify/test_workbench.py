@@ -302,8 +302,15 @@ class WorkbenchTests(unittest.TestCase):
             status,task=self.request("POST","/api/v1/model/plan",
                 {"instruction":"List guest project files"},hdr)
         self.assertEqual(status,202,task)
-        self.assertEqual(task["stages"][0]["state"],"pending")
         self.assertEqual(task["stages"][0]["tool"],"workspace.tree")
+        # Local read-only proposals run automatically; the stage is durable either way.
+        tid=task["task"]["id"]
+        for _ in range(200):
+            stage=self.request("GET","/api/v1/tasks/"+tid)[1]["stages"][0]
+            if stage["state"]=="completed":
+                break
+            time.sleep(.02)
+        self.assertEqual(stage["state"],"completed",stage)
         events=self.request("GET","/api/v1/tasks/"+task["task"]["id"]+"/audit")[1]["events"]
         self.assertIn("model.proposed",[e["action"] for e in events])
         self.assertNotIn("List guest project files",json.dumps(events))

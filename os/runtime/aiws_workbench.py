@@ -14,22 +14,19 @@ import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
-from aiws_toolplane import audit, catalog, invoke
+from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_model_registry import GuestModelRegistry
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
-from aiws_local_model import LocalPlanner, LocalModelError
+from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
 import subprocess
 
 HOST = "127.0.0.1"
 PORT = 17640
-READ_ONLY = frozenset({"workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
-                       "runtime.detect", "browser.local_text", "platform.inspect",
-                       "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
-GUEST_WRITES = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
-                          "file.trash", "file.restore"})
+READ_ONLY = PLANE_READ_TOOLS
+GUEST_WRITES = FILE_WRITE_TOOLS
 # No direct guest write through transient /jobs: use approved durable DAG.
 EXPOSED = READ_ONLY
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
@@ -190,8 +187,10 @@ class Controller:
             else:
                 tree=invoke("workspace.tree", {"path": "."})
             rows=self.tasks.list()
-            files=[str(f)[:96] for f in tree.get("files", [])[:24]
-                   if isinstance(f, str) and 0 < len(f) <= 96]
+            folders=[str(d)[:94] + "/" for d in tree.get("dirs", [])[:8]
+                     if isinstance(d, str) and 0 < len(d) <= 94]
+            files=folders + [str(f)[:96] for f in tree.get("files", [])[:24 - len(folders)]
+                             if isinstance(f, str) and 0 < len(f) <= 96]
             tasks=[{"id":str(t["id"])[:48], "title":str(t["title"])[:80]}
                    for t in rows[:8] if isinstance(t, dict)
                    and isinstance(t.get("id"), str)
@@ -207,23 +206,48 @@ class Controller:
             instruction, context=self.local_guest_context() if configured else None)
 
     def model_plan(self, instruction):
-        """Persist but do not execute a validated, read-only local model plan."""
+        """Persist a validated local model plan. Read-only leading stages run automatically;
+        every file-changing stage waits for an explicit user approval."""
         proposal = self.local_suggest(instruction)
         if proposal["tool"] == "refuse":
             # Explicit refusals are terminal decisions, never DAG tool nodes.
             return {"refused": True, "proposal": proposal, "executed": False}
         if self.agent is not None:
-            # Production: independent systemd user Agent revalidates the model
-            # output, owns durable state and records prompt/proposal hashes.
-            return self.tasks.model_plan(instruction, proposal)
-        stage = {"key": "inspect", "label": proposal["reason"][:160],
-                 "tool": proposal["tool"], "arguments": proposal["arguments"],
-                 "dependsOn": []}
-        saved = self.tasks.create(
-            ("Local proposal: " + proposal["tool"])[:160], proposal["reason"], [stage])
-        self.tasks.record_model_proposal(
-            saved["task"]["id"], "aiws-local", instruction, proposal)
-        return self.tasks.get(saved["task"]["id"])
+            # Production: independent systemd user Agent revalidates the raw model output,
+            # computes fingerprints, owns durable state and records prompt/proposal hashes.
+            doc = self.tasks.model_plan(instruction, LocalPlanner.canonical(proposal))
+        else:
+            stages = stages_from_proposal(proposal, lambda p: invoke("file.stat", {"path": p}))
+            title = ("Local plan: %d steps" % len(stages)) if "steps" in proposal \
+                else ("Local proposal: " + proposal["tool"])
+            saved = self.tasks.create(title[:160], proposal["reason"], stages)
+            self.tasks.record_model_proposal(
+                saved["task"]["id"], "aiws-local", instruction, proposal)
+            doc = self.tasks.get(saved["task"]["id"])
+        self._autorun_reads(doc["task"]["id"])
+        return doc
+
+    def _autorun_reads(self, task_id):
+        """Run the leading local read-only stages; stop at the first stage that needs approval."""
+        def work():
+            try:
+                for stage in self.tasks.get(task_id)["stages"]:
+                    if stage["tool"] not in PLANE_READ_TOOLS:
+                        return
+                    if stage["state"] != "pending":
+                        continue
+                    self.dispatch_stage(task_id, stage["stage_key"])
+                    deadline = time.time() + 60
+                    state = "queued"
+                    while time.time() < deadline and state in ("queued", "running"):
+                        time.sleep(0.1)
+                        state = next(s["state"] for s in self.tasks.get(task_id)["stages"]
+                                     if s["stage_key"] == stage["stage_key"])
+                    if state != "completed":
+                        return
+            except Exception:  # background convenience must never take the server down
+                return
+        threading.Thread(target=work, daemon=True, name="aiws-autorun").start()
 
     def import_windows(self, payload):
         if not isinstance(payload,dict) or set(payload)!={"task"}:

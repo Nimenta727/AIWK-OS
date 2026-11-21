@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 20:00 — 阶段 3：模型分级、多步计划、本机只读信息工具](2026-11-21_2000-stage3-local-model-grading-plans-readtools.md)
 - [2026-11-21 18:30 — 阶段 2：文件管理器、指令栏、批准卡片、撤销](2026-11-21_1830-stage2-file-manager-command-bar.md)
 - [2026-11-21 17:30 — 修复基线测试与安装预检 lsblk 字段缺失](2026-11-21_1730-fix-baseline-tests-installer-probe.md)
 - [2026-11-21 17:00 — 阶段 1：基础文件工具与路线文档](2026-11-21_1700-file-tools-stage1.md)
