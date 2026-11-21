@@ -15,7 +15,7 @@ PORT = 18080
 MODEL_ALIAS = "aiws-local"
 MAX_INTENT = 1000
 READ_TOOLS = frozenset({
-    "workspace.tree", "file.read", "code.search", "git.inspect", "runtime.detect",
+    "workspace.tree", "file.read", "file.stat", "code.search", "git.inspect", "runtime.detect",
     "browser.local_text", "platform.inspect", "code.symbols", "code.references",
     "code.dependencies", "code.platformApis",
 })

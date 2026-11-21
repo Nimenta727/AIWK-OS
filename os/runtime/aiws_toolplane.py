@@ -9,7 +9,9 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import re
 import tempfile
+import uuid
 from aiws_crossplatform import inspect_project, scaffold_project
 from aiws_guest_boundary import protect_guest_workspace
 from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
@@ -17,10 +19,20 @@ import time
 from urllib.parse import urlsplit
 
 MAX_TEXT = 128 * 1024
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "target", "dist", "build"}
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "target", "dist", "build", ".aiws-trash"}
+TRASH = ".aiws-trash"
+MAX_COPY_BYTES = 64 * 1024 * 1024
+MAX_TREE_ENTRIES = 5000
+MAX_TRASH_ITEMS = 500
 TOOL_SPECS = [
     ("workspace.tree", "List bounded workspace files without following symlinks", {"path": "string"}),
     ("file.read", "Read a UTF-8 file and its SHA-256", {"path": "string"}),
+    ("file.stat", "Read type, size, mtime and SHA-256 (directories: bounded tree fingerprint)", {"path": "string"}),
+    ("file.mkdir", "Create one new directory; parent must exist; guest workspace write", {"path": "string"}),
+    ("file.copy", "Copy one regular file (<=64MiB) to a new path; never overwrites; guest workspace write", {"path": "string", "to": "string", "expectedSha256": "string"}),
+    ("file.move", "Move or rename a file or directory to a new path; never overwrites; fingerprint precondition", {"path": "string", "to": "string", "expectedSha256": "string"}),
+    ("file.trash", "Move a file or directory to the reversible workspace trash; never deletes permanently", {"path": "string", "expectedSha256": "string"}),
+    ("file.restore", "Restore a trashed item to its original path if still free", {"trashId": "string"}),
     ("file.replace", "Atomically replace a file with SHA-256 precondition; guest workspace write", {"path": "string", "text": "string", "expectedSha256": "string"}),
     ("code.search", "Search literal text in source files with bounded output", {"query": "string", "path": "string"}),
     ("git.inspect", "Read git status or diff (not commit/push)", {"view": "string"}),
@@ -42,7 +54,7 @@ def catalog():
         properties = {key: {"type": value} for key, value in fields.items()}
         required = (["query"] if name == "code.search" else
                     ["symbol"] if name == "code.references" else
-                    list(fields) if name in {"file.read", "file.replace", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
+                    list(fields) if name in {"file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -122,6 +134,166 @@ def _replace(root, a):
         if temporary and os.path.exists(temporary):
             os.unlink(temporary)
     return {"path": a["path"], "sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "written": True}
+
+def _sha_file(path):
+    h = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+def _fingerprint(path):
+    """SHA-256 of a regular file, or a bounded deterministic digest of a directory tree.
+
+    Directories containing symlinks or special files are refused so that a
+    precondition always describes exactly what a move/trash will carry along.
+    """
+    if path.is_symlink():
+        raise ValueError("Symlinks are not supported")
+    if path.is_file():
+        return "file", _sha_file(path)
+    if not path.is_dir():
+        raise ValueError("Only regular files and directories are supported")
+    h, count = hashlib.sha256(), 0
+    for base, dirs, names in os.walk(path, followlinks=False):
+        dirs.sort()
+        for name in sorted(names + dirs):
+            item = Path(base) / name
+            count += 1
+            if count > MAX_TREE_ENTRIES:
+                raise ValueError("Directory has too many entries for a tracked operation")
+            rel = item.relative_to(path).as_posix()
+            if item.is_symlink():
+                raise ValueError("Directory contains a symlink; operation refused")
+            if item.is_dir():
+                h.update(b"D\0" + rel.encode("utf-8") + b"\0")
+            elif item.is_file():
+                h.update(b"F\0" + rel.encode("utf-8") + b"\0" + _sha_file(item).encode() + b"\0")
+            else:
+                raise ValueError("Directory contains a special file; operation refused")
+    return "dir", h.hexdigest()
+
+def _guard_ops_path(value):
+    if Path(value).parts[:1] == (TRASH,):
+        raise ValueError("The workspace trash is managed only by file.trash/file.restore")
+
+def _source(root, a):
+    _guard_ops_path(a["path"])
+    src = _path(root, a["path"])
+    if src == root:
+        raise ValueError("The workspace root cannot be moved or trashed")
+    kind, digest = _fingerprint(src)
+    expected = a.get("expectedSha256")
+    if not isinstance(expected, str) or expected != digest:
+        raise ValueError("Conflict: current fingerprint does not match expectedSha256")
+    return src, kind, digest
+
+def _destination(root, value):
+    _guard_ops_path(value)
+    dst = _path(root, value, allow_missing=True)
+    if dst == root or os.path.lexists(dst):
+        raise ValueError("Destination already exists; overwriting is not allowed")
+    if not dst.parent.is_dir() or dst.parent.is_symlink():
+        raise ValueError("Destination parent directory must already exist")
+    return dst
+
+def _stat(root, a):
+    _guard_ops_path(a["path"])
+    p = _path(root, a["path"])
+    kind, digest = _fingerprint(p)
+    st = p.stat()
+    return {"path": a["path"], "type": kind, "size": st.st_size if kind == "file" else None,
+            "mtime": int(st.st_mtime), "sha256": digest}
+
+def _mkdir(root, a):
+    _guard_ops_path(a["path"])
+    p = _path(root, a["path"], allow_missing=True)
+    if p == root or os.path.lexists(p):
+        raise ValueError("Path already exists")
+    if not p.parent.is_dir() or p.parent.is_symlink():
+        raise ValueError("Parent directory must already exist")
+    os.mkdir(p, 0o755)
+    return {"path": a["path"], "created": True}
+
+def _copy(root, a):
+    src, kind, digest = _source(root, a)
+    if kind != "file" or src.stat().st_size > MAX_COPY_BYTES:
+        raise ValueError("Only regular files up to 64MiB can be copied")
+    dst = _destination(root, a["to"])
+    temporary = None
+    try:
+        fd, temporary = tempfile.mkstemp(prefix=".aiws-", dir=dst.parent)
+        with os.fdopen(fd, "wb") as out, src.open("rb") as inp:
+            shutil.copyfileobj(inp, out, length=1024 * 1024)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(temporary, src.stat().st_mode & 0o777)
+        if _sha_file(Path(temporary)) != digest:
+            raise ValueError("Source changed while copying")
+        os.link(temporary, dst)  # fails if the destination appeared meanwhile
+    finally:
+        if temporary and os.path.lexists(temporary):
+            os.unlink(temporary)
+    return {"path": a["path"], "to": a["to"], "sha256": digest, "copied": True}
+
+def _move_nofollow(src, dst, kind):
+    if kind == "file":
+        os.link(src, dst)  # atomic, refuses to replace an existing path
+        os.unlink(src)
+    else:
+        if dst.is_relative_to(src):
+            raise ValueError("Cannot move a directory into itself")
+        os.rename(src, dst)
+
+def _move(root, a):
+    src, kind, digest = _source(root, a)
+    dst = _destination(root, a["to"])
+    _move_nofollow(src, dst, kind)
+    return {"path": a["path"], "to": a["to"], "type": kind, "sha256": digest, "moved": True}
+
+def _trash_dir(root):
+    d = root / TRASH
+    if d.is_symlink():
+        raise ValueError("Workspace trash must not be a symlink")
+    d.mkdir(mode=0o700, exist_ok=True)
+    return d
+
+def _trash(root, a):
+    src, kind, digest = _source(root, a)
+    bin_ = _trash_dir(root)
+    if sum(1 for _ in bin_.iterdir()) >= MAX_TRASH_ITEMS:
+        raise ValueError("Workspace trash is full; restore or review items first")
+    ident = uuid.uuid4().hex
+    slot = bin_ / ident
+    slot.mkdir(mode=0o700)
+    _move_nofollow(src, slot / "payload", kind)
+    meta = {"original": a["path"], "type": kind, "sha256": digest, "trashedAt": int(time.time())}
+    (slot / "meta.json").write_text(json.dumps(meta, sort_keys=True), encoding="utf-8")
+    return {"path": a["path"], "trashId": ident, "type": kind, "sha256": digest, "trashed": True}
+
+def _restore(root, a):
+    ident = a["trashId"]
+    if not isinstance(ident, str) or not re.fullmatch("[a-f0-9]{32}", ident):
+        raise ValueError("Invalid trash id")
+    slot = root / TRASH / ident
+    if (root / TRASH).is_symlink() or slot.is_symlink() or not slot.is_dir():
+        raise ValueError("Unknown trash item")
+    meta_file, payload = slot / "meta.json", slot / "payload"
+    if meta_file.is_symlink() or not meta_file.is_file():
+        raise ValueError("Trash metadata missing")
+    try:
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        original, kind, digest = meta["original"], meta["type"], meta["sha256"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ValueError("Trash metadata damaged") from exc
+    got_kind, got_digest = _fingerprint(payload)
+    if (got_kind, got_digest) != (kind, digest):
+        raise ValueError("Trashed content no longer matches its recorded fingerprint")
+    dst = _destination(root, original)
+    _move_nofollow(payload, dst, kind)
+    meta_file.unlink()
+    slot.rmdir()
+    return {"path": original, "trashId": ident, "type": kind, "sha256": digest, "restored": True}
 
 def _tree(root, a):
     sub = _path(root, a.get("path", "."))
@@ -294,6 +466,10 @@ def invoke(name, arguments):
         return _file_read(root, arguments)
     if name == "file.replace":
         return _replace(root, arguments)
+    handler = {"file.stat": _stat, "file.mkdir": _mkdir, "file.copy": _copy,
+               "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
+    if handler is not None:
+        return handler(root, arguments)
     if name == "code.search":
         return _search(root, arguments)
     if name == "git.inspect":

@@ -25,10 +25,11 @@ import subprocess
 
 HOST = "127.0.0.1"
 PORT = 17640
-READ_ONLY = frozenset({"workspace.tree", "file.read", "code.search", "git.inspect",
+READ_ONLY = frozenset({"workspace.tree", "file.read", "file.stat", "code.search", "git.inspect",
                        "runtime.detect", "browser.local_text", "platform.inspect",
                        "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
-GUEST_WRITES = frozenset({"file.replace"})
+GUEST_WRITES = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
+                          "file.trash", "file.restore"})
 # No direct guest write through transient /jobs: use approved durable DAG.
 EXPOSED = READ_ONLY
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",

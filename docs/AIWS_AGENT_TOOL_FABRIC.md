@@ -23,6 +23,12 @@ AIWS 目前采用只读 MCP stdio → systemd Agent → 独立用户态 Permissi
 | workspace.tree | Bounded source inventory; skips symlinks and large generated directories | Read-only |
 | file.read | Bounded UTF-8 text + SHA-256 | Workspace relative path |
 | file.replace | Atomic UTF-8 replacement with previous SHA-256, via approved persistent Agent DAG only | Not in MCP stdio's public read-only catalog |
+| file.stat | Type, size, mtime, SHA-256 (directory: bounded tree fingerprint, refuses symlinks) | Read-only; direct Agent/Broker read path |
+| file.mkdir | Create one new directory under an existing parent | Write: approved DAG only |
+| file.copy | Copy one regular file (<=64MiB) to a new path with SHA-256 precondition; never overwrites | Write: approved DAG only |
+| file.move | Move/rename a file or directory; fingerprint precondition; never overwrites | Write: approved DAG only |
+| file.trash | Move to reversible `.aiws-trash/` inside the workspace; **there is no permanent-delete tool** | Write: approved DAG only |
+| file.restore | Restore a trashed item to its original path if free and fingerprint still matches | Write: approved DAG only |
 | code.search | Literal string search, line numbers, capped entries | No LSP/Tree-sitter implementation yet |
 | git.inspect | status/diff, fixed git arguments, no push | Git subprocess; not a security sandbox |
 | runtime.detect | Detect language/compiler/editor/browser executables | No code execution |

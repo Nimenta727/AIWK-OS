@@ -115,7 +115,7 @@ class AgentCore:
             return self.tasks.verify_audit()
         if op=="tool.read":
             fields(a,{"tool","arguments"})
-            readonly={"workspace.tree","file.read","code.search","git.inspect",
+            readonly={"workspace.tree","file.read","file.stat","code.search","git.inspect",
                       "runtime.detect","browser.local_text","platform.inspect",
                       "code.symbols","code.references","code.dependencies","code.platformApis"}
             if a["tool"] not in readonly:
