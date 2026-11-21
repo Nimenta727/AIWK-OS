@@ -15,6 +15,7 @@
 - **AIWS Code**：Code - OSS（MIT）重新品牌化构建配方、webview 本地端点补丁、产品配置覆盖与端点/品牌扫描器、启动器、`/api/v1/ide` 接口；保留上游许可与声明。
 - **工具集成（以工作台为中心）**：`aiws_apps.py` 统一注册内置 / 桌面 / 命令行工具；`/api/v1/apps`、`/apps/launch`（固定命令、白名单环境、限速、仅按 id）；文档阅读器（Markdown 安全渲染、CSV、JSON、图片、PDF、DOCX 转文本、沙箱 HTML）；内置预览浏览器（只嵌入本机开发服务和工作区 HTML，外部网站交给系统浏览器）；新增 AI 只读工具 `tools.list`、`doc.text`；软件包 poppler-utils、pandoc。
 - **工具审批机制**：`app.launch` 写类阶段（需持久化批准 → Broker → Agent → 工作台桌面启动器再验证）；声明式外部只读工具 `ext.rg/jq/gitlog/sqlite`。见 `docs/AIWS_TOOL_APPROVAL.md`。
+- **数据集 v3**：v2 逐字保留 + 集成工具样本（`app.launch`、`doc.text`、`tools.list`、`ext.*` 及 3 类新拒绝）；train 882 / dev 122 / held-out 372；模型现在可以**提议**启动程序（仍须审批）。未用 v3 训练真实模型。
 - **版权法律**：新增根 `NOTICE`；`package.json` 标明 Apache-2.0；`test_legal.py` 防止文档/许可再次不一致。
 - `os/runtime/MODULES`：运行时模块清单，由测试与 `build.sh` 共同使用，取代手写的长 `cp` 列表。
 - 文档：重写 README（定位）、`docs/THIRD_PARTY.md`、OS 预览发行说明。

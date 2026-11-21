@@ -15,7 +15,7 @@ sys.path.insert(0, str(HERE.parents[1] / "runtime"))
 from aiws_local_model import LocalPlanner, stages_from_proposal
 
 NEAR_DUPLICATE = 0.8
-HELDOUT_FILES = (HERE.parent / "ci" / "heldout_v1.jsonl", HERE.parent / "ci" / "heldout_v2.jsonl")
+HELDOUT_FILES = (HERE.parent / "ci" / "heldout_v1.jsonl", HERE.parent / "ci" / "heldout_v2.jsonl", HERE.parent / "ci" / "heldout_v3.jsonl")
 
 def _bigrams(text):
     compact = "".join(str(text).casefold().split())

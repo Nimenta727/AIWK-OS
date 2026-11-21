@@ -19,6 +19,16 @@ from aiws_toolplane import catalog
 PATH_PATTERN = r"^(?!/)(?!.*\.\.)(?!.*\\)(?!(?:.*/)?(?:\.git|\.ssh|\.aiws-trash)(?:/|$))[^\x00-\x1f]{1,512}$"
 TRASH_PATTERN = r"^[a-f0-9]{32}$"
 
+def _app_id_pattern():
+    import aiws_apps
+    return "^(" + "|".join(sorted(r[0] for r in aiws_apps.REGISTRY if r[1] == "gui" and r[6] is not None)) + ")$"
+
+# Patterns below are deliberately AT LEAST as strict as LocalPlanner._check_external (the schema may only narrow it).
+# They avoid \b and inline flags so a grammar converter that supports only a regex subset can still use them.
+GITLOG_COUNT_PATTERN = r"^([1-9]|[1-4][0-9]|50)$"
+JQ_FILTER_PATTERN = r"^[^-].{0,511}$|^.$"
+SQLITE_QUERY_PATTERN = r"^\s*([Ss][Ee][Ll][Ee][Cc][Tt]|[Ww][Ii][Tt][Hh])[\s(*][^;]*;?\s*$"
+
 def _argument_schema(tool, spec):
     props, required = {}, []
     skip = {"expectedSha256"} if tool in FINGERPRINTED else set()    # the controller computes fingerprints, never the model
@@ -27,6 +37,14 @@ def _argument_schema(tool, spec):
             continue
         if name == "trashId":
             props[name] = {"type": "string", "pattern": TRASH_PATTERN}
+        elif name == "id":
+            props[name] = {"type": "string", "pattern": _app_id_pattern()}
+        elif tool == "ext.gitlog" and name == "count":
+            props[name] = {"type": "string", "pattern": GITLOG_COUNT_PATTERN}
+        elif tool == "ext.jq" and name == "filter":
+            props[name] = {"type": "string", "pattern": JQ_FILTER_PATTERN, "maxLength": 512}
+        elif tool == "ext.sqlite" and name == "query":
+            props[name] = {"type": "string", "pattern": SQLITE_QUERY_PATTERN, "maxLength": 512}
         elif name in ("path", "to"):
             props[name] = {"type": "string", "pattern": PATH_PATTERN}
         else:

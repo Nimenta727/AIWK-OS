@@ -56,7 +56,7 @@
 
 | 部分 | 状态 |
 | --- | --- |
-| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 427 项、前端 70 项） |
+| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 438 项、前端 70 项） |
 | 前端（VS Code 风格外壳） | **已在真实浏览器里点过**（深/浅主题、标签、命令面板、文件查看） |
 | Debian 13 镜像构建、BIOS/UEFI 引导 | CI 工作流已有；**以对应提交的 Actions 结论为准** |
 | AIWS Code 的真实构建与浏览器内运行 | **配方、补丁、扫描器已验证；完整构建尚未在本仓库环境里执行** |
@@ -136,7 +136,7 @@ python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监�
 - **Built for developers**: common language toolchains and open-source tools are preinstalled, and **AIWS Code** — a rebranded build of the MIT-licensed Code - OSS (no Microsoft names, logos, marketplace or services; upstream credits kept) — opens on demand. The workbench UI follows the VS Code layout (activity bar, side bar, tabs, panel, status bar, command palette; dark/light themes).
 - **Token- and resource-frugal by design**: the local model unloads when idle, and usage numbers are only what the provider reports.
 
-**Status: engineering preview.** Code and unit/contract tests exist (Python 427, frontend 70) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
+**Status: engineering preview.** Code and unit/contract tests exist (Python 438, frontend 70) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
 
 Repository code is licensed under Apache-2.0 (see `LICENSE`); third-party components keep their own licenses ([docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)).
 Start at [Documentation](docs/README.md), [Codebase map](docs/CODEBASE_MAP.md), [OS build](os/README.md) and [Routine log](docs/routine/README.md).

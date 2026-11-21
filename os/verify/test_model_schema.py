@@ -14,11 +14,11 @@ from aiws_local_model import LocalPlanner, LocalModelError, MODEL_WRITE_TOOLS, R
 import validate_dataset as vd
 
 SCHEMA = ms.output_schema()
-HELD = [json.loads(l) for l in (ROOT / "model/ci/heldout_v2.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+HELD = [json.loads(l) for l in (ROOT / "model/ci/heldout_v3.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
 
 def gold_outputs():
     out = []
-    for name in ("synthetic_intents.jsonl", "synthetic_intents_v2.jsonl"):
+    for name in ("synthetic_intents.jsonl", "synthetic_intents_v3.jsonl"):
         train, dev = vd.load_validate(ROOT / "model/training" / name)
         out += [LocalPlanner.canonical(e["expected"]) for e in list(train.values()) + list(dev.values())]
     for row in HELD:                                              # held-out gold has no reasons: add one
@@ -51,7 +51,7 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(a, json.dumps(ms.output_schema(), sort_keys=True))
         rf = json.dumps(ms.response_format())
         self.assertLess(len(rf), 20000)                           # the gate refuses larger response_format values
-        self.assertLess(len(rf), 16000)                           # keep headroom: each new model tool adds ~0.5 KB (defined once via $defs)
+        self.assertLess(len(rf), 17500)                           # keep headroom: each new model tool adds ~0.5 KB (defined once via $defs)
         self.assertEqual(ms.response_format()["type"], "json_schema")
 
     def test_covers_exactly_the_tools_the_model_may_propose(self):

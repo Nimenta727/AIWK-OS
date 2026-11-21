@@ -107,3 +107,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 08:13 — 代码结构整理、README 重写（系统定位）与发行准备](2026-11-21_081324-structure-readme-release-prep.md)
 - [2026-11-21 11:54 — 版权法律处理与工具集成（阅读器、预览浏览器、工具注册表）](2026-11-21_115402-legal-notice-and-integrated-tools.md)
 - [2026-11-21 12:12 — 工具审批机制底层：app.launch 审批 + 桌面启动器 + 声明式外部只读工具](2026-11-21_121203-tool-approval-foundation.md)
+- [2026-11-21 12:26 — 数据集 v3：集成工具（app.launch、doc.text、ext.* 及新拒绝类）](2026-11-21_122636-dataset-v3-integrated-tools.md)

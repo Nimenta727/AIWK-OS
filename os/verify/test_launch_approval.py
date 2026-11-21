@@ -30,7 +30,7 @@ class ToolClassTests(unittest.TestCase):
         self.assertEqual(APP_LAUNCH_TOOLS, {"app.launch"})
         self.assertTrue(APP_LAUNCH_TOOLS <= WRITE_TOOLS)                 # needs persisted approval; the Broker keys off this set
         self.assertFalse(APP_LAUNCH_TOOLS & READ_TOOLS)
-        self.assertNotIn("app.launch", MODEL_WRITE_TOOLS)                 # not proposable until the model has training data for it
+        self.assertIn("app.launch", MODEL_WRITE_TOOLS)                    # proposable (dataset v3), but ALWAYS a pending stage needing approval
         self.assertIn("app.launch", [t["name"] for t in catalog()])
 
     def test_plan_validation_accepts_only_registered_gui_programs(self):

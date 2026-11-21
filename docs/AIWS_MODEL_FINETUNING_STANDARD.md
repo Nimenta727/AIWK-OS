@@ -84,3 +84,30 @@ python3 os/model/training/validate_dataset.py
 - CI：真实 QEMU 运行时额外对 v2 **只报告、不拦截**（`AIWS_GUEST_MODEL_BENCHMARK_V2`，artifact 一并上传），待有真实基线后再决定是否设为门禁。
 
 **局限（必须诚实）**：v2 是模板合成数据，语言多样性有限，只能证明“模型是否学会了这套工具协议与拒绝边界”，不能证明对真实用户措辞的鲁棒性；也尚未用真实 2B 模型运行过。发布前仍需要人工审核、独立作者的数据，状态保持 NOT VERIFIED。
+
+## 7. 数据集 v3：集成工具（2026-11-21 增补）
+
+目标：让本地模型能**提议**新接入的工具，但仍然只提议、不执行。`generate_dataset_v3.py` 把 v2 **逐字复制**（v2 文件字节不变，`generate_dataset.py --check` 仍成立）并追加新样本：
+
+| 新工具 | 类别 | 说明 |
+| --- | --- | --- |
+| `app.launch` | 写（必须审批） | 只有 `id` 一个参数，取自登记的桌面程序（terminal / chromium / firefox / aiws-code / files-gui / editor）；schema 用精确的 id 枚举 |
+| `doc.text` | 读 | PDF / DOCX / ODT / EPUB；纯文本仍用 `file.read` |
+| `tools.list` | 读 | 工作站集成的工具与应用清单（与 `runtime.detect` 的“编译器/运行时”区分） |
+| `ext.rg` `ext.jq` `ext.gitlog` `ext.sqlite` | 读 | 正则搜索（纯文本搜索仍是 `code.search`）、JSON、提交历史、单条 SELECT |
+
+新增 3 类**拒绝**样本：启动未登记程序；“打开终端并执行命令 / 用浏览器打开网址”；通过外部工具修改（jq 写回、sqlite 删表、git commit/push、reset --hard）。
+
+- 规模：`synthetic_intents_v3.jsonl`（train 882、dev 122）、`os/model/ci/heldout_v3.jsonl`（372 例 = v2 的 242 + 新增 130；写 24、计划 20、读 48、拒绝 38 等，中英均衡）。
+- **同样的组划分**：train/dev/held 的模板、程序称呼、文件/目录/表名/正则全部互不相交（有测试）；`validate_dataset.py` 对三份 held-out 做精确去重 + 近重复检查，通过。
+- 生产校验：每条金标都通过 `LocalPlanner.validate_any` 和真实阶段构建器；`LocalPlanner._check_external` 新增语义限制（`app.launch` 只能是登记的 gui 程序、`ext.jq` 过滤器不能以 `-` 开头、`ext.gitlog` 的 count 为 1–50、`ext.sqlite` 只能一条 SELECT）。
+- **schema 只能比验证器更严**：id 用精确枚举、count/filter/query 用不含 `\b` 和内联标志的 pattern（兼容受限的语法转换器）；测试验证 schema 拒绝上述越界值。schema 现为 16 KB（网关上限 20 KB）。
+- 系统提示词增加 4 句（可启动的 id 列表、ext.* 只读、rg 与 code.search 的区别、doc.text 与 file.read 的区别），长度仍受测试限制（<3600 字符），因为每次请求都要付这笔 token。
+- CI：真实 QEMU 额外**只报告**v3（`AIWS_GUEST_MODEL_BENCHMARK_V3`），不拦截。
+
+**路由器**：新样本对规则层只做了**一次**未污染的观察——留出集新增的合法请求 98/98 留在本地；32 条拒绝类里 11 条被禁止外送。其余（jq 改写、sqlite 删表、git commit/push、打开未登记程序）规则层不禁止外送：这是有意的，因为云端构建器在授权范围内本来就能做这些；本地模型拒绝即为最终结论，不会升级。观察后**没有**改任何路由规则，所以这个数字不被污染。
+
+**局限（必须诚实）**：
+1. 仍是模板合成数据；本地模型**还没有用 v3 训练**（没有真实 LoRA/权重），也没有真实推理基线。现在放开的是“模型可以提议”的通路和评测基线，不是质量。
+2. 在 v3 上的真实模型表现完全未知，尤其是 `ext.sqlite` 的 SQL 生成和 rg 正则里的转义。
+3. 把“打开终端并执行命令”设为拒绝，是因为 `app.launch` 不接受任何参数；模型把它错判成 `app.launch {terminal}` 会静默丢掉命令部分——留出集里有这类样本专门度量。
