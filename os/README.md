@@ -59,3 +59,10 @@ Linux KVM 宿主（普通账号拥有 /dev/kvm 访问权限）：
 This is a **standalone, bootable AI guest operating system project**, not a WPF theme. Phase P0 provides a Debian 13 Live image recipe, GUI browser/IDE/developer tools, guest-only system configuration, an interactive guest administrator entrypoint, and offline-by-default KVM test launcher. The existing Windows WebView2 bridge and Agent host have **not** yet been ported to Linux; packaging a full AIWS session and a reviewed guest execution broker are subsequent milestones. The kernel fragment is a *design target*, not a compiled custom kernel.
 
 Build with Debian 13 as above; validate with `python3 -m unittest discover -s os/verify`. See [kernel/isolation design](../docs/AIWS_OS_BLUEPRINT.md) and [routine log](../docs/routine/2026-11-20_2130-aiws-os-guest-bootstrap.md). Host-side security policy, VM escape testing, and actual ISO boot validation remain open requirements.
+
+
+## 2026-11-21 experimental system-level progress
+
+The earlier bootstrap description is retained for history. Current Debian guest defaults to a dedicated AIWS Shell and an independent systemd user aiws-agent.service over a same-UID private UNIX socket. File edits and kernel candidate mutations must use the same durable, reviewed DAG. An interactive guest-root-only A/B manager is packaged for guest EFI installations, but the standard Live ISO has no persistent EFI slot. Guest Qwen3.5-2B weights can optionally be included in a hash-pinned, licensed model-inclusive image. Normal smoke ISO remains model-free.
+
+Both real firmware A/B recovery and actual in-guest Qwen 2B inference require CI acceptance, which has not been established by the code changes themselves.

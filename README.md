@@ -142,3 +142,6 @@ Read the [documentation index](docs/README.md), [security guide](docs/SECURITY.m
 ### AIWS OS guest control plane / 客户机统一系统控制
 
 已提交 guest-local SQLite DAG 任务与审核/重启恢复、AIWS systemd 用户服务固定白名单、内核版本化候选/哈希验证/撤销及恢复预案、本地 Qwen 2B 的可选 llama.cpp 适配与 GGUF 权重 SHA-256 版本注册和回滚。工作台已经增加客户机系统服务与内核候选页面，并可将本地小模型的只读建议保存为未执行的持久任务。**当前并不包含/实际运行 Qwen 2B 权重，LoRA 未训练，真实内核 A/B 启动/回滚机制未完成。** 客户机真实界面基础 smoke 已通过，扩展到内核候选图形审批的新验收仍待当前 CI 实际运行完成。详情见 [AIWS 客户机控制架构](docs/AIWS_GUEST_AGENT_SYSTEM_KERNEL.md)。
+
+
+AIWS OS 2026-11-21 integration: a separate guest systemd Agent now owns the durable DAG for file/code inspection, approved file edits, allowlisted services and staged kernel candidates. Experimental guest-admin-only EFI A/B version management and real QEMU firmware fault-injection acceptance are under test. Optional, license-reviewed and SHA-256-pinned Qwen3.5-2B weights can be bundled in a guest ISO, with a separate real-QEMU inference gate. Do not claim successful real kernel recovery or deployed guest AI weights until their jobs actually pass. See docs/AIWS_GUEST_AGENT_SYSTEM_KERNEL.md.

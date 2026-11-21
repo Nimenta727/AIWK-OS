@@ -2,6 +2,21 @@
 
 **Delivery status:** experimental integrated control plane. The code has been committed; independent validation is ongoing. This document deliberately distinguishes what runs today from what is only staged.
 
+## 2026-11-21 integrated architecture and outstanding acceptance gates
+
+Production guest architecture is now AIWS React Shell → loopback UI adapter → same-UID AF_UNIX socket → independent unprivileged systemd user Agent → one persistent SQLite DAG/approval/audit store → allowlisted guest execution.
+
+- Directory and file reads, code inspection, and workbench read-only jobs route through this Agent, without any model token requirement.
+- Direct temporary file writes are rejected. Manual edits must create a durable file.replace DAG stage, receive explicit approval, and satisfy an expected SHA-256 precondition.
+- Guest services are managed through allowlisted user-systemd operations only. Model suggestions are read-only, independently checked, saved pending, and never auto-executed.
+- The independent guest-root-only EFI kernel A/B CLI is not callable through the AI Agent, HTTP, or Unix IPC. It requires an actual mounted FAT ESP, known-good A entry, trusted B kernel/initrd hashes, and manual administrator consent. A trial boot preserves A as the default. This is experimental, not a production watchdog solution.
+- A separate GitHub CI job constructs a disposable GPT/FAT disk and attempts real OVMF firmware B-failure/A-recovery. Only a successful run with actual serial evidence qualifies as recovery acceptance.
+- Optional model-inclusive Debian ISO requires a local license-reviewed and SHA-pinned Qwen3.5-2B GGUF and llama-server binary. The guest can verify root-owned immutable bundled GGUF and load it without copying multi-GiB weights to the volatile Live overlay; the service is off until expressly enabled.
+- Two model gates are separate: actual networkless container CPU inference and actual QEMU guest inference from the model-inclusive ISO. Neither is claimed passed until their workflows complete successfully.
+- NixOS ISO remains evaluation-only, not build-and-boot verified. A model or third-party parser cannot be assumed safe simply because it runs offline.
+
+All AIWS APIs remain guest-only and deny host files, host shell, root, hypervisor control, shared folders or device passthrough. This is defense in depth rather than a guarantee against VM escape or malicious guest root.
+
 ## 1. Architecture
 
 Guest AIWS React desktop → localhost 127.0.0.1:17640 HTTP (Host/Origin/CSRF) → one persistent GuestTaskStore SQLite DAG + audit chain → an allowlisted guest-only tool runner.
