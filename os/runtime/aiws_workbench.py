@@ -16,7 +16,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
-from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
+from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS, APP_LAUNCH_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
@@ -27,6 +27,7 @@ from aiws_events import EventStore, EventError, SAFE_NAME, make_event
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
 import aiws_apps
+import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
 from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
@@ -486,6 +487,10 @@ class Controller:
                 # Every system/kernel stage goes through the approved durable DAG.
                 result = self.guest_ops.execute(
                     tool, args, approved=action["approvalGranted"])
+            elif tool in APP_LAUNCH_TOOLS:
+                # Stand-alone workbench (no separate Agent): this process HAS the display and `dispatch` already
+                # required the user's persisted approval.
+                result = aiws_apps.launch(aiws_apps.require_launchable(args["id"]), self.workspace)
             else:
                 result = invoke(tool, args)
             encoded = json.dumps(result, ensure_ascii=False)
@@ -865,6 +870,11 @@ def main():
                           "toolCount": len(READ_ONLY)}))
         return
     server = make_server(workspace, ui, args.port, singleton=True)
+    try:                                              # the desktop launcher for approved `app.launch` stages
+        state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        aiws_launcher.start_in_thread(aiws_launcher.LauncherPolicy(state / "aiws" / "tasks.sqlite3", workspace.resolve(strict=True)))
+    except (OSError, PermissionError) as exc:
+        print("AIWS desktop launcher unavailable: " + type(exc).__name__, flush=True)
     print("AIWS guest workbench http://" + HOST + ":" + str(server.server_port), flush=True)
     try:
         server.serve_forever(poll_interval=0.2)

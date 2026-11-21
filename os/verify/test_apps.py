@@ -186,6 +186,26 @@ class ApiTests(unittest.TestCase):
         self.assertIn("default-src 'none'", h["Content-Security-Policy"])
         self.assertEqual(self.raw("GET", "/api/v1/workspace/raw?path=n.txt")[0], 415)  # only previewable types
 
+    def test_launch_through_the_approval_dag_in_standalone_mode(self):
+        stage = {"key": "open", "label": "Open terminal", "tool": "app.launch", "arguments": {"id": "terminal"}, "dependsOn": []}
+        status, _, data = self.raw("POST", "/api/v1/tasks", {"title": "Open", "goal": "", "stages": [stage]}, self.hdr)
+        self.assertIn(status, (200, 201, 202), data)
+        tid = json.loads(data)["task"]["id"]; base = "/api/v1/tasks/" + tid + "/stages/open/"
+        calls = []
+        with patch("aiws_apps.shutil.which", lambda n: "/usr/bin/" + n), patch("aiws_apps.subprocess.Popen", lambda argv, **kw: calls.append(argv)):
+            self.assertGreaterEqual(self.raw("POST", base + "dispatch", {}, self.hdr)[0], 400)        # not approved: refused
+            self.assertEqual(calls, [])
+            self.assertLess(self.raw("POST", base + "approve", {}, self.hdr)[0], 300)
+            self.assertLess(self.raw("POST", base + "dispatch", {}, self.hdr)[0], 300)
+            for _ in range(100):
+                st = json.loads(self.raw("GET", "/api/v1/tasks/" + tid)[2])["stages"][0]
+                if st["state"] not in ("queued", "running"):
+                    break
+                time.sleep(0.02)
+        self.assertEqual(st["state"], "completed", st); self.assertEqual(calls, [["/usr/bin/xfce4-terminal"]])
+        bad = dict(stage, key="bad", arguments={"id": "git"})
+        self.assertGreaterEqual(self.raw("POST", "/api/v1/tasks", {"title": "x", "goal": "", "stages": [bad]}, self.hdr)[0], 400)
+
     def test_doc_endpoint_returns_text_through_the_tool_plane(self):
         (self.root / "n.md").write_text("# hi")
         s, _, d = self.raw("GET", "/api/v1/workspace/doc?path=n.md")

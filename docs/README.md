@@ -21,6 +21,7 @@
 ## AIWS OS / Linux 系统工程
 
 - [Guest Agent、系统服务、内核候选](AIWS_GUEST_AGENT_SYSTEM_KERNEL.md) — 持久任务 DAG、systemd 和实验性引导管理。
+- [工具调用的审批机制](AIWS_TOOL_APPROVAL.md) — AI 启动程序 / 调用外部工具的分类、流程与限制。
 - [Permission Broker](AIWS_PERMISSION_BROKER.md) — 独立同 UID 决策服务；**不是**内核 MAC。
 - [OS production gates](AIWS_OS_PRODUCTION_GATES.md) — ISO BIOS/UEFI、GUI、模型、权限验收。
 - [OS priority gates](AIWS_OS_PRIORITY_GATES.md) — 早期 P0/P1 阶段检查；以最新 production gates 为准。

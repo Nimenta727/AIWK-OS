@@ -58,6 +58,8 @@ AIWK-OS/
 | `aiws_mandate.py` / `aiws_supervisor.py` / `aiws_cli_adapters.py` | 一次性授权、官方 CLI 监督与用户隔离、输出解析 | 不保存 API 密钥；预算超限即停止 |
 | `aiws_egress_proxy.py` | 构建通道的域名白名单 CONNECT 代理 | 只绑定 127.0.0.1，拒绝 IP 字面量和非公网地址 |
 | `aiws_apps.py` | 集成应用注册表（内置/桌面/命令行）与固定命令启动 | 不接收参数；环境白名单；限速 |
+| `aiws_launcher.py` | 工作台里的桌面启动器：只为“已批准且运行中”的 `app.launch` 阶段启动登记的程序，自己重新核对 | 同 UID 应用层防护；不信任请求 |
+| `aiws_exttools.py` | 声明式外部只读命令（rg / jq / git log / sqlite SELECT） | 固定 argv、`--` 之后传值、路径受限、输出有界 |
 | `aiws_workbench.py`（IDE 部分） | `/api/v1/ide` 与 `/ide/open`：固定命令、白名单环境、限速 | 不接收任何参数 |
 
 新增运行时模块时，**先把文件名加入 `os/runtime/MODULES`**；`test_runtime_manifest.py` 会在清单与目录不一致时失败。

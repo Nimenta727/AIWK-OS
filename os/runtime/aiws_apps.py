@@ -38,6 +38,13 @@ LAUNCH_ENV = ("HOME", "PATH", "LANG", "DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR"
 RATE_SECONDS = 2.0
 _last_launch = {}
 
+def require_launchable(ident):
+    """Raise ValueError unless `ident` names a registered gui program (a command line is fixed per entry)."""
+    entry = next((r for r in REGISTRY if r[0] == ident), None) if isinstance(ident, str) else None
+    if entry is None or entry[1] != "gui" or entry[6] is None:
+        raise ValueError("Not a launchable application: " + str(ident)[:40])
+    return ident
+
 def _found(executables, which):
     for name in executables:
         path = which(name)

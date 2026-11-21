@@ -14,10 +14,11 @@ import threading
 import time
 from uuid import uuid4
 from aiws_guest_ops import TOOLS as GUEST_OP_TOOLS, WRITE_TOOLS as GUEST_OP_WRITES, validate as validate_guest_operation
-from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
+from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS, APP_LAUNCH_TOOLS
+import aiws_apps
 
-TOOLS = PLANE_READ_TOOLS | FILE_WRITE_TOOLS | GUEST_OP_TOOLS
-WRITE_TOOLS = FILE_WRITE_TOOLS | GUEST_OP_WRITES
+TOOLS = PLANE_READ_TOOLS | FILE_WRITE_TOOLS | APP_LAUNCH_TOOLS | GUEST_OP_TOOLS
+WRITE_TOOLS = FILE_WRITE_TOOLS | APP_LAUNCH_TOOLS | GUEST_OP_WRITES
 MAX_STAGES = 32
 
 class TaskError(ValueError):
@@ -187,6 +188,11 @@ class GuestTaskStore:
                 if not schema or set(args) - set(schema["properties"]) or any(
                         field not in args for field in schema["required"]):
                     raise TaskError("Missing/unknown tool arguments")
+            if tool in APP_LAUNCH_TOOLS:
+                try:
+                    aiws_apps.require_launchable(args.get("id"))
+                except ValueError as exc:
+                    raise TaskError(str(exc)) from exc
             if not isinstance(deps, list) or len(deps) > MAX_STAGES or any(not isinstance(x, str) for x in deps):
                 raise TaskError("Invalid dependencies")
             keys.append(key)

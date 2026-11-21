@@ -7,6 +7,8 @@ aiws_agent_service.py
 aiws_agent_client.py
 aiws_mcp.py
 aiws_apps.py
+aiws_launcher.py
+aiws_exttools.py
 
 # Tool plane, task graph and permission
 aiws_toolplane.py

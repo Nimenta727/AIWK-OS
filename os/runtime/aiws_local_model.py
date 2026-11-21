@@ -28,6 +28,8 @@ MAX_STEPS = 8
 # file.replace is deliberately not proposable: a small model must not author file contents.
 READ_TOOLS = frozenset(PLANE_READ_TOOLS)
 MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore"})
+# app.launch is NOT proposable yet: the training/held-out data (os/model/training) has no examples for it. The approval
+# path exists (aiws_launcher.py); a dataset v3 + held-out re-baseline is required before the model may propose launches.
 FINGERPRINTED = frozenset({"file.copy", "file.move", "file.trash"})
 TRASH_ID = re.compile(r"^[a-f0-9]{32}$")
 # Token thrift (step O5): small outputs by default, a larger budget only when the request looks multi-step,
@@ -180,6 +182,7 @@ class LocalPlanner:
                     raise LocalModelError("Model attempted to escape guest workspace")
         if "trashId" in args and not TRASH_ID.fullmatch(args["trashId"]):
             raise LocalModelError("Invalid trash id")
+
         return {"tool": tool, "arguments": args, "reason": reason,
                 "requiresReview": True, "requiresApproval": write, "executed": False,
                 "source": "local-model", "refused": False,

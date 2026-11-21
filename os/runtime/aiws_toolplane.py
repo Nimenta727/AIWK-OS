@@ -18,6 +18,7 @@ from aiws_guest_boundary import protect_guest_workspace
 from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
 import time
 from urllib.parse import urlsplit
+import aiws_exttools
 
 MAX_TEXT = 128 * 1024
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "target", "dist", "build", ".aiws-trash"}
@@ -42,6 +43,7 @@ TOOL_SPECS = [
     ("file.replace", "Atomically replace a file with SHA-256 precondition; guest workspace write", {"path": "string", "text": "string", "expectedSha256": "string"}),
     ("tools.list", "List the integrated applications and command-line tools of this workstation and whether each is installed (read-only)", {}),
     ("doc.text", "Extract plain text from a workspace document: PDF (pdftotext), DOCX/ODT/EPUB (pandoc), HTML, or any small text file; bounded output", {"path": "string"}),
+    ("app.launch", "Start a registered desktop program (terminal, browser, editor ...). Needs the user's explicit approval; fixed command, no arguments", {"id": "string"}),
     ("code.search", "Search literal text in source files with bounded output", {"query": "string", "path": "string"}),
     ("git.inspect", "Read git status or diff (not commit/push)", {"view": "string"}),
     ("runtime.detect", "Discover installed language and build executables", {}),
@@ -58,9 +60,11 @@ TOOL_SPECS = [
 
 def catalog():
     tools = []
-    for name, description, fields in TOOL_SPECS:
+    for name, description, fields in TOOL_SPECS + aiws_exttools.specs():
         properties = {key: {"type": value} for key, value in fields.items()}
-        required = (["query"] if name == "code.search" else
+        required = (aiws_exttools.required(name) if name in aiws_exttools.EXT else
+                    ["id"] if name == "app.launch" else
+                    ["query"] if name == "code.search" else
                     ["symbol"] if name == "code.references" else
                     list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
@@ -82,7 +86,10 @@ READ_TOOLS = frozenset({
     "runtime.detect", "browser.local_text", "platform.inspect", "code.symbols",
     "code.references", "code.dependencies", "code.platformApis",
     "system.info", "network.status", "download.list", "download.progress",
-})
+}) | aiws_exttools.names()
+# Desktop launches are write-class: they always become pending DAG stages that need the user's approval, and they are
+# EXECUTED by the workbench's desktop launcher (aiws_launcher.py), because only it can reach the display.
+APP_LAUNCH_TOOLS = frozenset({"app.launch"})
 FILE_WRITE_TOOLS = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
                               "file.trash", "file.restore"})
 
@@ -747,6 +754,10 @@ def invoke(name, arguments):
                "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
     if handler is not None:
         return handler(root, arguments)
+    if name in aiws_exttools.EXT:
+        return aiws_exttools.run(name, arguments, root, _path, _safe_env())
+    if name == "app.launch":
+        raise PermissionError("app.launch is executed by the desktop launcher after approval, not by the tool plane")
     if name == "tools.list":
         return _tools_list(root, arguments)
     if name == "doc.text":
