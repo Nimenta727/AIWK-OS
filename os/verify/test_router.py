@@ -19,6 +19,7 @@ from aiws_model_router import RouterError, classify, after_local, build_handoff,
 from aiws_local_model import LocalPlanner, LocalModelError
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_workbench import make_server, HOST
+from buildsrc import build_text
 
 NONE_INSTALLED = lambda exe: None
 def cfg(**over):
@@ -347,7 +348,7 @@ class WorkbenchRouteTests(unittest.TestCase):
 
 class PackagingTests(unittest.TestCase):
     def test_every_runtime_import_is_packaged_into_the_image(self):
-        build = (ROOT / "debian/build.sh").read_text(encoding="utf-8")
+        build = build_text()
         for module in ("aiws_model_router", "aiws_local_model", "aiws_toolplane", "aiws_tasks", "aiws_workbench"):
             self.assertIn("os/runtime/" + module + ".py", build, module)
         # every aiws_* module imported by the workbench must be in the image

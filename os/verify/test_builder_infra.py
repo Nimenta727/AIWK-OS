@@ -171,7 +171,7 @@ class ImageWiringTests(unittest.TestCase):
         self.assertEqual(p.ports, frozenset({443}))
 
     def test_build_script_installs_and_secures_everything(self):
-        build = (ROOT / "debian/build.sh").read_text()
+        build = build_text()
         for needle in ("os/runtime/aiws_egress_proxy.py", "aiws_builder_selftest.py", "usr/local/sbin/aiws-builder-selftest",
                        "chmod 0440", "etc/sudoers.d/aiws-builder"):
             self.assertIn(needle, build)
@@ -269,6 +269,7 @@ class SelftestLogicTests(unittest.TestCase):
         self.assertIn("has not been run on a real guest", src)
 
 from unittest.mock import patch  # noqa: E402
+from buildsrc import build_text
 
 def patch_marker(exists):
     return patch.object(Path, "is_file", lambda self: exists if str(self) == "/run/aiws/builder-firewall.ok" else os.path.isfile(str(self)))

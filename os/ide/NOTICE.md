@@ -10,7 +10,7 @@ Microsoft Corporation.
 * The upstream copyright notice and the MIT permission notice must be included in all copies or substantial portions
   of the software. Every AIWS Code package therefore ships `LICENSE.txt` (the upstream MIT text, unchanged) and
   `ThirdPartyNotices.txt` (upstream's notices for the many components it bundles). **These files are never removed or edited.**
-* AIWS's own additions (branding, launcher, build scripts, patches) are MIT licensed like the rest of this repository.
+* AIWS's own additions (branding, launcher, build scripts, patches) are licensed under this repository's own `LICENSE` (Apache-2.0); the upstream Code - OSS code stays MIT.
 
 ## What we deliberately do NOT reuse
 * Microsoft's names, logos, icons and other trademarks ("Visual Studio Code", "VS Code", the blue logo, ...).

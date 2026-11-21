@@ -245,7 +245,7 @@ class IsolationTests(unittest.TestCase):
                 self.assertNotIn(forbidden, source, name)
 
     def test_packaged_into_image(self):
-        build = (ROOT / "debian/build.sh").read_text(encoding="utf-8")
+        build = build_text()
         for module in ("aiws_events", "aiws_cli_adapters"):
             self.assertIn("os/runtime/" + module + ".py", build)
 
@@ -254,6 +254,7 @@ class IsolationTests(unittest.TestCase):
         self.assertIn("not recorded", (FIX / "README.md").read_text(encoding="utf-8").lower().replace("**", ""))
 
 import unittest.mock  # noqa: E402  (used by StoreTests)
+from buildsrc import build_text
 
 if __name__ == "__main__":
     unittest.main()

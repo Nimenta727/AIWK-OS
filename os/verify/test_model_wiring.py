@@ -9,6 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "runtime"))
 from aiws_model_gate import validate_child_argv
+from buildsrc import build_text
 
 SCRIPTS = [ROOT / "model/aiws-local-model.sh", ROOT / "debian/config/includes.chroot/usr/local/bin/aiws-local-model"]
 
@@ -52,7 +53,7 @@ class ScriptTests(unittest.TestCase):
 
 class PackagingTests(unittest.TestCase):
     def test_gate_and_schema_are_packaged(self):
-        build = (ROOT / "debian/build.sh").read_text()
+        build = build_text()
         for m in ("aiws_model_gate", "aiws_model_schema"):
             self.assertIn("os/runtime/%s.py" % m, build)
         planner = (ROOT / "runtime/aiws_local_model.py").read_text()

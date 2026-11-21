@@ -1,0 +1,34 @@
+# Python modules installed into /usr/local/lib/aiws of the image (one per line).
+# Add a new runtime module HERE; test_runtime_manifest.py fails if this list and os/runtime/ drift apart.
+
+# Entry points and HTTP/UI
+aiws_workbench.py
+aiws_agent_service.py
+aiws_agent_client.py
+aiws_mcp.py
+
+# Tool plane, task graph and permission
+aiws_toolplane.py
+aiws_tasks.py
+aiws_permission_broker.py
+aiws_guest_boundary.py
+aiws_guest_ops.py
+aiws_codeintel.py
+aiws_crossplatform.py
+aiws_windows_compat.py
+aiws_boot_slots.py
+
+# Local model and router
+aiws_local_model.py
+aiws_model_gate.py
+aiws_model_schema.py
+aiws_model_router.py
+aiws_model_registry.py
+
+# Observatory, builder lane (official CLI under a mandate)
+aiws_events.py
+aiws_observatory.py
+aiws_mandate.py
+aiws_supervisor.py
+aiws_cli_adapters.py
+aiws_egress_proxy.py

@@ -35,7 +35,12 @@ case "${AIWS_OS_PROFILE:-full}" in
   *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
 esac
 mkdir -p -- "$out/config/includes.chroot/usr/local/lib/aiws"
-cp -a -- "$repo/os/runtime/aiws_toolplane.py" "$repo/os/runtime/aiws_mcp.py" "$repo/os/runtime/aiws_crossplatform.py" "$repo/os/runtime/aiws_codeintel.py" "$repo/os/runtime/aiws_workbench.py" "$repo/os/runtime/aiws_guest_boundary.py" "$repo/os/runtime/aiws_tasks.py" "$repo/os/runtime/aiws_local_model.py" "$repo/os/runtime/aiws_model_router.py" "$repo/os/runtime/aiws_model_gate.py" "$repo/os/runtime/aiws_model_schema.py" "$repo/os/runtime/aiws_events.py" "$repo/os/runtime/aiws_observatory.py" "$repo/os/runtime/aiws_mandate.py" "$repo/os/runtime/aiws_egress_proxy.py" "$repo/os/runtime/aiws_supervisor.py" "$repo/os/runtime/aiws_cli_adapters.py" "$repo/os/runtime/aiws_guest_ops.py" "$repo/os/runtime/aiws_model_registry.py" "$repo/os/runtime/aiws_agent_service.py" "$repo/os/runtime/aiws_agent_client.py" "$repo/os/runtime/aiws_permission_broker.py" "$repo/os/runtime/aiws_boot_slots.py" "$repo/os/runtime/aiws_windows_compat.py" "$out/config/includes.chroot/usr/local/lib/aiws/"
+# Runtime modules come from os/runtime/MODULES (single source of truth; checked by test_runtime_manifest.py)
+while IFS= read -r module; do
+  case "$module" in ''|'#'*) continue;; esac
+  case "$module" in aiws_*.py) ;; *) echo "Bad entry in os/runtime/MODULES: $module" >&2; exit 2;; esac
+  cp -a -- "$repo/os/runtime/$module" "$out/config/includes.chroot/usr/local/lib/aiws/$module"
+done < "$repo/os/runtime/MODULES"
 cp -- "$repo/os/verify/aiws_guest_lifecycle_smoke.py" "$out/config/includes.chroot/usr/local/lib/aiws/aiws_guest_lifecycle_smoke.py"
 ui="$repo/desktop/AIWorkstation.Frontend/dist"
 if [[ ! -s "$ui/index.html" ]]; then

@@ -1,0 +1,29 @@
+# Changelog
+
+遵循「工程预览」语义：版本号带 `-preview`，不代表稳定。条目按时间倒序；每次改动的详细记录、验证与下一步见 [docs/routine](docs/routine/README.md)。
+
+## 0.2.0-preview.1 — 未发布（准备中）
+
+面向程序员的 AI 原生系统方向：观察台首页 + 本地小模型中转 + 官方 CLI 云端构建 + 开发者工具链。
+
+### 新增
+- **观察台**（只读首页）：token、模型状态、调用状态、任务、审计结论、待批准；示例数据明确标注为合成回放。
+- **VS Code 风格工作台外壳**：活动栏、资源管理器（真实文件树）、标签页、底部面板、状态栏、命令面板、深色/浅色主题、快捷键。
+- **本地小模型框架**：懒启动/空闲卸载的模型网关、受约束输出 schema、规则 → 本地模型 → 官方 CLI 的路由；模型只提议，写操作必须审批；完全离线。
+- **官方 CLI 构建通道**：一次性授权（目录/预算/工具/时长）、专用低权限用户、nftables 出口限制 + 域名白名单代理、事件库与用量统计（只统计提供方上报数字）。
+- **开发者工具链**：额外 53 个 Debian 软件包（Ruby、PHP、Lua、TypeScript、Meson、g++、clangd、valgrind、shellcheck、gh、neovim、tmux 等），包名已对照真实 Debian 索引校验。
+- **AIWS Code**：Code - OSS（MIT）重新品牌化构建配方、webview 本地端点补丁、产品配置覆盖与端点/品牌扫描器、启动器、`/api/v1/ide` 接口；保留上游许可与声明。
+- `os/runtime/MODULES`：运行时模块清单，由测试与 `build.sh` 共同使用，取代手写的长 `cp` 列表。
+- 文档：重写 README（定位）、`docs/THIRD_PARTY.md`、OS 预览发行说明。
+
+### 变更
+- 前端数据获取收敛到共享轮询 hook（页面隐藏时不轮询）；旧样式的硬编码颜色改为主题变量。
+- README 与 `os/` 文档中的许可证描述改为与 `LICENSE` 文件一致（Apache-2.0）。
+
+### 已知限制
+- AIWS Code 的完整构建、真实客户机里的模型质量、官方 CLI 实跑、完整镜像体积、固件/真机启动均**未验证**。
+- Permission Broker 为应用层策略，不是内核强制隔离。
+- 发行前仍需 SBOM、模型权重许可确认与根 NOTICE（见 `docs/THIRD_PARTY.md`）。
+
+## 1.9.0-preview.1
+Windows 原生工作台预览（WPF/.NET + WebView2）。详见 [docs/RELEASE_NOTES_V19.md](docs/RELEASE_NOTES_V19.md)。

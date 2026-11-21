@@ -104,3 +104,4 @@ Each repository modification requires a timestamped log with changed files, veri
 
 - [2026-11-21 12:10 — 模型独立 held-out、真实 QEMU 指标与 Windows 历史完整投影](2026-11-21_121000-model-heldout-windows-history.md)
 - [2026-11-21 08:07 — VS Code 风格前端外壳与 AIWS Code 启动接口](2026-11-21_080728-vscode-style-shell-and-ide-api.md)
+- [2026-11-21 08:13 — 代码结构整理、README 重写（系统定位）与发行准备](2026-11-21_081324-structure-readme-release-prep.md)
