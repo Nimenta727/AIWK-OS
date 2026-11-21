@@ -25,7 +25,7 @@ import subprocess
 
 HOST = "127.0.0.1"
 PORT = 17640
-READ_ONLY = frozenset({"workspace.tree", "file.read", "file.stat", "code.search", "git.inspect",
+READ_ONLY = frozenset({"workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
                        "runtime.detect", "browser.local_text", "platform.inspect",
                        "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
 GUEST_WRITES = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
@@ -304,6 +304,25 @@ class Handler(BaseHTTPRequestHandler):
                           if app.file_tools is not None else invoke("workspace.tree", {"path": "."}))
                 if app.file_tools is None:
                     audit("workspace.tree", {"path": "."}, True)
+                return self.reply(200, result)
+            except AgentUnavailable as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
+            except (ValueError, OSError, PermissionError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+        if path in ("/api/v1/workspace/stat", "/api/v1/workspace/trash"):
+            from urllib.parse import parse_qs
+            if path.endswith("/stat"):
+                paths = parse_qs(urlsplit(self.path).query).get("path", [])
+                if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
+                    return self.reply(400, {"error": "One bounded guest-workspace path required"})
+                tool, args = "file.stat", {"path": paths[0]}
+            else:
+                tool, args = "file.trashList", {}
+            try:
+                result = (app.file_tools.invoke(tool, args)
+                          if app.file_tools is not None else invoke(tool, args))
+                if app.file_tools is None:
+                    audit(tool, args, True)
                 return self.reply(200, result)
             except AgentUnavailable as exc:
                 return self.reply(503, {"error": str(exc)[:240]})

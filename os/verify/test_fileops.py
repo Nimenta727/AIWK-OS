@@ -148,6 +148,26 @@ class FileOpsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.inv("file.restore", trashId=bad)
 
+    def test_tree_lists_empty_dirs_and_hides_trash(self):
+        self.inv("file.mkdir", path="empty")
+        self.make("d/x.txt")
+        sha = self.inv("file.stat", path="d/x.txt")["sha256"]
+        self.inv("file.trash", path="d/x.txt", expectedSha256=sha)
+        tree = self.inv("workspace.tree")
+        self.assertIn("empty", tree["dirs"])
+        self.assertIn("d", tree["dirs"])
+        self.assertNotIn(plane.TRASH, tree["dirs"])
+
+    def test_trash_list(self):
+        self.assertEqual(self.inv("file.trashList")["items"], [])
+        sha = self.make("a.txt")
+        r = self.inv("file.trash", path="a.txt", expectedSha256=sha)
+        items = self.inv("file.trashList")["items"]
+        self.assertEqual([(i["trashId"], i["original"], i["type"]) for i in items],
+                         [(r["trashId"], "a.txt", "file")])
+        self.assertIn("file.trashList", DIRECT_READ)
+        self.assertNotIn("file.trashList", aiws_tasks.WRITE_TOOLS)
+
     def test_no_permanent_delete_tool(self):
         names = {t["name"] for t in plane.catalog()}
         self.assertFalse({n for n in names if "delete" in n or "remove" in n or "unlink" in n})

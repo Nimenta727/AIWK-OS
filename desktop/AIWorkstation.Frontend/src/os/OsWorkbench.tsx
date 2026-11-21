@@ -42,6 +42,9 @@ export default function OsWorkbench(){
  const [submitting,setSubmitting]=useState(false);
  const pending=useRef(false);
  const [starting,setStarting]=useState(true);
+ const [commandText,setCommandText]=useState('');
+ const [command,setCommand]=useState<{text:string;nonce:number}|null>(null);
+ const submitCommand=()=>{const text=commandText.trim();if(!text)return;setPage('files');setCommand({text,nonce:Date.now()});setCommandText('');};
  const refresh=useCallback(async()=>{
   try{setSnapshot(await api<Snapshot>('/snapshot'));setError('');}
   catch(e){setError(e instanceof Error?e.message:String(e));}
@@ -93,7 +96,12 @@ export default function OsWorkbench(){
     <div className="aiws-os-foot">{health?tr('本地系统服务已响应','GUEST SERVICE RESPONDING'):tr('正在检查系统服务','CHECKING SERVICE')}<small>127.0.0.1 · {health?.mode||'not connected'}</small></div>
    </aside>
    <main className="aiws-os-body">
-    <header className="aiws-os-top"><span>AIWS / <strong>{MENU.find(x=>x.id===page)?.[language]}</strong></span><div>
+    <header className="aiws-os-top"><span>AIWS / <strong>{MENU.find(x=>x.id===page)?.[language]}</strong></span>
+     <form className="aiws-os-command" role="search" onSubmit={e=>{e.preventDefault();submitCommand();}}>
+      <input value={commandText} onChange={e=>setCommandText(e.target.value)} spellCheck={false}
+       aria-label={tr('指令栏','Command bar')}
+       placeholder={tr('指令栏：移动 a.txt 到 docs/a.txt · 删除 b.txt · 新建文件夹 论文','Command: mv a.txt docs/a.txt · rm b.txt · mkdir notes')}/>
+      <button type="submit" disabled={!csrf||!commandText.trim()}>{tr('预览','Preview')}</button></form><div>
      <button type="button" onClick={()=>setLanguage(x=>x==='zh'?'en':'zh')}>{language==='zh'?'EN':'中文'}</button>
      <button type="button" onClick={()=>void refresh()} title={tr('刷新','Refresh')} aria-label={tr('刷新','Refresh')}><RefreshCw size={16}/></button></div></header>
     <div className="aiws-os-content">
@@ -123,7 +131,7 @@ export default function OsWorkbench(){
        <button type="button" className="aiws-os-primary" onClick={()=>setPage('code')}>{tr('打开代码智能','Open code intelligence')}</button>
       </section>
      </div>}
-     {page==='files'&&<GuestFiles csrf={csrf} english={language==='en'} onPlanCreated={()=>setPage('plans')}/>}
+     {page==='files'&&<GuestFiles csrf={csrf} english={language==='en'} command={command} onPlanCreated={()=>setPage('plans')}/>}
      {page==='code'&&<section className="aiws-os-card">
       <h2>{tr('通过 Agent 调用代码能力','Call a code tool through the task controller')}</h2>
       <label>{tr('能力','Capability')}<select value={tool} onChange={e=>setTool(e.target.value)}>{tools.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select></label>

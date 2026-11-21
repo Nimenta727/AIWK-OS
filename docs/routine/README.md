@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 18:30 — 阶段 2：文件管理器、指令栏、批准卡片、撤销](2026-11-21_1830-stage2-file-manager-command-bar.md)
 - [2026-11-21 17:30 — 修复基线测试与安装预检 lsblk 字段缺失](2026-11-21_1730-fix-baseline-tests-installer-probe.md)
 - [2026-11-21 17:00 — 阶段 1：基础文件工具与路线文档](2026-11-21_1700-file-tools-stage1.md)
 - [2026-11-21 15:35 — 镜像验收前置 CI 语法修复](2026-11-21_1535-boot-ci-preflight-gate.md)

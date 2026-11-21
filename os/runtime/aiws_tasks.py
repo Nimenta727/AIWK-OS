@@ -17,7 +17,7 @@ from aiws_guest_ops import TOOLS as GUEST_OP_TOOLS, WRITE_TOOLS as GUEST_OP_WRIT
 from aiws_toolplane import catalog as tool_catalog
 
 TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy",
+    "workspace.tree", "file.read", "file.replace", "file.stat", "file.trashList", "file.mkdir", "file.copy",
     "file.move", "file.trash", "file.restore", "code.search",
     "git.inspect", "runtime.detect", "browser.local_text", "platform.inspect",
     "code.symbols", "code.references", "code.dependencies", "code.platformApis",

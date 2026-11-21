@@ -140,6 +140,49 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(result["stages"][0]["state"],"failed",result)
         self.assertEqual((self.root/"Example.cs").read_text(),text)
 
+    def _run_stage(self, headers, title, stage):
+        _, doc = self.request("POST", "/api/v1/tasks", {"title": title, "goal": "", "stages": [stage]}, headers)
+        tid = doc["task"]["id"]
+        uri = "/api/v1/tasks/" + tid + "/stages/" + stage["key"] + "/"
+        # Writes never run before an explicit approval call.
+        self.assertEqual(self.request("POST", uri + "dispatch", {}, headers)[0], 400)
+        self.assertEqual(self.request("POST", uri + "approve", {}, headers)[0], 202)
+        self.assertEqual(self.request("POST", uri + "dispatch", {}, headers)[0], 202)
+        for _ in range(150):
+            _, result = self.request("GET", "/api/v1/tasks/" + tid)
+            if result["stages"][0]["state"] not in ("queued", "running"):
+                return result["stages"][0]
+            time.sleep(.01)
+        self.fail("stage did not finish")
+
+    def test_file_manager_flow_mkdir_move_trash_restore_over_http(self):
+        csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
+        hdr = {"X-AIWS-CSRF": csrf}
+        def stage(tool, **args):
+            return {"key": "op", "label": tool, "tool": tool, "arguments": args, "dependsOn": []}
+        self.assertEqual(self._run_stage(hdr, "mk", stage("file.mkdir", path="docs"))["state"], "completed")
+        status, tree = self.request("GET", "/api/v1/workspace/tree")
+        self.assertIn("docs", tree["dirs"])
+        status, info = self.request("GET", "/api/v1/workspace/stat?path=Example.cs")
+        self.assertEqual((status, info["type"]), (200, "file"))
+        self.assertEqual(self._run_stage(hdr, "mv", stage("file.move", path="Example.cs",
+                         to="docs/Example.cs", expectedSha256=info["sha256"]))["state"], "completed")
+        self.assertTrue((self.root / "docs/Example.cs").is_file())
+        _, info = self.request("GET", "/api/v1/workspace/stat?path=docs/Example.cs")
+        done = self._run_stage(hdr, "rm", stage("file.trash", path="docs/Example.cs", expectedSha256=info["sha256"]))
+        self.assertEqual(done["state"], "completed", done)
+        status, bin_ = self.request("GET", "/api/v1/workspace/trash")
+        self.assertEqual([i["original"] for i in bin_["items"]], ["docs/Example.cs"])
+        done = self._run_stage(hdr, "undo", stage("file.restore", trashId=bin_["items"][0]["trashId"]))
+        self.assertEqual(done["state"], "completed", done)
+        self.assertEqual((self.root / "docs/Example.cs").read_text(), "public class Example {}")
+        self.assertEqual(self.request("GET", "/api/v1/workspace/trash")[1]["items"], [])
+
+    def test_stat_endpoint_rejects_escape_and_bad_query(self):
+        self.assertEqual(self.request("GET", "/api/v1/workspace/stat")[0], 400)
+        self.assertEqual(self.request("GET", "/api/v1/workspace/stat?path=%2Fetc%2Fpasswd")[0], 403)
+        self.assertEqual(self.request("GET", "/api/v1/workspace/stat?path=..%2Fx")[0], 403)
+
     def test_local_model_lifecycle_cannot_manage_host(self):
         token=self.request("GET","/api/v1/session")[1]["csrf"]
         self.assertEqual(self.request("POST","/api/v1/model/enable",{})[0],403)

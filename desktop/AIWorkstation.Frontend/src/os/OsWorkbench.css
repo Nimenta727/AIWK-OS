@@ -64,3 +64,21 @@ font-size:12px;overflow-wrap:anywhere}
 .aiws-os-guest-service strong{color:#24446c}.aiws-os-guest-service span{color:#58739b}
 .aiws-os-system-console .aiws-os-primary{display:inline-flex;align-items:center;gap:8px}
 .aiws-os-divider-line{height:1px;background:#dfe6f0;margin:22px 0}
+
+.aiws-os-file-toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.aiws-os-file-toolbar button{display:inline-flex;align-items:center;gap:7px;border:1px solid #d8e1eb;border-radius:8px;padding:8px 12px;background:#fff;color:#24446c;cursor:pointer}
+.aiws-os-command{display:flex;gap:8px;flex:1;max-width:560px}
+.aiws-os-command input{flex:1;min-width:0;border:1px solid #d6deea;border-radius:8px;padding:9px 12px;color:#213653;background:#fff}
+.aiws-os-command button{background:#315ecf!important;color:#fff!important;border-color:#315ecf!important}.aiws-os-command button:disabled{opacity:.5;cursor:not-allowed}
+.aiws-os-approvals{display:grid;gap:10px;margin:16px 0}
+.aiws-os-approval{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;border:1px solid #f0d9a8;background:#fffaf0;border-radius:10px;padding:13px 15px}
+.aiws-os-approval.done{border-color:#bfe3c9;background:#f3fbf5}.aiws-os-approval.failed{border-color:#f5b8bf;background:#fff4f5}.aiws-os-approval.running{border-color:#c9d8f5;background:#f5f8ff}
+.aiws-os-approval strong{display:block;font-size:13px;overflow-wrap:anywhere}.aiws-os-approval small{display:block;color:#68788f;font-size:11px;margin-top:4px;font-family:ui-monospace,monospace}
+.aiws-os-error-inline{color:#8d2936!important}
+.aiws-os-approval-actions{display:flex;gap:8px;flex-wrap:wrap}
+.aiws-os-approval-actions button,.aiws-os-file-form button,.aiws-os-trash button{display:inline-flex;align-items:center;gap:6px;border:1px solid #d8e1eb;border-radius:8px;padding:8px 12px;background:#fff;color:#24446c;cursor:pointer}
+.aiws-os-approval-actions button.aiws-os-primary,.aiws-os-file-form button.aiws-os-primary{background:#315ecf;color:#fff;margin:0}
+.aiws-os-file-form{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:14px 0}.aiws-os-file-form label{flex:1;min-width:220px;margin:0}
+.aiws-os-trash{margin-top:20px;border-top:1px solid #e3e8f1;padding-top:14px}.aiws-os-trash h3{display:flex;align-items:center;gap:7px;font-size:13px;margin:0 0 10px;color:#314564}
+.aiws-os-trash-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #edf1f5;font-size:12px;overflow-wrap:anywhere}.aiws-os-trash-row small{color:#8a99ae;margin-left:6px}
+@media(max-width:800px){.aiws-os-top{flex-wrap:wrap;height:auto;padding:10px 14px}.aiws-os-command{max-width:none;order:3;flex-basis:100%}}

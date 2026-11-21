@@ -28,6 +28,7 @@ TOOL_SPECS = [
     ("workspace.tree", "List bounded workspace files without following symlinks", {"path": "string"}),
     ("file.read", "Read a UTF-8 file and its SHA-256", {"path": "string"}),
     ("file.stat", "Read type, size, mtime and SHA-256 (directories: bounded tree fingerprint)", {"path": "string"}),
+    ("file.trashList", "List items in the reversible workspace trash (id, original path, type, time)", {}),
     ("file.mkdir", "Create one new directory; parent must exist; guest workspace write", {"path": "string"}),
     ("file.copy", "Copy one regular file (<=64MiB) to a new path; never overwrites; guest workspace write", {"path": "string", "to": "string", "expectedSha256": "string"}),
     ("file.move", "Move or rename a file or directory to a new path; never overwrites; fingerprint precondition", {"path": "string", "to": "string", "expectedSha256": "string"}),
@@ -173,6 +174,25 @@ def _fingerprint(path):
                 raise ValueError("Directory contains a special file; operation refused")
     return "dir", h.hexdigest()
 
+def _trash_list(root, a):
+    bin_ = root / TRASH
+    items = []
+    if bin_.is_dir() and not bin_.is_symlink():
+        for slot in sorted(bin_.iterdir()):
+            meta = slot / "meta.json"
+            if (slot.is_symlink() or not re.fullmatch("[a-f0-9]{32}", slot.name)
+                    or meta.is_symlink() or not meta.is_file()):
+                continue
+            try:
+                m = json.loads(meta.read_text(encoding="utf-8"))
+                items.append({"trashId": slot.name, "original": str(m["original"])[:512],
+                              "type": str(m["type"]), "trashedAt": int(m["trashedAt"])})
+            except (ValueError, KeyError, TypeError):
+                continue
+            if len(items) >= MAX_TRASH_ITEMS:
+                break
+    return {"items": items}
+
 def _guard_ops_path(value):
     if Path(value).parts[:1] == (TRASH,):
         raise ValueError("The workspace trash is managed only by file.trash/file.restore")
@@ -299,17 +319,20 @@ def _tree(root, a):
     sub = _path(root, a.get("path", "."))
     if not sub.is_dir():
         raise ValueError("Expected directory")
-    entries = []
+    entries, folders = [], []
     for base, dirs, names in os.walk(sub, followlinks=False):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not (Path(base) / d).is_symlink())
+        for d in dirs:
+            if len(folders) < 300:
+                folders.append((Path(base) / d).relative_to(root).as_posix())
         for name in sorted(names):
             candidate = Path(base) / name
             if candidate.is_symlink() or not candidate.is_file():
                 continue
             entries.append(candidate.relative_to(root).as_posix())
             if len(entries) >= 300:
-                return {"files": entries, "truncated": True}
-    return {"files": entries, "truncated": False}
+                return {"files": entries, "dirs": folders, "truncated": True}
+    return {"files": entries, "dirs": folders, "truncated": False}
 
 def _search(root, a):
     query = a["query"]
@@ -466,7 +489,7 @@ def invoke(name, arguments):
         return _file_read(root, arguments)
     if name == "file.replace":
         return _replace(root, arguments)
-    handler = {"file.stat": _stat, "file.mkdir": _mkdir, "file.copy": _copy,
+    handler = {"file.stat": _stat, "file.trashList": _trash_list, "file.mkdir": _mkdir, "file.copy": _copy,
                "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
     if handler is not None:
         return handler(root, arguments)

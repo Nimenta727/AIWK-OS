@@ -22,7 +22,7 @@ from aiws_tasks import WRITE_TOOLS, TOOLS as STAGE_TOOLS
 from aiws_toolplane import catalog as tool_catalog
 
 DIRECT_READ = frozenset({
-    "workspace.tree", "file.read", "file.stat", "code.search", "git.inspect",
+    "workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
     "runtime.detect", "browser.local_text", "platform.inspect",
     "code.symbols", "code.references", "code.dependencies", "code.platformApis"
 }) | GUEST_READ
