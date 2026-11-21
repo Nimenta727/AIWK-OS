@@ -36,6 +36,21 @@ class GuestOperationsTest(unittest.TestCase):
         self.tool_boundary.stop()
         self.boundary.stop()
 
+    def test_model_service_enable_disable_also_require_approved_dag(self):
+        for tool in ("service.enable","service.disable"):
+            with self.assertRaises(PermissionError):
+                self.ops.execute(tool,{"service":"aiws-local-model.service"})
+            with self.assertRaises(GuestOperationError):
+                self.ops.execute(tool,{"service":"host.service"},approved=True)
+        # The disable operation can be tested without any model weights.
+        # All systemd calls are intercepted by a fake, never executed.
+        with patch("aiws_guest_ops.Path.home",return_value=self.root if hasattr(self,"root") else self.workspace):
+            result=self.ops.execute("service.disable",
+                {"service":"aiws-local-model.service"},approved=True)
+        self.assertFalse(result["enabled"])
+        self.assertEqual(self.commands[-1],
+            ["systemctl","--user","disable","--now","aiws-local-model.service"])
+
     def test_service_is_allowlisted_and_mutations_require_approval(self):
         self.assertEqual(self.ops.execute("service.inspect",
             {"service":"aiws-local-model.service"})["status"]["ActiveState"],"active")

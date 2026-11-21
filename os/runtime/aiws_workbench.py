@@ -163,55 +163,15 @@ class Controller:
 
 
     def configure_model(self, enabled):
-        # Model lifecycle is a fixed guest-user systemd operation, never a
-        # model-generated shell command or a host hypervisor API.
+        # A button click only creates a pending durable DAG. The user must
+        # separately approve and dispatch before any guest systemd action.
         require_guest_runtime()
-        weights = Path.home() / ".local/share/aiws/models/aiws-local.gguf"
-        bundled = Path("/usr/local/share/aiws/model-preload/manifest.json").is_file()
-        if enabled:
-            registry=GuestModelRegistry(Path.home()/".local/share/aiws/models",self.workspace)
-            if bundled:
-                registry.import_bundled(verify_only=True)
-            else:
-                if weights.is_symlink() or not weights.is_file():
-                    raise LocalModelError("Install a verified model inside the guest before enabling")
-                protect_guest_workspace((Path.home()/".local/share/aiws").resolve(),
-                                        weights.resolve(strict=True))
-                registry.verify()
-        folder = Path.home()/".config/aiws"
-        folder.mkdir(parents=True,mode=0o700,exist_ok=True)
-        if folder.is_symlink() or not folder.resolve().is_relative_to(Path.home().resolve()):
-            raise LocalModelError("Invalid guest model configuration folder")
-        marker = folder/"local-model-enabled"
-        if marker.is_symlink():
-            raise LocalModelError("Guest model flag symlink forbidden")
-        verb = "enable" if enabled else "disable"
-        result = subprocess.run(["systemctl","--user",verb,"--now",
-                                 "aiws-local-model.service"],
-                                capture_output=True,timeout=15,check=False)
-        if result.returncode != 0:
-            raise LocalModelError("Guest local inference service could not change state")
-        if enabled:
-            marker.write_text("1\n",encoding="ascii")
-            os.chmod(marker,0o600)
-        else:
-            marker.unlink(missing_ok=True)
-        self.model.enabled = enabled
-        return self.model.status()
-
-    def model_plan(self, instruction):
-        """Convert a validated local model proposal to a pending DAG, never execute."""
-        proposal = self.model.suggest(instruction)
-        if self.agent is not None:
-            return self.tasks.model_plan(instruction, proposal)
-        key = "inspect"
-        stage = {"key": key, "label": proposal["reason"][:160],
-                 "tool": proposal["tool"], "arguments": proposal["arguments"],
-                 "dependsOn": []}
-        task = self.tasks.create(("Local proposal: " + proposal["tool"])[:160],
-                                 proposal["reason"], [stage])
-        self.tasks.record_model_proposal(task["task"]["id"], "aiws-local", instruction, proposal)
-        return self.tasks.get(task["task"]["id"])
+        tool="service.enable" if enabled else "service.disable"
+        title="Enable guest offline model" if enabled else "Disable guest offline model"
+        return self.tasks.create(title,"Review guest-local model service lifecycle",
+                                 [{"key":"service","label":title,"tool":tool,
+                                   "arguments":{"service":"aiws-local-model.service"},
+                                   "dependsOn":[]}])
 
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:

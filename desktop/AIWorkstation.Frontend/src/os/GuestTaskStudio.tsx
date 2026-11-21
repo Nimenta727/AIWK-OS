@@ -90,9 +90,11 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   if(busy||!csrf)return;
   setBusy(true);setError('');
   try{
-   setModel(await request<ModelStatus>('/model/'+(value?'enable':'disable'),{
+   const plan=await request<TaskDetail>('/model/'+(value?'enable':'disable'),{
     method:'POST',headers,body:'{}'
-   }));
+   });
+   await update();
+   await open(plan.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
@@ -137,9 +139,9 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     <span>{model?.online?'LOCAL ONLINE':model?.configured?'OFFLINE SERVICE NOT READY':'DISABLED'}</span></div>
    <div className="aiws-os-studio-actions">
      <button type="button" disabled={!csrf||busy||!model?.weightsPresent||Boolean(model?.configured)}
-      onClick={()=>void toggleModel(true)}>{tr('启用客户机离线模型','Enable guest-only model')}</button>
+      onClick={()=>void toggleModel(true)}>{tr('申请启用模型（需审核）','Request model enable approval')}</button>
      <button type="button" disabled={!csrf||busy||!model?.configured}
-      onClick={()=>void toggleModel(false)}>{tr('关闭离线模型','Disable offline model')}</button>
+      onClick={()=>void toggleModel(false)}>{tr('申请关闭模型（需审核）','Request model disable approval')}</button>
      <span className="aiws-os-muted">{model?.weightsPresent?tr('已发现客户机权重','Guest weights found'):tr('尚未安装客户机 GGUF 权重','Guest GGUF weights not provisioned')}</span>
     </div>
    <p>{tr('模型只提出工作区只读操作建议，不执行，也不自动调用云端。CPU 模式可用；权重需要在客户机内单独安装。',

@@ -30,13 +30,17 @@ class LocalPlanner:
         marker = Path.home() / ".config/aiws/local-model-enabled"
         persisted = marker.is_file() and not marker.is_symlink() and marker.read_text().strip() == "1"
         self.enabled = ((os.environ.get("AIWS_LOCAL_MODEL_ENABLED") == "1") or persisted) if enabled is None else enabled
+        self._auto_enabled=enabled is None
         if not isinstance(port, int) or not (1 <= port <= 65535):
             raise LocalModelError("Invalid localhost inference port")
         self.url = "http://" + HOST + ":" + str(port)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def status(self):
-        status = {"mode": "optional-guest-only", "configured": bool(self.enabled),
+        marker=Path.home()/".config/aiws/local-model-enabled"
+        persisted=marker.is_file() and not marker.is_symlink() and marker.read_text().strip()=="1"
+        configured=bool(self.enabled or persisted) if self._auto_enabled else bool(self.enabled)
+        status = {"mode": "optional-guest-only", "configured": configured,
                   "provider": "llama.cpp", "model": MODEL_ALIAS,
                   "network": "guest-loopback-only",
                   "automaticExecution": False, "cloudFallback": False,
@@ -47,7 +51,7 @@ class LocalPlanner:
                        Path("/usr/local/share/aiws/model-preload/aiws-local.gguf").is_file()) or
                       (not (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_symlink() and
                        (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_file()))}
-        if self.enabled:
+        if configured:
             try:
                 with self.opener.open(self.url + "/health", timeout=1.5) as response:
                     status["online"] = response.status == 200
@@ -82,7 +86,7 @@ class LocalPlanner:
                 "requiresReview": True, "executed": False, "source": "local-model"}
 
     def suggest(self, instruction):
-        if not self.enabled:
+        if not self.status()["configured"]:
             raise LocalModelError("No local model configured; deterministic guest tools remain available")
         if not isinstance(instruction, str) or not (1 <= len(instruction) <= MAX_INTENT):
             raise LocalModelError("Intent must contain 1-1000 characters")

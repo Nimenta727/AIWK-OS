@@ -17,9 +17,10 @@ from uuid import uuid4
 
 from aiws_guest_boundary import protect_guest_workspace, require_guest_runtime
 from aiws_toolplane import _path
+from aiws_model_registry import GuestModelRegistry
 
 READ_TOOLS = frozenset({"service.inspect", "kernel.inspect", "kernel.verify", "kernel.recovery_plan"})
-WRITE_TOOLS = frozenset({"service.restart", "kernel.stage", "kernel.abandon"})
+WRITE_TOOLS = frozenset({"service.restart", "service.enable", "service.disable", "kernel.stage", "kernel.abandon"})
 TOOLS = READ_TOOLS | WRITE_TOOLS
 SERVICES = frozenset({"aiws-workbench.service", "aiws-local-model.service"})
 RESTARTABLE = frozenset({"aiws-local-model.service"})
@@ -34,6 +35,8 @@ FRAGMENT_KEYS = frozenset({
 SPEC = {
     "service.inspect": ("service",),
     "service.restart": ("service",),
+    "service.enable": ("service",),
+    "service.disable": ("service",),
     "kernel.inspect": (),
     "kernel.stage": ("path", "expectedSha256"),
     "kernel.verify": ("candidateId",),
@@ -57,7 +60,7 @@ def validate(tool, args):
     if any(not isinstance(v, str) or not v or len(v) > 512 for v in args.values()):
         raise GuestOperationError("Guest operation arguments must be bounded strings")
     if "service" in args:
-        names = RESTARTABLE if tool == "service.restart" else SERVICES
+        names = RESTARTABLE if tool in ("service.restart", "service.enable", "service.disable") else SERVICES
         if args["service"] not in names:
             raise GuestOperationError("Service not in guest-only allowlist")
     if "candidateId" in args and not re.fullmatch(r"[0-9a-f]{32}", args["candidateId"]):
@@ -170,6 +173,41 @@ class GuestOperations:
                 raise GuestOperationError("Guest local model restart failed")
             return {"service": "aiws-local-model.service", "restartRequested": True,
                     "hostTouched": False, "privileged": False}
+        if tool in ("service.enable", "service.disable"):
+            # This is the ONLY production path to mutate local model service
+            # state; it is a separately approved durable guest DAG stage.
+            enable = tool == "service.enable"
+            if enable:
+                registry=GuestModelRegistry(Path.home()/".local/share/aiws/models",
+                                            self.workspace)
+                if Path("/usr/local/share/aiws/model-preload/manifest.json").is_file():
+                    registry.import_bundled(verify_only=True)
+                else:
+                    registry.verify()
+            flag_dir=Path.home()/".config/aiws"
+            flag_dir.mkdir(mode=0o700,parents=True,exist_ok=True)
+            if (flag_dir.is_symlink() or
+                not flag_dir.resolve().is_relative_to(Path.home().resolve()) or
+                flag_dir.stat().st_mode & 0o077):
+                raise GuestOperationError("Model service flag directory must be private")
+            flag=flag_dir/"local-model-enabled"
+            if flag.is_symlink():
+                raise GuestOperationError("Model service flag symlink forbidden")
+            action="enable" if enable else "disable"
+            result=self.runner(["systemctl","--user",action,"--now",
+                                "aiws-local-model.service"],
+                               capture_output=True,text=True,
+                               check=False,timeout=20)
+            if result.returncode:
+                raise GuestOperationError("Approved guest model service change failed")
+            if enable:
+                flag.write_text("1\n",encoding="ascii")
+                os.chmod(flag,0o600)
+            else:
+                flag.unlink(missing_ok=True)
+            return {"service":"aiws-local-model.service",
+                    "enabled":enable,"guestOnly":True,"approved":True,
+                    "privileged":False}
         if tool == "kernel.inspect":
             return {"runningKernel": platform.release(), "guestOnly": True,
                     "kernelDeploymentSupported": False, "candidateOnly": True,
