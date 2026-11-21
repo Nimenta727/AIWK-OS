@@ -1,0 +1,21 @@
+[Unit]
+Description=AIWS persistent guest-only system Agent
+After=default.target
+Before=aiws-workbench.service
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/aiws-agent
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+RuntimeDirectory=aiws-agent
+RuntimeDirectoryMode=0700
+MemoryMax=1G
+CPUQuota=200%
+TasksMax=128
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+[Install]
+WantedBy=default.target
