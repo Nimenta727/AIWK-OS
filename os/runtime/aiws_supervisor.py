@@ -50,10 +50,23 @@ FORBIDDEN_FLAGS = ("--dangerously-skip-permissions", "bypassPermissions", "dontA
 class SupervisorError(RuntimeError):
     pass
 
+ISOLATION_DEFAULT = {"mode": "none", "user": "aiws-builder", "proxy": "http://127.0.0.1:3128"}
+SAFE_PATH = "/usr/local/bin:/usr/bin:/bin"
+SIGNAL_NAMES = {signal.SIGSTOP: "STOP", signal.SIGCONT: "CONT", signal.SIGTERM: "TERM", signal.SIGKILL: "KILL"}
+
+def validate_isolation(value):
+    if not isinstance(value, dict) or set(value) - set(ISOLATION_DEFAULT):
+        raise SupervisorError("isolation has unknown keys")
+    out = {**ISOLATION_DEFAULT, **value}
+    if (out["mode"] not in ("none", "user") or not isinstance(out["user"], str) or not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", out["user"])
+            or not isinstance(out["proxy"], str) or not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{2,5}", out["proxy"])):
+        raise SupervisorError("isolation must be {mode: none|user, user: <account>, proxy: http://127.0.0.1:<port>}")
+    return out
+
 def load_builder_config(path=None):
     """~/.config/aiws/builder.json: strict, default DISABLED."""
     path = Path(path) if path is not None else Path.home() / ".config/aiws/builder.json"
-    config = {"enabled": False, "envAllow": []}
+    config = {"enabled": False, "envAllow": [], "isolation": dict(ISOLATION_DEFAULT)}
     if path.is_symlink():
         raise SupervisorError("Builder config must not be a symlink")
     if not path.exists():
@@ -66,6 +79,8 @@ def load_builder_config(path=None):
         raise SupervisorError("Builder config is not valid JSON") from exc
     if not isinstance(data, dict) or set(data) - set(config):
         raise SupervisorError("Builder config has unknown keys")
+    if "isolation" in data:
+        config["isolation"] = validate_isolation(data["isolation"])
     if "enabled" in data:
         if not isinstance(data["enabled"], bool):
             raise SupervisorError("enabled must be true or false")
@@ -124,6 +139,93 @@ def classify_action(tool, detail, project_abs):
                 return category
     return None
 
+class UserIsolation:
+    """Run the CLI as an unprivileged sandbox user (step O4). Everything here is a list of argv: no shell.
+
+    Prevention comes from the OS: the user's own UID (no sudo, no groups), the nftables rule that lets that UID
+    reach only the egress proxy, and ACLs that give it write access to ONE project folder (read-only .git).
+    It is refused unless the firewall marker written by the root-owned firewall unit exists (fail closed).
+    """
+    def __init__(self, user, proxy, runner=subprocess.run, marker="/run/aiws/builder-firewall.ok", which=shutil.which,
+                 sudo=None, setfacl=None, home="/var/lib/aiws-builder/home", main_user=None):
+        self.user, self.proxy, self.runner, self.marker, self.which, self.home = user, proxy, runner, Path(marker), which, home
+        self.sudo, self.setfacl = sudo or "sudo", setfacl or "setfacl"
+        if main_user is None:
+            import pwd
+            main_user = pwd.getpwuid(os.getuid()).pw_name
+        self.main_user = main_user
+        self.touched = []
+
+    def check(self):
+        if self.marker.is_symlink() or not self.marker.is_file():
+            raise SupervisorError("The builder firewall is not active (marker missing): refusing to run the builder")
+        for tool in (self.sudo, self.setfacl):
+            if not self.which(tool) and not Path(tool).is_file():
+                raise SupervisorError("%s is required for the isolated builder" % Path(tool).name)
+
+    def _run(self, argv, strict=True):
+        try:
+            result = self.runner(argv, capture_output=True, text=True, timeout=15, shell=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            if strict:
+                raise SupervisorError("%s failed: %s" % (Path(argv[0]).name, type(exc).__name__)) from exc
+            return False
+        if result.returncode != 0 and strict:
+            raise SupervisorError("%s failed (exit %s)" % (Path(argv[0]).name, result.returncode))
+        return result.returncode == 0
+
+    def _ancestors(self, project):
+        mine = []
+        for parent in reversed(project.parents):
+            try:
+                if parent != Path("/") and parent.stat().st_uid == os.getuid():
+                    mine.append(parent)
+            except OSError:
+                continue
+        return mine
+
+    def prepare(self, project):
+        self.check()
+        project = Path(project)
+        u, m = self.user, self.main_user
+        try:
+            for directory in self._ancestors(project):          # traverse only: no listing, no reading
+                self._run([self.setfacl, "-m", "u:%s:--x" % u, str(directory)])
+                self.touched.append(directory)
+            self._run([self.setfacl, "-R", "-m", "u:%s:rwX" % u, "-m", "d:u:%s:rwX" % u,
+                       "-m", "u:%s:rwX" % m, "-m", "d:u:%s:rwX" % m, str(project)])
+            git = project / ".git"
+            if git.is_dir() and not git.is_symlink():              # hooks and config must not be writable by the builder
+                self._run([self.setfacl, "-R", "-m", "u:%s:rX" % u, "-m", "d:u:%s:rX" % u, str(git)])
+        except SupervisorError:
+            self.cleanup(project)
+            raise
+
+    def cleanup(self, project):
+        project = Path(project)
+        u, m = self.user, self.main_user
+        self._run([self.setfacl, "-R", "-x", "u:" + u, "-x", "d:u:" + u, "-x", "u:" + m, "-x", "d:u:" + m, str(project)], strict=False)
+        for directory in self.touched:
+            self._run([self.setfacl, "-x", "u:" + u, str(directory)], strict=False)
+        self.touched = []
+
+    def wrap(self, argv):
+        env = {"PATH": SAFE_PATH, "HOME": self.home, "LANG": "C.UTF-8", "TERM": "dumb", "NO_PROXY": "", "no_proxy": "",
+               "HTTPS_PROXY": self.proxy, "HTTP_PROXY": self.proxy, "https_proxy": self.proxy, "http_proxy": self.proxy}
+        return ([self.sudo, "-n", "-u", self.user, "--", "env", "-i"] + ["%s=%s" % kv for kv in env.items()] + list(argv))
+
+    def signal(self, sig):
+        """Signal every process of the sandbox user (one run at a time, so that is exactly the run)."""
+        name = SIGNAL_NAMES.get(sig)
+        if name is None:
+            raise SupervisorError("Unsupported signal")
+        return self._run([self.sudo, "-n", "-u", self.user, "--", "kill", "-" + name, "-1"], strict=False)
+
+def default_isolation_factory(config):
+    iso = (config or {}).get("isolation") or ISOLATION_DEFAULT
+    iso = validate_isolation(iso)
+    return None if iso["mode"] == "none" else UserIsolation(iso["user"], iso["proxy"])
+
 def _read_lines(stream, sink):
     try:
         while True:
@@ -152,6 +254,7 @@ class _Run:
         self.stderr = b""
         self.paused = False
         self.before = {"input": 0, "output": 0}
+        self.iso = None
 
     def effective(self):
         if self.tot_in is not None or self.tot_out is not None:
@@ -159,8 +262,10 @@ class _Run:
         return self.sum_in, self.sum_out
 
 class Supervisor:
-    def __init__(self, mandates, events, workspace, launcher=None, config=None, clock=time.time, approval_timeout=APPROVAL_TIMEOUT):
+    def __init__(self, mandates, events, workspace, launcher=None, config=None, clock=time.time, approval_timeout=APPROVAL_TIMEOUT,
+                 isolation_factory=None):
         self.mandates, self.events, self.clock = mandates, events, clock
+        self.isolation_factory = isolation_factory or default_isolation_factory
         self.workspace = Path(workspace).resolve(strict=True)
         self.launcher = launcher or default_launcher()
         self.config = config or (lambda: load_builder_config())
@@ -218,18 +323,27 @@ class Supervisor:
             argv, extra_env = self.launcher(mandate, prompt, cwd)
             if (not isinstance(argv, list) or not argv or any(not isinstance(a, str) for a in argv)):
                 raise SupervisorError("Invalid command line")
+            iso = self.isolation_factory(self.config())
+            if iso is not None:
+                iso.prepare(Path(cwd))                      # fails closed: no marker / no ACL tooling -> nothing starts
+                argv, env = iso.wrap(argv), {"PATH": SAFE_PATH}
+            else:
+                env = self._env(extra_env)
             run_id = self.mandates.run_create(mandate_id, "")
             session = "build-" + run_id[:12]
             adapter = self._adapter(mandate["provider"], session, self.clock)
             try:
-                proc = subprocess.Popen(argv, cwd=cwd, env=self._env(extra_env), stdin=subprocess.DEVNULL,
+                proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
                                         close_fds=True, shell=False, bufsize=0)
             except OSError as exc:
+                if iso is not None:
+                    iso.cleanup(Path(cwd))
                 self.mandates.run_update(run_id, state="failed", reason="could not start", ended=self.clock())
                 raise SupervisorError("Could not start the CLI: %s" % type(exc).__name__) from exc
             deadline = self.clock() + mandate["wallClockMinutes"] * 60
             run = _Run(run_id, mandate, adapter, proc, deadline, cwd)
+            run.iso = iso
             run.before = dict(mandate["used"])       # budget already spent by earlier runs of this mandate
             self.active = run
         self.mandates.run_update(run_id, session=session)
@@ -263,34 +377,39 @@ class Supervisor:
                 current = {"runId": run.id, "mandateId": run.mandate["id"], "state": "awaiting-approval" if run.pending else "running",
                            "usedInput": used_in, "usedOutput": used_out, "turns": run.adapter.turns,
                            "pending": run.pending, "deadline": run.deadline}
-        return {"enabled": bool(self.config().get("enabled")), "active": current,
+        isolation = (self.config().get("isolation") or ISOLATION_DEFAULT)
+        return {"enabled": bool(self.config().get("enabled")), "isolation": {"mode": isolation.get("mode", "none"),
+                                                                              "user": isolation.get("user", "aiws-builder")},
+                "active": current,
                 "runs": self.mandates.runs(5)}
 
     # ---- internals -----------------------------------------------------------------------
+    def _signal(self, run, sig):
+        """Signal the build. With user isolation the child runs as another UID, so signals go through sudo."""
+        try:
+            if run.iso is not None:
+                return run.iso.signal(sig)
+            os.killpg(run.proc.pid, sig)             # the whole group, including grandchildren
+            return True
+        except (ProcessLookupError, PermissionError, SupervisorError):
+            return False
+
     def _terminate(self, run):
         proc = run.proc
-        try:
-            if run.paused:
-                os.killpg(proc.pid, signal.SIGCONT)
-                run.paused = False
-            os.killpg(proc.pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+        if run.paused:
+            self._signal(run, signal.SIGCONT)
+            run.paused = False
+        if not self._signal(run, signal.SIGTERM) and proc.poll() is None and run.iso is None:
             return
         for _ in range(20):
             if proc.poll() is not None:
                 break
             time.sleep(0.1)
-        try:
-            os.killpg(proc.pid, signal.SIGKILL)      # the whole group, including grandchildren
-        except (ProcessLookupError, PermissionError):
-            pass
+        self._signal(run, signal.SIGKILL)
 
     def _pause(self, run, category, tool, detail, session):
-        try:
-            os.killpg(run.proc.pid, signal.SIGSTOP)
+        if self._signal(run, signal.SIGSTOP):
             run.paused = True
-        except (ProcessLookupError, PermissionError):
-            pass
         run.pending = {"category": category, "tool": tool, "detail": (detail or "")[:120], "since": self.clock()}
         self.mandates.run_update(run.id, state="awaiting-approval", pending=json.dumps(run.pending))
         self._emit("sup-" + run.id[:12], "approval", status="pending", detail=category)
@@ -338,11 +457,8 @@ class Supervisor:
         self._emit("sup-" + run.id[:12], "approval", status="ok" if approved else "denied", detail=category)
         self.mandates.run_update(run.id, state="running", pending=None)
         if approved:
-            try:
-                os.killpg(run.proc.pid, signal.SIGCONT)
+            if self._signal(run, signal.SIGCONT):
                 run.paused = False
-            except (ProcessLookupError, PermissionError):
-                pass
         else:
             run.stop_reason = "approval-timeout" if timed_out else "approval-denied"
             self._terminate(run)
@@ -399,6 +515,8 @@ class Supervisor:
                 self.events.append(event)
             except (EventError, OSError, ValueError):
                 pass
+        if run.iso is not None:
+            run.iso.cleanup(Path(run.project_abs))
         used_in, used_out = run.effective()
         if run.stop_reason:
             state = "stopped" if run.stop_reason == "user-stop" else "killed"

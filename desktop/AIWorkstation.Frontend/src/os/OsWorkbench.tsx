@@ -112,7 +112,7 @@ export default function OsWorkbench(){
       <button type="submit" disabled={!csrf||!commandText.trim()}>{tr('预览','Preview')}</button></form>}<div>
      <button type="button" onClick={()=>setLanguage(x=>x==='zh'?'en':'zh')}>{language==='zh'?'EN':'中文'}</button>
      <button type="button" onClick={()=>void refresh()} title={tr('刷新','Refresh')} aria-label={tr('刷新','Refresh')}><RefreshCw size={16}/></button></div></header>
-    <div className="aiws-os-content">
+    <div className={'aiws-os-content'+(page==='observatory'?' obs':'')}>
      {page!=='observatory'&&<div className="aiws-os-heading"><small>AIWS OS / LINUX GUEST</small>
       <h1>{page==='overview'?tr('工作台与操作系统，真正贯通','One workspace, integrated with Linux'):
         page==='files'?tr('AI 工作区文件管理','AI-managed guest files'):

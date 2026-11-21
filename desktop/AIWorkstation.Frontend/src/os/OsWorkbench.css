@@ -129,3 +129,54 @@ font-size:12px;overflow-wrap:anywhere}
 .aiws-obs-check input{width:auto}
 .aiws-obs-row .aiws-os-primary+button{margin-left:8px}
 @media(max-width:800px){.aiws-obs-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---- observatory: dense dashboard layout (overrides the roomy defaults above) ---- */
+.aiws-os-content.obs{max-width:1560px;padding:18px min(2.5vw,32px) 22px}
+.aiws-obs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:start;padding-bottom:84px}
+.aiws-obs>*{grid-column:span 6;min-width:0}
+.aiws-obs-grid{display:contents}
+.aiws-obs .aiws-os-card{padding:12px 14px;border-radius:10px;box-shadow:none;border-color:#e1e7ef}
+.aiws-obs h2{font-size:12px;letter-spacing:.02em;margin:0 0 8px;color:#3a4d6c;text-transform:none}
+.aiws-obs .aiws-os-card p,.aiws-obs p.aiws-os-muted{margin:4px 0;line-height:1.45;font-size:12px}
+.aiws-obs [data-aiws=inbox]{order:1;grid-column:span 4}
+.aiws-obs [data-aiws=verdict]{order:2;grid-column:span 2}
+.aiws-obs [data-aiws=tokens]{order:3;grid-column:span 2}
+.aiws-obs [data-aiws=tasks]{order:4;grid-column:span 2}
+.aiws-obs [data-aiws=builder]{order:5;grid-column:span 2}
+.aiws-obs [data-aiws=builder].wide{grid-column:span 6}
+.aiws-obs [data-aiws=activity]{order:6;grid-column:span 3}
+.aiws-obs [data-aiws=sessions]{order:7;grid-column:span 3}
+.aiws-obs .aiws-obs-strip,.aiws-obs>.aiws-os-error{order:0}
+.aiws-obs-strip{gap:6px}.aiws-obs-chip{padding:4px 10px;font-size:11px}
+.aiws-obs-big{gap:16px;font-size:11px}.aiws-obs-big strong{font-size:19px;line-height:1.1}
+.aiws-obs-bar{margin:4px 0;grid-template-columns:62px 1fr 44px;font-size:11px}.aiws-obs-bar>div{height:7px}
+.aiws-obs-budget{margin-top:6px}.aiws-obs-meter{height:8px}
+.aiws-obs-stack{height:10px;margin:2px 0 4px}
+.aiws-obs-task{padding:5px 0;font-size:11px}
+.aiws-obs-row{padding:7px 10px;margin:5px 0;border-radius:8px;gap:8px}.aiws-obs-row strong{font-size:12px}.aiws-obs-row small{margin-top:1px;font-size:10.5px}
+.aiws-obs-row .aiws-os-primary,.aiws-obs-row button{padding:5px 10px;font-size:12px}
+.aiws-obs-verdict{padding:8px 10px;gap:0 9px}.aiws-obs-verdict p{margin:0 0 3px!important;font-size:12px}.aiws-obs-verdict i{width:11px;height:11px;margin-top:3px}
+.aiws-obs-feed{max-height:210px}.aiws-obs-feed li{grid-template-columns:62px 74px 1fr;padding:3px 0;font-size:11px;gap:6px}
+.aiws-obs-session{padding:6px 2px;font-size:11px;grid-template-columns:14px 70px minmax(0,1fr) 54px auto}
+.aiws-obs-events{font-size:10.5px}.aiws-obs-events td{padding:3px 6px}
+.aiws-obs-link{padding:2px 0;font-size:11px}
+.aiws-obs-form{gap:8px;padding:10px;margin:6px 0}.aiws-obs-form label{font-size:11px;gap:4px}.aiws-obs-form input,.aiws-obs-form select,.aiws-obs-form textarea{padding:6px 8px}
+.aiws-obs [data-aiws=builder] .aiws-obs-form-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.aiws-obs-input{padding:14px min(2.5vw,32px) 12px}.aiws-obs-input input{padding:10px 14px;font-size:13px}
+.aiws-obs-input>div,.aiws-obs-reply{max-width:1500px}
+@media(max-width:1180px){.aiws-obs [data-aiws=inbox],.aiws-obs [data-aiws=activity],.aiws-obs [data-aiws=sessions]{grid-column:span 6}
+ .aiws-obs [data-aiws=verdict],.aiws-obs [data-aiws=tokens],.aiws-obs [data-aiws=tasks],.aiws-obs [data-aiws=builder]{grid-column:span 3}}
+@media(max-width:800px){.aiws-obs>*,.aiws-obs [data-aiws]{grid-column:span 6!important}.aiws-obs [data-aiws=builder] .aiws-obs-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.aiws-obs{align-items:stretch}
+.aiws-obs>.aiws-os-error{padding:6px 12px;margin:0;font-size:12px;border-radius:8px}
+.aiws-obs .aiws-os-card{display:flex;flex-direction:column}
+.aiws-obs .aiws-os-card>h2{flex:none}
+
+.aiws-obs-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+.aiws-obs .aiws-obs-link{align-self:flex-start;text-align:left}
+.aiws-obs [data-aiws=verdict]{align-self:start}
+@media(max-width:1180px){.aiws-obs-rows{grid-template-columns:1fr}}
+
+.aiws-obs-iso{margin:4px 0;padding:4px 8px;border-radius:6px;font-size:11px;line-height:1.4}
+.aiws-obs-iso.ok{background:#f3fbf5;color:#1f6b3a}.aiws-obs-iso.warn{background:#fffaf0;color:#8a5a00}

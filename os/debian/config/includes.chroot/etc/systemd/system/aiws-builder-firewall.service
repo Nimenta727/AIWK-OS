@@ -1,0 +1,16 @@
+[Unit]
+Description=AIWS builder lane firewall (the builder user may only reach the egress proxy)
+DefaultDependencies=no
+After=systemd-sysusers.service systemd-tmpfiles-setup.service
+Before=network-pre.target aiws-egress-proxy.service
+Wants=network-pre.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/aiws/builder-firewall.nft
+# The marker is what the supervisor checks before it will run anything as the builder user (fail closed).
+ExecStartPost=/usr/bin/touch /run/aiws/builder-firewall.ok
+ExecStop=/usr/sbin/nft delete table inet aiws_builder
+ExecStopPost=/usr/bin/rm -f /run/aiws/builder-firewall.ok
+[Install]
+WantedBy=multi-user.target

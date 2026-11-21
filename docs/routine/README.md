@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-22 08:30 — O4：构建通道隔离与观察台布局紧凑化](2026-11-22_0830-observatory-o4-builder-isolation.md)
 - [2026-11-22 05:30 — O3：授权令牌与监督器](2026-11-22_0530-observatory-o3-mandate-supervisor.md)
 - [2026-11-22 03:00 — O2：观察台首页与“高级”抽屉](2026-11-22_0300-observatory-o2-home.md)
 - [2026-11-22 01:00 — O1：事件模式、CLI 适配器、事件存储](2026-11-22_0100-observatory-o1-events.md)

@@ -1,0 +1,15 @@
+#!/usr/sbin/nft -f
+# AIWS builder lane (step O4): the builder sandbox user may reach ONLY the local egress proxy.
+# Every other destination (internet, other local services such as the workbench or the local model,
+# DNS, IPv6) is dropped for that UID. The proxy (user aiws-egress) enforces the domain allowlist.
+# Unix sockets are not covered by netfilter: they are protected by file permissions (0700 run dirs).
+table inet aiws_builder
+delete table inet aiws_builder
+
+table inet aiws_builder {
+	chain output {
+		type filter hook output priority filter; policy accept;
+		meta skuid "aiws-builder" oifname "lo" ip daddr 127.0.0.1 tcp dport 3128 accept
+		meta skuid "aiws-builder" counter drop
+	}
+}

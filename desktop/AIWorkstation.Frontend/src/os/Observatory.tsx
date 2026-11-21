@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
+import type {ReactNode} from 'react';
 import {Activity,AlertTriangle,Check,ChevronDown,ChevronRight,CircleDot,Send,ShieldCheck,X} from 'lucide-react';
 import {agentBars,attentionFirst,basisText,budgetState,clock,formatTokens,lightTone,stateSegments} from '../model/observatory.mjs';
 
@@ -12,7 +13,7 @@ type RecentTask={id:string;title:string;createdAt:number;stages:Record<string,nu
 type Budget={mandateId:string;used:number;limit:number;input:{used:number;limit:number};output:{used:number;limit:number}};
 type RunApproval={runId:string;category:string;tool:string;detail:string};
 type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number};
-type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
+type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{isolation?:{mode:string;user:string};active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
 type Summary={demo:boolean;runApprovals:RunApproval[];
  status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
  tokens:{total:Totals;byAgent:Record<string,Totals>;budget:Budget|null};
@@ -44,6 +45,7 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
  const [form,setForm]=useState({provider:'claude',projectDir:'',prompt:'',inputK:'200',outputK:'60',minutes:'30',turns:'30',tools:'Read,Edit,Write,Bash(npm test)',
   del:true,install:true,push:true});
  const [formOpen,setFormOpen]=useState(false);
+ const [inboxAll,setInboxAll]=useState(false);
  const headers={'Content-Type':'application/json','X-AIWS-CSRF':csrf};
  const timer=useRef<number|undefined>(undefined);
  const load=useCallback(async()=>{
@@ -130,6 +132,21 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
   }catch(e){setError(String(e instanceof Error?e.message:e));}
   finally{setBusy(false);}
  };
+
+ const inboxItems:ReactNode[]=[
+  ...(summary?.runApprovals||[]).map(a=><div className="aiws-obs-row" key={'run'+a.runId} data-aiws="run-approval">
+   <div><strong>{tr('构建任务想要执行敏感操作：','The build wants a sensitive action: ')}{a.category}</strong><small>{a.tool} · {a.detail}</small>
+    <small>{tr('构建已暂停。注意：操作可能在被发现前已经开始，批准只是让它继续。','The build is paused. The action may have started before it was noticed; approving lets it continue.')}</small></div>
+   <span><button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'approve')}><Check size={15}/>{tr('批准继续','Approve')}</button>
+    <button type="button" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'deny')}><X size={15}/>{tr('拒绝并终止','Deny & stop')}</button></span></div>),
+  ...(summary?.tasks.needsApproval||[]).map(w=><div className="aiws-obs-row" key={w.taskId+w.stageKey}>
+   <div><strong>{w.label}</strong><small>{w.tool} · {w.taskTitle}</small></div>
+   {w.ready?<button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void approveAndRun(w)}><Check size={15}/>{tr('批准并运行','Approve & run')}</button>:
+    <span className="aiws-os-muted">{tr('等待前置步骤','Waiting for earlier steps')}</span>}</div>),
+  ...(summary?.tasks.failures||[]).map(f=><div className="aiws-obs-row fail" key={'f'+f.taskId+f.stageKey}>
+   <div><strong>{f.label}</strong><small>{f.tool} · {f.error||tr('失败','failed')}</small></div>
+   <button type="button" onClick={()=>onOpenAdvanced('plans')}>{tr('查看','Inspect')}</button></div>)
+ ];
  const s=summary;
  const tone=s?lightTone(s.verdict.level):'green';
  const tasks=attentionFirst(s?.tasks.recent,5);
@@ -185,26 +202,22 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
   </div>
 
   <section className="aiws-os-card" data-aiws="inbox">
-   <h2>{tr('需要你','Needs you')} <small>({(s?.tasks.needsApproval.length||0)+(s?.tasks.failures.length||0)+(s?.runApprovals.length||0)})</small></h2>
-   {s?.runApprovals.map(a=><div className="aiws-obs-row" key={a.runId} data-aiws="run-approval">
-    <div><strong>{tr('构建任务想要执行敏感操作：','The build wants a sensitive action: ')}{a.category}</strong><small>{a.tool} · {a.detail}</small>
-     <small>{tr('构建已暂停。注意：操作可能在被发现前已经开始，批准只是让它继续。','The build is paused. The action may have started before it was noticed; approving lets it continue.')}</small></div>
-    <span><button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'approve')}><Check size={15}/>{tr('批准继续','Approve')}</button>
-     <button type="button" disabled={busy||!csrf} onClick={()=>void decide(a.runId,'deny')}><X size={15}/>{tr('拒绝并终止','Deny & stop')}</button></span></div>)}
-   {!(s?.tasks.needsApproval.length||s?.tasks.failures.length||s?.runApprovals.length)&&<p className="aiws-os-muted">{tr('现在没有需要你处理的事。','Nothing needs you right now.')}</p>}
-   {s?.tasks.needsApproval.map(w=><div className="aiws-obs-row" key={w.taskId+w.stageKey}>
-    <div><strong>{w.label}</strong><small>{w.tool} · {w.taskTitle}</small></div>
-    {w.ready?<button type="button" className="aiws-os-primary" disabled={busy||!csrf} onClick={()=>void approveAndRun(w)}><Check size={15}/>{tr('批准并运行','Approve & run')}</button>:
-     <span className="aiws-os-muted">{tr('等待前置步骤','Waiting for earlier steps')}</span>}</div>)}
-   {s?.tasks.failures.map(f=><div className="aiws-obs-row fail" key={f.taskId+f.stageKey}>
-    <div><strong>{f.label}</strong><small>{f.tool} · {f.error||tr('失败','failed')}</small></div>
-    <button type="button" onClick={()=>onOpenAdvanced('plans')}>{tr('查看','Inspect')}</button></div>)}
+   <h2>{tr('需要你','Needs you')} <small>({inboxItems.length})</small></h2>
+   {!inboxItems.length&&<p className="aiws-os-muted">{tr('现在没有需要你处理的事。','Nothing needs you right now.')}</p>}
+   <div className="aiws-obs-rows">{inboxItems.slice(0,inboxAll?inboxItems.length:6)}</div>
+   {inboxItems.length>6&&<button type="button" className="aiws-obs-link" onClick={()=>setInboxAll(v=>!v)}>
+    {inboxAll?tr('收起','Collapse'):tr('展开全部','Show all')+' ('+(inboxItems.length-6)+')'}</button>}
   </section>
 
-  <section className="aiws-os-card" data-aiws="builder">
+  <section className={'aiws-os-card'+(formOpen?' wide':'')} data-aiws="builder">
    <h2>{tr('构建','Build')} <small>{tr('（官方 CLI，在你的授权范围内工作）','(official CLI, inside your mandate)')}</small></h2>
-   {!builder?.enabled?<p className="aiws-os-muted">{tr('构建通道默认关闭。要启用，请在 ~/.config/aiws/builder.json 写入 {"enabled": true}。注意：在专用用户与域名白名单网络（O4）完成之前，CLI 会以当前客户机用户的权限运行，隔离较弱。',
-     'The builder is off by default. Enable it with {"enabled": true} in ~/.config/aiws/builder.json. Until the dedicated user and domain-allowlisted network (step O4) exist, the CLI runs with this guest user\'s privileges, so isolation is weaker.')}</p>:<>
+   {!builder?.enabled?<p className="aiws-os-muted">{tr('构建通道默认关闭。要启用，请在 ~/.config/aiws/builder.json 写入 {"enabled": true}。注意：默认不隔离，CLI 以当前客户机用户的权限运行；要使用专用用户与域名白名单网络，请在镜像里完成 O4 配置并在 builder.json 设置 isolation.mode。',
+     'The builder is off by default. Enable it with {"enabled": true} in ~/.config/aiws/builder.json. By default there is no isolation and the CLI runs with this guest user\'s privileges; for the dedicated user and domain-allowlisted network, finish the O4 setup in the image and set isolation.mode in builder.json.')}</p>:<>
+    <p className={'aiws-obs-iso '+(builder.status.isolation?.mode==='user'?'ok':'warn')} data-aiws="isolation">{builder.status.isolation?.mode==='user'?
+     tr('隔离：专用用户 ','Isolation: dedicated user ')+builder.status.isolation.user+tr('，只能经域名白名单代理联网','; network only through the domain-allowlist proxy'):
+     tr('隔离：无——CLI 以当前用户权限运行（在 builder.json 设置 isolation.mode="user" 启用专用用户隔离）','Isolation: none: the CLI runs with your own privileges (set isolation.mode="user" in builder.json)')}</p>
+    <p className="aiws-os-muted">{Object.entries(builder.providers).map(([k,v])=>k+': '+(v.installed?tr('已安装','installed'):tr('本机未安装','not installed'))).join(' · ')}
+     {' · '}{tr('有效授权','active mandates')}: {builder.mandates.length}</p>
     {builder.status.active?<div className="aiws-obs-row"><div><strong>{tr('正在构建','Building')} · {builder.status.active.state}</strong>
       <small>{tr('轮次','turns')} {builder.status.active.turns} · {tr('已用','used')} {formatTokens(builder.status.active.usedInput)}/{formatTokens(builder.status.active.usedOutput)}</small></div>
       <button type="button" disabled={busy||!csrf} onClick={()=>void stopRun(builder.status.active!.runId)}><X size={15}/>{tr('停止','Stop')}</button></div>:
