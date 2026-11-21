@@ -158,6 +158,9 @@ def main():
             raise PermissionError("Guest paths must be inside the dedicated guest user home")
         path.mkdir(mode=0o700,parents=True,exist_ok=True)
         protect_guest_workspace(path.resolve(strict=True))
+    # The tool plane needs an explicit workspace; systemd user units do not
+    # inherit the shell's AIWS_WORKSPACE variable.
+    os.environ["AIWS_WORKSPACE"]=str(workspace.resolve(strict=True))
     endpoint=socket_path()
     endpoint.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
     core=AgentCore(workspace,state,singleton=True)

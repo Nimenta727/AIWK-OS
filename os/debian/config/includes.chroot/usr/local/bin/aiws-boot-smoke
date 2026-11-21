@@ -33,6 +33,18 @@ if [ "$health" -ne 1 ]; then
     emit "AIWS_BOOT_SMOKE_FAIL: workbench-agent-unhealthy"
     exit 1
 fi
+# The independent Agent must be a real systemd user service, not a second
+# controller hidden inside the browser process.
+if ! runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 \
+    systemctl --user is-active --quiet aiws-agent.service; then
+    emit "AIWS_BOOT_SMOKE_FAIL: persistent-systemd-agent-not-running"
+    exit 1
+fi
+if ! curl --fail --silent --noproxy '*' --max-time 3 http://127.0.0.1:17640/api/v1/health |
+    python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("agentIndependentService")'; then
+    emit "AIWS_BOOT_SMOKE_FAIL: workbench-not-using-independent-agent"
+    exit 1
+fi
 if ! /usr/local/bin/aiws-toolctl --list | grep -q '"code.symbols"'; then
     emit "AIWS_BOOT_SMOKE_FAIL: mcp-unavailable"
     exit 1

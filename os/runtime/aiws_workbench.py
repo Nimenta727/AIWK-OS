@@ -280,13 +280,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(404, {"error": str(exc)})
                 except (AgentUnavailable, AgentError) as exc:
                     return self.reply(503, {"error": str(exc)[:240]})
-                except (AgentUnavailable, AgentError) as exc:
-                    return self.reply(503, {"error": str(exc)[:240]})
             if len(parts) == 5 and parts[4] == "audit":
                 try:
                     return self.reply(200, {"events": app.tasks.audit(parts[3])})
                 except TaskError as exc:
                     return self.reply(404, {"error": str(exc)})
+                except (AgentUnavailable, AgentError) as exc:
+                    return self.reply(503, {"error": str(exc)[:240]})
         if path == "/api/v1/guest/services":
             try:
                 return self.reply(200, {"services": [
