@@ -3,7 +3,7 @@ import {AlertTriangle,ChevronRight,FileText,FolderTree,RefreshCw,Save} from 'luc
 
 type FileTree={files:string[];truncated:boolean};
 type FileDetail={path:string;text:string;sha256:string};
-type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
+type TaskCreated={task:{id:string};stages:Array<{state:string;approval:number}>};
 
 async function local<T>(path:string, options?:RequestInit):Promise<T>{
  const response=await fetch('/api/v1'+path,{credentials:'omit',cache:'no-store',...options});
@@ -12,8 +12,8 @@ async function local<T>(path:string, options?:RequestInit):Promise<T>{
  return data;
 }
 
-export default function GuestFiles({csrf,onSubmitted,english}:{
- csrf:string;onSubmitted:(job:Job)=>void;english:boolean
+export default function GuestFiles({csrf,onPlanCreated,english}:{
+ csrf:string;onPlanCreated:()=>void;english:boolean
 }){
  const tr=(zh:string,en:string)=>english?en:zh;
  const [files,setFiles]=useState<FileTree|null>(null);
@@ -44,13 +44,21 @@ export default function GuestFiles({csrf,onSubmitted,english}:{
   if(pending.current||!selected||!editing||!csrf)return;
   pending.current=true;setBusy(true);setError('');
   try{
-   const job=await local<Job>('/jobs',{method:'POST',headers:{
+   const planned=await local<TaskCreated>('/tasks',{method:'POST',headers:{
     'Content-Type':'application/json','X-AIWS-CSRF':csrf
-   },body:JSON.stringify({tool:'file.replace',arguments:{
-    path:selected.path,text,expectedSha256:selected.sha256
-   }})});
+   },body:JSON.stringify({
+    title:'Guest file edit: '+selected.path.slice(0,100),
+    goal:'Review before changing a guest project file',
+    stages:[{key:'write',label:'Review and replace guest file',
+      tool:'file.replace',arguments:{
+        path:selected.path,text,expectedSha256:selected.sha256
+      },dependsOn:[]}]
+   })});
+   if(!planned.task.id||planned.stages[0].approval!==0){
+    throw new Error('Guest write stage did not require explicit approval');
+   }
    setEditing(false);
-   onSubmitted(job);
+   onPlanCreated();
   }catch(e){setError(String(e));}
   finally{setBusy(false);pending.current=false;}
  };

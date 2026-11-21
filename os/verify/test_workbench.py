@@ -79,6 +79,14 @@ class WorkbenchTests(unittest.TestCase):
                                           {"tool": blocked, "arguments": {}}, h)[0], 400)
         self.assertEqual(self.request("POST", "/api/v1/jobs", data, h)[0], 202)
 
+    def test_legacy_job_path_rejects_write_even_with_csrf(self):
+        csrf=self.request("GET","/api/v1/session")[1]["csrf"]
+        status,data=self.request("POST","/api/v1/jobs",
+            {"tool":"file.replace","arguments":{"path":"Example.cs","text":"bad",
+                "expectedSha256":""}},{"X-AIWS-CSRF":csrf})
+        self.assertEqual(status,400,data)
+        self.assertEqual((self.root/"Example.cs").read_text(),"public class Example {}")
+
     def test_guest_files_listing_read_and_sha_write(self):
         import hashlib
         status, tree = self.request("GET", "/api/v1/workspace/tree")
@@ -90,29 +98,47 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/v1/workspace/file?path=%2Fetc%2Fpasswd")[0], 403)
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
         text = "public class GuestOnly {}"
-        _, job = self.request("POST", "/api/v1/jobs", {"tool": "file.replace",
-             "arguments": {"path": "Example.cs", "text": text,
-                           "expectedSha256": file["sha256"]}}, {"X-AIWS-CSRF": csrf})
-        result = {}
-        for _ in range(100):
-            _, result = self.request("GET", "/api/v1/jobs/" + job["id"])
-            if result["status"] not in ("queued", "running"):
+        headers={"X-AIWS-CSRF":csrf}
+        direct={"tool":"file.replace","arguments":{
+            "path":"Example.cs","text":text,"expectedSha256":file["sha256"]}}
+        self.assertEqual(self.request("POST","/api/v1/jobs",direct,headers)[0],400)
+        self.assertEqual((self.root/"Example.cs").read_text(),"public class Example {}")
+        stage={"key":"write","label":"Approved guest edit","tool":"file.replace",
+               "arguments":direct["arguments"],"dependsOn":[]}
+        status,doc=self.request("POST","/api/v1/tasks",{
+            "title":"Guest edit","goal":"","stages":[stage]},headers)
+        self.assertEqual(status,202,doc)
+        tid=doc["task"]["id"]
+        uri="/api/v1/tasks/"+tid+"/stages/write/"
+        self.assertEqual(self.request("POST",uri+"dispatch",{},headers)[0],400)
+        self.assertEqual((self.root/"Example.cs").read_text(),"public class Example {}")
+        self.assertEqual(self.request("POST",uri+"approve",{},headers)[0],202)
+        self.assertEqual(self.request("POST",uri+"dispatch",{},headers)[0],202)
+        result=None
+        for _ in range(150):
+            _,result=self.request("GET","/api/v1/tasks/"+tid)
+            if result["stages"][0]["state"] not in ("queued","running"):
                 break
-            time.sleep(0.01)
-        self.assertEqual(result["status"], "completed", result)
-        self.assertEqual((self.root / "Example.cs").read_text(), text)
-        self.assertEqual(self.request("GET", "/api/v1/workspace/file?path=Example.cs")[1]["sha256"],
+            time.sleep(.01)
+        self.assertEqual(result["stages"][0]["state"],"completed",result)
+        self.assertEqual((self.root/"Example.cs").read_text(),text)
+        self.assertEqual(self.request("GET","/api/v1/workspace/file?path=Example.cs")[1]["sha256"],
                          hashlib.sha256(text.encode()).hexdigest())
-        _, stale = self.request("POST", "/api/v1/jobs", {"tool": "file.replace",
-             "arguments": {"path": "Example.cs", "text": "unauthorized collision",
-                           "expectedSha256": file["sha256"]}}, {"X-AIWS-CSRF": csrf})
-        for _ in range(100):
-            _, result = self.request("GET", "/api/v1/jobs/" + stale["id"])
-            if result["status"] not in ("queued", "running"):
+        stale={"key":"write","label":"Stale hash","tool":"file.replace",
+               "arguments":{"path":"Example.cs","text":"unauthorized collision",
+                            "expectedSha256":file["sha256"]},"dependsOn":[]}
+        _,doc=self.request("POST","/api/v1/tasks",
+            {"title":"Stale edit","goal":"","stages":[stale]},headers)
+        tid=doc["task"]["id"];uri="/api/v1/tasks/"+tid+"/stages/write/"
+        self.request("POST",uri+"approve",{},headers)
+        self.request("POST",uri+"dispatch",{},headers)
+        for _ in range(150):
+            _,result=self.request("GET","/api/v1/tasks/"+tid)
+            if result["stages"][0]["state"] not in ("queued","running"):
                 break
-            time.sleep(0.01)
-        self.assertEqual(result["status"], "failed", result)
-        self.assertEqual((self.root / "Example.cs").read_text(), text)
+            time.sleep(.01)
+        self.assertEqual(result["stages"][0]["state"],"failed",result)
+        self.assertEqual((self.root/"Example.cs").read_text(),text)
 
     def test_local_model_lifecycle_cannot_manage_host(self):
         token=self.request("GET","/api/v1/session")[1]["csrf"]

@@ -29,7 +29,8 @@ READ_ONLY = frozenset({"workspace.tree", "file.read", "code.search", "git.inspec
                        "runtime.detect", "browser.local_text", "platform.inspect",
                        "code.symbols", "code.references", "code.dependencies", "code.platformApis"})
 GUEST_WRITES = frozenset({"file.replace"})
-EXPOSED = READ_ONLY | GUEST_WRITES
+# No direct guest write through transient /jobs: use approved durable DAG.
+EXPOSED = READ_ONLY
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
           ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon",
           ".woff2": "font/woff2"}
@@ -76,11 +77,35 @@ class Controller:
                 "serviceScope": "guest-user-allowlist", "kernelChanges": "candidate-only",
                 "note": "Optional offline LLM makes suggestions only; no guest privilege broker or host VM access."}
 
+    def _remote_job(self, identifier):
+        try:
+            task=self.tasks.get(identifier)
+        except (TaskError, AgentError):
+            return None
+        if not task["task"]["title"].startswith("Workbench tool: "):
+            return None
+        stage=task["stages"][0]
+        return {"id":identifier,"tool":stage["tool"],"status":stage["state"],
+                "result":stage["result"],"error":stage["error"],
+                "submittedAt":task["task"]["created_at"]}
+
     def recent(self):
+        if self.agent is not None:
+            jobs=[]
+            for task in self.tasks.list():
+                if task["title"].startswith("Workbench tool: "):
+                    job=self._remote_job(task["id"])
+                    if job is not None:
+                        jobs.append(job)
+                if len(jobs)>=24:
+                    break
+            return jobs
         with self.lock:
             return [dict(x) for x in list(self.records.values())[-24:]][::-1]
 
     def job(self, identifier):
+        if self.agent is not None:
+            return self._remote_job(identifier)
         with self.lock:
             item = self.records.get(identifier)
             return dict(item) if item else None
@@ -95,6 +120,13 @@ class Controller:
             raise ValueError("Missing required tool arguments")
         if any(not isinstance(v, str) for v in args.values()):
             raise ValueError("Tool arguments must be strings")
+        if self.agent is not None:
+            stage={"key":"operation","label":tool[:160],"tool":tool,
+                   "arguments":args,"dependsOn":[]}
+            task=self.tasks.create("Workbench tool: "+tool,
+                                   "Guest read-only workbench request",[stage])
+            self.tasks.dispatch(task["task"]["id"],"operation")
+            return self._remote_job(task["task"]["id"])
         item = {"id": uuid4().hex, "tool": tool, "status": "queued",
                 "result": None, "error": None, "submittedAt": int(time.time())}
         with self.lock:

@@ -120,7 +120,7 @@ export default function OsWorkbench(){
        <button type="button" className="aiws-os-primary" onClick={()=>setPage('code')}>{tr('打开代码智能','Open code intelligence')}</button>
       </section>
      </div>}
-     {page==='files'&&<GuestFiles csrf={csrf} english={language==='en'} onSubmitted={item=>{setJob(item);setPage('tasks');void refresh();}}/>}
+     {page==='files'&&<GuestFiles csrf={csrf} english={language==='en'} onPlanCreated={()=>setPage('plans')}/>}
      {page==='code'&&<section className="aiws-os-card">
       <h2>{tr('通过 Agent 调用代码能力','Call a code tool through the task controller')}</h2>
       <label>{tr('能力','Capability')}<select value={tool} onChange={e=>setTool(e.target.value)}>{tools.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select></label>
