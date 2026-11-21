@@ -76,3 +76,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 11:55 — 修复真实 Qwen 2B 推理启动参数并加入 CLI 兼容性检查](2026-11-21_1155-model-cli-compatibility-preflight.md)
 - [2026-11-21 12:01 — 统一 Agent 大结果与审计跨重启修复](2026-11-21_1201-guest-large-result-audit-persistence.md)
 - [2026-11-21 12:09 — Windows 历史 WorkTask/DAG 导入同一 Linux Agent（不可执行）](2026-11-21_1209-windows-dag-history-safe-import.md)
+- [2026-11-21 12:15 — AIWS Shell 导入 Windows WorkTask GUI 及真实点击验收](2026-11-21_1215-windows-worktask-import-guest-gui.md)
