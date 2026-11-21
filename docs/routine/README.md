@@ -59,3 +59,8 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 10:49 — Read-only bundled GGUF verification](2026-11-21_1049-zero-copy-bundled-gguf-verification.md)
 - [2026-11-21 10:56 — Real QEMU guest model inference test](2026-11-21_1056-real-guest-qemu-local-2b-inference.md)
 - [2026-11-21 11:00 — Documentation and verification gate sync](2026-11-21_1100-gates-unified-agent-boot-model-docs.md)
+
+- [2026-11-21 11:07 — 修复真实小模型容器文件权限](2026-11-21_1107-model-container-permission-fix.md)
+- [2026-11-21 11:14 — 修复 UEFI 文件路径预检兼容性](2026-11-21_1114-uefi-firmware-discovery-preflight.md)
+- [2026-11-21 11:23 — 在 QEMU 中强制验证独立 Agent 与 UI 服务重启恢复](2026-11-21_1123-guest-agent-ui-lifecycle-qemu-smoke.md)
+- [2026-11-21 11:28 — 本轮真实 CI 结果与严格验收边界](2026-11-21_1128-verified-ci-results-and-open-gates.md)

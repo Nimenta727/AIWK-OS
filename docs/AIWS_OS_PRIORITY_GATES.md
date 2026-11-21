@@ -75,3 +75,13 @@ GitHub Actions run 44787989404 completed successfully with Debian real ISO + QEM
 - Real Debian/QEMU basic GUI click passed before the new kernel candidate test; new full candidate-flow QEMU run still pending at authoring. NixOS ISO remains eval-only, not built/booted.
 
 All above lives inside a dedicated unprivileged guest. No guest agent API can control host files, root, host kernel, hypervisor, shared folders or host GPU.
+
+
+## 2026-11-21 current real CI receipts (do not confuse builds with acceptance)
+
+- Root cause of the earlier failed kernel candidate GUI test has been confirmed by QEMU runtime: durable stage was sent to ordinary toolplane and failed with "Unknown tool: kernel.stage". The persistent stage router was fixed and newer Debian/QEMU runs (e.g. 44849405506, 44849604994, 44849763444) succeeded.
+- The first separate real OVMF EFI A/B attempt 44850151109 failed **before firmware startup** because the script's discovery code exited with no boot serial artifact. A robust code/vars/bootloader preflight has been committed; the **new real A/B run remains pending**. Never claim real boot fallback passed based only on the Python A/B manager tests.
+- The first real Qwen3.5-2B Q4 CPU run 44850313856 verified pinned model download and compiled llama.cpp, but failed before inference because non-root Docker could not open its test script. Permissions were fixed. A subsequent real CPU + model-inclusive QEMU guest workflow is in progress, not yet a model performance proof.
+- An independent unprivileged systemd Agent with private AF_UNIX IPC now owns persistent DAG state. The newer guest lifecycle smoke requires separate UI/Agent restarts, PID separation, task persistence and audit chain validity; that stricter new acceptance must pass before claiming long-term guest service reliability.
+- The model-inclusive Debian ISO is **opt-in** and the default ISO remains without model weights. The guest model boot test is opt-in and must use a licensed SHA-verified builder artifact. A real 2B model in a networkless container, if passed, is still distinct from a real guest model test.
+
