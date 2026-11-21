@@ -48,14 +48,17 @@ def main():
             time.sleep(1)
         else:
             raise RuntimeError("Guest model never became healthy")
-        load_sec = round(time.monotonic() - begin, 3)
-        pid_result = subprocess.run(
-            ["systemctl", "--user", "show", "--property=MainPID", "--value", UNIT],
-            check=True, capture_output=True, text=True, timeout=10
-        )
-        pid = int(pid_result.stdout.strip())
-        if pid <= 1:
-            raise RuntimeError("Invalid guest-only llama-server PID")
+        # The gate answers /health instantly and loads llama-server on the first real request, so warm the model
+        # up first and read the true cold-start time and the llama-server PID (not the gate's) from /gate/status.
+        planner.suggest("List the guest workspace files")
+        with planner.opener.open(planner.url + "/gate/status", timeout=5) as response:
+            gate = json.loads(response.read(8192))
+        pid = gate.get("childPid")
+        if not isinstance(pid, int) or pid <= 1:
+            raise RuntimeError("The gate did not report a loaded llama-server PID")
+        load_sec = gate.get("lastColdStartSeconds")
+        if not isinstance(load_sec, (int, float)):
+            load_sec = round(time.monotonic() - begin, 3)
         metrics = benchmark(planner, cases, heldout_sha, lambda: model_memory(pid))
         metrics.update({
             "realGuestModel": True,

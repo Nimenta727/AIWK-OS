@@ -15,7 +15,7 @@ type RunApproval={runId:string;category:string;tool:string;detail:string};
 type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number};
 type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{isolation?:{mode:string;user:string};active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
 type Summary={demo:boolean;runApprovals:RunApproval[];
- status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
+ status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean;gate?:{loaded:boolean;rssMiB?:number}|null};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
  tokens:{total:Totals;byAgent:Record<string,Totals>;budget:Budget|null};
  tasks:{tasks:number;stages:Record<string,number>;needsApproval:Waiting[];failures:Failure[];recent:RecentTask[]};
  sessions:SessionRow[];recent:Array<{ts:number;source:string;label:string;status:string}>;
@@ -161,7 +161,8 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
 
   <section className="aiws-obs-strip" aria-label={tr('状态','Status')}>
    <span className={'aiws-obs-chip '+(model?.online?'ok':model?.configured?'warn':'off')}><CircleDot size={13}/>
-    {tr('本地模型','Local model')}: {model?.online?tr('在线','online'):model?.configured?tr('未就绪','not ready'):tr('未启用','off')}</span>
+    {tr('本地模型','Local model')}: {model?.online?tr('在线','online'):model?.configured?tr('未就绪','not ready'):tr('未启用','off')}
+    {model?.online&&model.gate&&(model.gate.loaded?' · '+tr('已加载','loaded')+(model.gate.rssMiB?' '+(model.gate.rssMiB>=1024?(model.gate.rssMiB/1024).toFixed(1)+'G':Math.round(model.gate.rssMiB)+'M'):''):' · '+tr('空闲，已卸载','idle, unloaded'))}</span>
    <span className={'aiws-obs-chip '+(s?.status.builder.state==='running'?'ok':s?.status.builder.state==='awaiting-approval'?'warn':'off')} data-aiws="builder-chip"><CircleDot size={13}/>
     {tr('构建通道','Builder')}: {({disabled:tr('未启用','off'),idle:tr('空闲','idle'),running:tr('运行中','running'),'awaiting-approval':tr('等待批准','awaiting approval')} as Record<string,string>)[s?.status.builder.state||'disabled']||s?.status.builder.state}</span>
    <span className={'aiws-obs-chip '+(s?.status.router.externalEnabled?'warn':'ok')}><CircleDot size={13}/>

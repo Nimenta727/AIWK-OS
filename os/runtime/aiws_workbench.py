@@ -92,11 +92,16 @@ class Controller:
             pass
 
     def _emit_local_call(self, outcome):
+        info = self.model.take_info()
         usage = self.model.take_usage()
+        if info["cached"]:                       # answered from the result cache: zero tokens, which is a fact, not "unknown"
+            self._emit("local", "local", "message", detail="cache-hit")
+            return
         tokens = ({"in": usage["in"], "out": usage["out"], "cacheRead": None, "cacheWrite": None,
                    "source": "reported", "scope": "delta"} if usage else {"source": "unknown", "scope": "delta"})
         self._emit("local", "local", "usage", tokens=tokens)
-        self._emit("local", "local", "message", detail=outcome[:60])
+        notes = ("+retry" if info["retried"] else "") + ("+schema-fallback" if info["schemaFallback"] else "")
+        self._emit("local", "local", "message", detail=(outcome + notes)[:60])
 
     # ---- builder (official CLI under a user mandate) ----
     @staticmethod

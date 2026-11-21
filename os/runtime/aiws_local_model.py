@@ -4,11 +4,14 @@ The model is ONLY a constrained guest-tool suggestion service. It cannot call
 tools itself, access files, run commands, or make HTTP requests to the host.
 The sole model URL is hardcoded IPv4 guest loopback with proxies disabled.
 """
+import collections
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -27,6 +30,36 @@ READ_TOOLS = frozenset(PLANE_READ_TOOLS)
 MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore"})
 FINGERPRINTED = frozenset({"file.copy", "file.move", "file.trash"})
 TRASH_ID = re.compile(r"^[a-f0-9]{32}$")
+# Token thrift (step O5): small outputs by default, a larger budget only when the request looks multi-step,
+# and a single retry only if the server reports the answer was cut off (finish_reason == "length").
+TOKENS_SINGLE, TOKENS_PLAN, TOKENS_RETRY = 192, 512, 640
+MULTI_STEP_CUE = re.compile(r"然后|并且|接着|之后|再把|先.{0,20}再|同时|以及|；|;|\bthen\b|\bafter that\b|\band then\b|\bfirst\b.{0,40}\bthen\b", re.I)
+RESULT_CACHE_MAX = 64
+MODEL_CONFIG_DEFAULT = {"constrainedOutput": "json_object", "cachePrompt": True, "resultCacheSeconds": 600}
+
+def max_tokens_for(instruction):
+    return TOKENS_PLAN if MULTI_STEP_CUE.search(instruction) else TOKENS_SINGLE
+
+def load_model_config(path=None):
+    """~/.config/aiws/model.json: strict; any problem falls back to the safe defaults (plain JSON mode)."""
+    path = Path(path) if path is not None else Path.home() / ".config/aiws/model.json"
+    config = dict(MODEL_CONFIG_DEFAULT)
+    if path.is_symlink() or not path.is_file():
+        return config
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.stat().st_size <= 1024 else None
+    except (OSError, ValueError):
+        return config
+    if not isinstance(data, dict) or set(data) - set(config):
+        return config
+    if data.get("constrainedOutput", "json_object") in ("json_object", "json_schema"):
+        config["constrainedOutput"] = data.get("constrainedOutput", "json_object")
+    if isinstance(data.get("cachePrompt"), bool):
+        config["cachePrompt"] = data["cachePrompt"]
+    seconds = data.get("resultCacheSeconds")
+    if isinstance(seconds, int) and not isinstance(seconds, bool) and 0 <= seconds <= 3600:
+        config["resultCacheSeconds"] = seconds
+    return config
 
 def system_prompt():
     """The one system prompt used for inference AND for building training examples."""
@@ -54,8 +87,11 @@ def system_prompt():
 class LocalModelError(ValueError):
     pass
 
+class _SchemaRejected(Exception):
+    pass
+
 class LocalPlanner:
-    def __init__(self, enabled=None, port=PORT, request_timeout=40):
+    def __init__(self, enabled=None, port=PORT, request_timeout=40, config=None):
         # The port is internal/test-only. Neither API clients nor model content
         # may choose an inference URL or point the connection at the host.
         marker = Path.home() / ".config/aiws/local-model-enabled"
@@ -70,6 +106,10 @@ class LocalPlanner:
         self.url = "http://" + HOST + ":" + str(port)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         self._tls = threading.local()
+        self.config = config if config is not None else load_model_config()
+        self._cache = collections.OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._schema_ok = True            # flips to False for the process lifetime if the server rejects json_schema
 
     def status(self):
         marker=Path.home()/".config/aiws/local-model-enabled"
@@ -90,7 +130,16 @@ class LocalPlanner:
             try:
                 with self.opener.open(self.url + "/health", timeout=1.5) as response:
                     status["online"] = response.status == 200
-            except (OSError, urllib.error.URLError, TimeoutError):
+                    health = json.loads(response.read(4096) or b"{}")
+                if isinstance(health, dict) and health.get("gate") is True:
+                    status["gate"] = {"loaded": bool(health.get("loaded"))}
+                    if status["gate"]["loaded"]:           # details only while loaded; asking never loads the model
+                        with self.opener.open(self.url + "/gate/status", timeout=1.5) as response:
+                            info = json.loads(response.read(4096) or b"{}")
+                        for key in ("rssMiB", "peakRssMiB", "lastColdStartSeconds", "coldStarts", "idleUnloads", "requests"):
+                            if isinstance(info.get(key), (int, float)) and not isinstance(info.get(key), bool):
+                                status["gate"][key] = info[key]
+            except (OSError, urllib.error.URLError, TimeoutError, ValueError):
                 pass
         return status
 
@@ -214,45 +263,120 @@ class LocalPlanner:
         self._tls.usage = None
         return usage
 
-    def suggest(self, instruction, context=None):
-        if not self.status()["configured"]:
-            raise LocalModelError("No local model configured; deterministic guest tools remain available")
-        if not isinstance(instruction, str) or not (1 <= len(instruction) <= MAX_INTENT):
-            raise LocalModelError("Intent must contain 1-1000 characters")
-        system = system_prompt()
-        guest_context = self.context_message(context)
+    def take_info(self):
+        """What happened in this thread's last suggest(): cache hit, token-limit retry, schema fallback. Read once."""
+        info = getattr(self._tls, "info", None) or {"cached": False, "retried": False, "schemaFallback": False}
+        self._tls.info = None
+        return info
+
+    def clear_cache(self):
+        with self._cache_lock:
+            self._cache.clear()
+
+    def _cache_get(self, key):
+        seconds = self.config["resultCacheSeconds"]
+        if not seconds:
+            return None
+        with self._cache_lock:
+            entry = self._cache.get(key)
+            if entry is None or entry[0] < time.monotonic():
+                self._cache.pop(key, None)
+                return None
+            self._cache.move_to_end(key)
+            return json.loads(json.dumps(entry[1]))
+
+    def _cache_put(self, key, proposal):
+        seconds = self.config["resultCacheSeconds"]
+        if not seconds:
+            return
+        with self._cache_lock:
+            self._cache[key] = (time.monotonic() + seconds, json.loads(json.dumps(proposal)))
+            while len(self._cache) > RESULT_CACHE_MAX:
+                self._cache.popitem(last=False)
+
+    def _payload(self, instruction, guest_context, tokens, schema_mode):
+        if schema_mode:
+            from aiws_model_schema import response_format
+            fmt = response_format()
+        else:
+            fmt = {"type": "json_object"}
         payload = {
-            "model": MODEL_ALIAS, "stream": False,
-            "temperature": 0.1, "max_tokens": 640,
-            "response_format": {"type": "json_object"},
-            "messages": [{"role": "system", "content": system}]
+            "model": MODEL_ALIAS, "stream": False, "temperature": 0.1, "max_tokens": tokens,
+            "response_format": fmt, "cache_prompt": bool(self.config["cachePrompt"]),
+            # The system prompt comes first and never changes: a byte-stable prefix the server can keep cached.
+            "messages": [{"role": "system", "content": system_prompt()}]
                 + ([{"role": "user", "content": guest_context}] if guest_context else [])
                 + [{"role": "user", "content": instruction}],
         }
+        return payload
+
+    def _post(self, payload):
         request = urllib.request.Request(
-            self.url + "/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
+            self.url + "/v1/chat/completions", data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST")
         try:
             with self.opener.open(request, timeout=self.request_timeout) as response:
                 data = response.read(16385)
                 if len(data) > 16384:
                     raise LocalModelError("Local model response size limit exceeded")
+                return data
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400 and payload["response_format"]["type"] == "json_schema":
+                raise _SchemaRejected() from exc
+            raise LocalModelError("Local guest inference service unavailable") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise LocalModelError("Local guest inference service unavailable") from exc
-        self._tls.usage = None
-        try:
-            response = json.loads(data)
-            usage = response.get("usage") if isinstance(response, dict) else None
-            if isinstance(usage, dict):       # reported by llama-server itself; never estimated
-                prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
-                ok = lambda v: isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 9
-                if ok(prompt) or ok(completion):
-                    self._tls.usage = {"in": prompt if ok(prompt) else None, "out": completion if ok(completion) else None}
-            proposal = json.loads(response["choices"][0]["message"]["content"])
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise LocalModelError("Model returned invalid structured JSON") from exc
-        return self.validate_any(proposal)
+
+    def suggest(self, instruction, context=None):
+        if not self.status()["configured"]:
+            raise LocalModelError("No local model configured; deterministic guest tools remain available")
+        if not isinstance(instruction, str) or not (1 <= len(instruction) <= MAX_INTENT):
+            raise LocalModelError("Intent must contain 1-1000 characters")
+        guest_context = self.context_message(context)
+        info = {"cached": False, "retried": False, "schemaFallback": False}
+        self._tls.info, self._tls.usage = info, None
+        # The key is the instruction plus the FILE inventory (it decides valid paths). The recent-task list is left out on
+        # purpose: every plan creates a task, so including it would make the cache miss on every repeat.
+        inventory = json.dumps((context or {}).get("guestFiles", []), ensure_ascii=False)
+        key = hashlib.sha256((instruction + "\0" + inventory).encode("utf-8")).hexdigest()
+        hit = self._cache_get(key)
+        if hit is not None:                      # identical request and identical guest inventory: zero tokens
+            info["cached"] = True
+            return hit
+        tokens = max_tokens_for(instruction)
+        schema_mode = self.config["constrainedOutput"] == "json_schema" and self._schema_ok
+        spent_in = spent_out = None
+        proposal = None
+        for _ in range(3):
+            try:
+                data = self._post(self._payload(instruction, guest_context, tokens, schema_mode))
+            except _SchemaRejected:
+                self._schema_ok, schema_mode, info["schemaFallback"] = False, False, True
+                continue
+            try:
+                response = json.loads(data)
+                usage = response.get("usage") if isinstance(response, dict) else None
+                if isinstance(usage, dict):      # reported by llama-server itself; never estimated
+                    ok = lambda v: isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 9
+                    if ok(usage.get("prompt_tokens")):
+                        spent_in = (spent_in or 0) + usage["prompt_tokens"]
+                    if ok(usage.get("completion_tokens")):
+                        spent_out = (spent_out or 0) + usage["completion_tokens"]
+                choice = response["choices"][0]
+                if choice.get("finish_reason") == "length" and tokens < TOKENS_RETRY:
+                    tokens, info["retried"] = TOKENS_RETRY, True      # cut off: one retry with the larger budget
+                    continue
+                proposal = json.loads(choice["message"]["content"])
+                break
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+                raise LocalModelError("Model returned invalid structured JSON") from exc
+        if spent_in is not None or spent_out is not None:
+            self._tls.usage = {"in": spent_in, "out": spent_out}
+        if proposal is None:
+            raise LocalModelError("Model returned invalid structured JSON")
+        result = self.validate_any(proposal)
+        self._cache_put(key, result)
+        return result
 
 
 def _related(a, b):

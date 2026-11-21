@@ -76,7 +76,8 @@ def budget_view(mandate, live_input=0, live_output=0):
 def build_summary(*, sessions, overview, audit, model, router, demo, recent_events, builder=None, budget=None, run_approvals=()):
     return {
         "demo": demo,
-        "status": {"localModel": {"configured": model["configured"], "online": model["online"], "weightsPresent": model["weightsPresent"]},
+        "status": {"localModel": {"configured": model["configured"], "online": model["online"], "weightsPresent": model["weightsPresent"],
+                                   "gate": model.get("gate")},
                    "builder": builder or {"state": "not-configured"},
                    "router": {"externalEnabled": router["externalEnabled"]}},
         "tokens": {"total": token_totals(sessions), "byAgent": token_by_agent(sessions), "budget": budget},
