@@ -85,6 +85,18 @@ def main():
             print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
             if not isinstance(content,str) or not content:
                 raise RuntimeError("Real model returned no content")
+        except Exception:
+            # Always leave actionable offline loader diagnostic in CI, but
+            # never write a prompt or model weights into artifacts.
+            try:
+                with open("/tmp/aiws-llama.log",encoding="utf-8",errors="replace") as stream:
+                    logtext=stream.read()[-14000:]
+                print("AIWS_REAL_MODEL_SERVER_DIAGNOSTIC_START",flush=True)
+                print(logtext,flush=True)
+                print("AIWS_REAL_MODEL_SERVER_DIAGNOSTIC_END",flush=True)
+            except OSError as logerr:
+                print("Could not read guest model loader diagnostic: "+type(logerr).__name__,flush=True)
+            raise
         finally:
             server.terminate()
             try:
