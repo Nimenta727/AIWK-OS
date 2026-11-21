@@ -166,10 +166,25 @@ let package = Package(name: "App", dependencies: [
         self.assertEqual(tools["code.references"]["inputSchema"]["required"], ["symbol"])
         for name in ("code.symbols", "code.dependencies", "code.platformApis"):
             self.assertEqual(tools[name]["inputSchema"]["required"], [])
-        reply = aiws_mcp.handle({"jsonrpc": "2.0", "id": 33, "method": "tools/call",
-                                 "params": {"name": "code.symbols", "arguments": {"query": "Demo"}}})
+        # Public MCP always routes through the independent guest Agent;
+        # mock only the transport in this offline semantics unit test.
+        with patch.object(aiws_mcp, "AgentClient") as agent:
+            agent.return_value.request.side_effect = lambda op, payload: plane.invoke(
+                payload["tool"], payload["arguments"])
+            reply = aiws_mcp.handle({"jsonrpc": "2.0", "id": 33, "method": "tools/call",
+                                     "params": {"name": "code.symbols",
+                                                "arguments": {"query": "Demo"}}})
+            agent.return_value.request.assert_called_once_with(
+                "tool.read", {"tool": "code.symbols", "arguments": {"query": "Demo"}})
         self.assertFalse(reply["result"]["isError"])
         self.assertEqual(json.loads(reply["result"]["content"][0]["text"])["count"], 1)
+        # With no running guest Agent, even reads must fail closed.
+        with patch.object(aiws_mcp, "AgentClient", side_effect=ConnectionError):
+            denied = aiws_mcp.handle({"jsonrpc": "2.0", "id": 34,
+                                      "method": "tools/call",
+                                      "params": {"name": "code.symbols",
+                                                 "arguments": {"query": "Demo"}}})
+        self.assertTrue(denied["result"]["isError"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,18 @@
 """Static contract checks only: they do not prove ISO boot or hypervisor isolation."""
 from pathlib import Path
 import re
+import stat
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "os/debian/config"
 
 class AiwsOsContract(unittest.TestCase):
+    def test_image_builder_keeps_executable_git_mode(self):
+        builder = ROOT / "os/debian/build.sh"
+        self.assertTrue(builder.stat().st_mode & stat.S_IXUSR,
+                        "Image builder must retain Git mode 100755 for CI execution")
+
     def test_live_package_list_supplies_desktop_and_languages(self):
         packages = set((CONFIG / "package-lists/aiws-desktop.list.chroot").read_text().split())
         for package in ("xfce4", "lightdm", "firefox-esr", "geany", "python3",

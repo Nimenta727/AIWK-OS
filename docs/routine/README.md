@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 13:45 — MCP 只读回归与镜像构建脚本执行位修复](2026-11-21_1345-mcp-regression-build-executable.md)
 - [2026-11-21 13:30 — 独立权限 Broker 和 Agent/MCP 审批闭环](2026-11-21_1330-broker-pdp-policy-agent.md)
 - [2026-11-21 13:10 — 原生 BIOS/UEFI ISO 启动与桌面 Shell](2026-11-21_1310-firmware-iso-native-shell.md)
 

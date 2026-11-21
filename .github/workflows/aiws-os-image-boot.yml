@@ -39,6 +39,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify executable Git build script mode
+        run: |
+          test -x os/debian/build.sh
+          test "$(git ls-files -s os/debian/build.sh | awk '{print $1}')" = 100755
       - name: Compile shared AIWS React workstation
         working-directory: desktop/AIWorkstation.Frontend
         run: |

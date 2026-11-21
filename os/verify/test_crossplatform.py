@@ -88,18 +88,34 @@ class CrossPlatformTests(unittest.TestCase):
         self.assertTrue({"windows", "swift", "cross-platform"}.issubset(candidates))
         self.assertFalse(out["compiled"])
 
-    def test_mcp_call_and_rejection(self):
+    def test_mcp_read_only_platform_inspection_and_scaffold_rejection(self):
+        # Opt-in environment flags must never grant a direct public MCP write.
         with patch.dict(os.environ, {"AIWS_ALLOW_SCAFFOLD": "1"}):
-            response = aiws_mcp.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+            rejected = aiws_mcp.handle({"jsonrpc": "2.0", "id": 4,
+                                        "method": "tools/call",
                                         "params": {"name": "project.scaffold",
-                                                   "arguments": {"name": "FromAgent", "template": "macos-swiftui"}}})
-        self.assertFalse(response["result"]["isError"])
-        payload = json.loads(response["result"]["content"][0]["text"])
-        self.assertFalse(payload["compiled"])
-        denied = aiws_mcp.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+                                                   "arguments": {"name": "FromAgent",
+                                                                 "template": "macos-swiftui"}}})
+        self.assertTrue(rejected["result"]["isError"])
+        self.assertFalse((self.root / "FromAgent").exists())
+        denied = aiws_mcp.handle({"jsonrpc": "2.0", "id": 5,
+                                  "method": "tools/call",
                                   "params": {"name": "project.scaffold",
-                                             "arguments": {"name": "../outside", "template": "windows-wpf"}}})
+                                             "arguments": {"name": "../outside",
+                                                           "template": "windows-wpf"}}})
         self.assertTrue(denied["result"]["isError"])
+        (self.root / "Example.swift").write_text("import SwiftUI")
+        with patch.object(aiws_mcp, "AgentClient") as agent:
+            agent.return_value.request.side_effect = lambda op, req: plane.invoke(
+                req["tool"], req["arguments"])
+            checked = aiws_mcp.handle({"jsonrpc": "2.0", "id": 6,
+                                       "method": "tools/call",
+                                       "params": {"name": "platform.inspect",
+                                                  "arguments": {"path": "."}}})
+            agent.return_value.request.assert_called_once_with(
+                "tool.read", {"tool": "platform.inspect", "arguments": {"path": "."}})
+        self.assertFalse(checked["result"]["isError"])
+        self.assertFalse(json.loads(checked["result"]["content"][0]["text"])["compiled"])
 
 if __name__ == "__main__":
     unittest.main()
