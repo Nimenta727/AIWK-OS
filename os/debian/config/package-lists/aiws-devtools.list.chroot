@@ -1,0 +1,74 @@
+# AIWS OS developer toolchain: Debian 13 (trixie) 'main' only. Every name below was checked against the real
+# trixie package index (see os/debian/tools/check_packages.py). Compilers already present in aiws-desktop.list.chroot
+# (python3, nodejs, npm, golang-go, rustc, cargo, openjdk-21-jdk, maven, clang, cmake, ninja-build, gdb, strace,
+# ripgrep, fd-find, jq) are not repeated. NOT available in Debian main, so NOT included: .NET SDK, pnpm, black, ruff
+# (install them per user with pipx/npm/Microsoft's feed if needed). The full profile only: the smoke profile drops this list.
+
+# Languages and language tooling
+ruby
+ruby-dev
+php-cli
+lua5.4
+node-typescript
+python3-dev
+
+# Build systems
+meson
+pkg-config
+make
+g++
+
+# Databases (clients only)
+sqlite3
+postgresql-client
+
+# Debugging, analysis, linting, formatting
+valgrind
+clangd
+clang-format
+shellcheck
+shfmt
+universal-ctags
+pylint
+mypy
+flake8
+python3-pytest
+hyperfine
+
+# Git and code review helpers
+git-lfs
+gh
+git-delta
+tig
+
+# Terminal productivity
+tmux
+vim
+neovim
+nano
+fzf
+bat
+tree
+htop
+btop
+direnv
+httpie
+less
+file
+man-db
+bash-completion
+zsh
+
+# Transfer and archives
+wget
+openssh-client
+rsync
+unzip
+zip
+xz-utils
+zstd
+
+# Programming fonts (SIL OFL)
+fonts-firacode
+fonts-jetbrains-mono
+fonts-hack

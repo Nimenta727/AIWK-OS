@@ -65,6 +65,15 @@ def catalog():
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
 
+# Executables `runtime.detect` reports (path or null). Languages first, then build, debug, VCS and editors.
+DETECT_TOOLS = (
+    "python3", "pipx", "node", "npm", "tsc", "go", "rustc", "cargo", "javac", "java", "mvn", "ruby", "php", "lua5.4",
+    "dotnet", "swift", "sourcekit-lsp", "xcodegen",
+    "cc", "gcc", "g++", "clang", "clangd", "cmake", "make", "ninja", "meson",
+    "gdb", "valgrind", "shellcheck", "sqlite3", "psql",
+    "git", "gh", "rg", "jq", "tmux", "nvim", "vim", "aiws-code", "chromium", "chromedriver",
+)
+
 # Single source of truth for tool classes. Every other module imports these.
 READ_TOOLS = frozenset({
     "workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
@@ -700,9 +709,7 @@ def invoke(name, arguments):
     if name == "git.inspect":
         return _git(root, arguments)
     if name == "runtime.detect":
-        return {"tools": {p: shutil.which(p) for p in
-                ("python3", "node", "npm", "dotnet", "swift", "sourcekit-lsp", "xcodegen", "javac", "rustc", "cargo", "go",
-                 "cc", "clang", "cmake", "mvn", "git", "chromium", "chromedriver")}}
+        return {"tools": {p: shutil.which(p) for p in DETECT_TOOLS}}
     if name == "runtime.test":
         return _runtime(root, arguments)
     if name == "browser.local_text":

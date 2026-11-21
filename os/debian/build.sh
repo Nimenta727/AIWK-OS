@@ -30,6 +30,7 @@ case "${AIWS_OS_PROFILE:-full}" in
   smoke)
     # Real bootable XFCE+Agent+React ISO with fewer optional compilers.
     cp -- "$repo/os/debian/profiles/smoke.list.chroot" "$out/config/package-lists/aiws-desktop.list.chroot"
+    rm -f -- "$out/config/package-lists/aiws-devtools.list.chroot"   # the developer toolchain belongs to the full profile only
     ;;
   *) echo 'AIWS_OS_PROFILE must be full or smoke' >&2; exit 2;;
 esac
