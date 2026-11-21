@@ -14,6 +14,7 @@ from aiws_local_model import LocalPlanner, LocalModelError
 
 class MockModelHandler(BaseHTTPRequestHandler):
     proposal = {"tool":"workspace.tree","arguments":{"path":"."},"reason":"Inspect guest"}
+    last_request = None
     def log_message(self, *args):
         return
     def do_GET(self):
@@ -23,6 +24,7 @@ class MockModelHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length))
+        MockModelHandler.last_request=body
         assert body["model"] == "aiws-local"
         content = json.dumps(self.proposal)
         data = json.dumps({"choices":[{"message":{"content":content}}]}).encode()
@@ -65,6 +67,26 @@ class LocalPlannerTests(unittest.TestCase):
                 self.assertTrue(dynamic.status()["configured"])
                 flag.unlink()
                 self.assertFalse(dynamic.status()["configured"])
+
+    def test_scoped_guest_metadata_is_bounded_and_never_executed(self):
+        context={"guestFiles":["src/App.tsx","README.md"],
+                 "recentTasks":[{"id":"a"*32,"title":"Inspect guest sources"}]}
+        item=self.model.suggest("Find source files",context=context)
+        self.assertFalse(item["executed"])
+        prompts=MockModelHandler.last_request["messages"]
+        self.assertEqual(len(prompts),3)
+        self.assertIn("UNTRUSTED GUEST DATA",prompts[1]["content"])
+        self.assertIn("src/App.tsx",prompts[1]["content"])
+        self.assertNotIn("/home/",prompts[1]["content"])
+        with self.assertRaises(LocalModelError):
+            self.model.context_message({"guestFiles":["../../host/secret"],
+                                        "recentTasks":[]})
+        with self.assertRaises(LocalModelError):
+            self.model.context_message({"guestFiles":["x"*100],
+                                        "recentTasks":[]})
+        with self.assertRaises(LocalModelError):
+            self.model.context_message({"guestFiles":["one"],"recentTasks":[],
+                                        "hostFiles":["secret"]})
 
     def test_read_only_suggestion_not_execution(self):
         result=self.model.suggest("List my guest workspace files")

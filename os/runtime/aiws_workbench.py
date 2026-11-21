@@ -173,9 +173,37 @@ class Controller:
                                    "arguments":{"service":"aiws-local-model.service"},
                                    "dependsOn":[]}])
 
+    def local_guest_context(self):
+        """Bounded inventory assembled by the same unprivileged guest Agent.
+
+        Never reads file bodies, task goals, environment secrets or host data.
+        Model context is optional and must not block basic workbench operation.
+        """
+        try:
+            if self.file_tools is not None:
+                tree=self.file_tools.invoke("workspace.tree", {"path": "."})
+            else:
+                tree=invoke("workspace.tree", {"path": "."})
+            rows=self.tasks.list()
+            files=[str(f)[:96] for f in tree.get("files", [])[:24]
+                   if isinstance(f, str) and 0 < len(f) <= 96]
+            tasks=[{"id":str(t["id"])[:48], "title":str(t["title"])[:80]}
+                   for t in rows[:8] if isinstance(t, dict)
+                   and isinstance(t.get("id"), str)
+                   and isinstance(t.get("title"), str)]
+            return {"guestFiles": files, "recentTasks": tasks}
+        except (ValueError, OSError, PermissionError, AgentError, AgentUnavailable):
+            return {"guestFiles": [], "recentTasks": []}
+
+    def local_suggest(self, instruction):
+        # Do not consult workspace metadata when the optional model is off.
+        configured=self.model.status()["configured"]
+        return self.model.suggest(
+            instruction, context=self.local_guest_context() if configured else None)
+
     def model_plan(self, instruction):
         """Persist but do not execute a validated, read-only local model plan."""
-        proposal = self.model.suggest(instruction)
+        proposal = self.local_suggest(instruction)
         if self.agent is not None:
             # Production: independent systemd user Agent revalidates the model
             # output, owns durable state and records prompt/proposal hashes.
@@ -408,7 +436,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/model/suggest":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")
-                result = app.model.suggest(payload["instruction"])
+                result = app.local_suggest(payload["instruction"])
             elif route[6] == "approve":
                 if payload:
                     raise ValueError("No arguments allowed for approval")

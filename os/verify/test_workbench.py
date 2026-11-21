@@ -263,6 +263,14 @@ class WorkbenchTests(unittest.TestCase):
         self.assertIn("model.proposed",[e["action"] for e in events])
         self.assertNotIn("List guest project files",json.dumps(events))
 
+    def test_model_context_reads_guest_file_names_and_task_titles_only(self):
+        context=self.server.application.local_guest_context()
+        self.assertIn("Example.cs",context["guestFiles"])
+        self.assertNotIn("public class Example",json.dumps(context))
+        self.assertNotIn("/etc/passwd",json.dumps(context))
+        safe=self.server.application.model.context_message(context)
+        self.assertLess(len(safe.encode("utf-8")),3000)
+
     def test_windows_workflow_import_is_not_executable(self):
         csrf=self.request("GET","/api/v1/session")[1]["csrf"]
         h={"X-AIWS-CSRF":csrf}
