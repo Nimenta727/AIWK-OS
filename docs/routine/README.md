@@ -71,3 +71,5 @@ Each repository modification requires a timestamped log with changed files, veri
 
 - [2026-11-21 11:55 — SQLite 任务状态和审计原子事务](2026-11-21_1155-atomic-agent-state-audit-transitions.md)
 - [2026-11-21 12:00 — QEMU Agent/UI 重启恢复验收通过](2026-11-21_1200-qemu-agent-lifecycle-verified.md)
+
+- [2026-11-21 12:07 — 修复 Qwen 推理 GLIBC 编译目标不一致](2026-11-21_1207-debian13-llama-abi-build.md)
