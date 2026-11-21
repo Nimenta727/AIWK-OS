@@ -189,6 +189,11 @@ class Controller:
             saved["task"]["id"], "aiws-local", instruction, proposal)
         return self.tasks.get(saved["task"]["id"])
 
+    def import_windows(self, payload):
+        if not isinstance(payload,dict) or set(payload)!={"task"}:
+            raise ValueError("Expected Windows exported WorkTask object in task field")
+        return self.tasks.import_windows(payload["task"])
+
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
             raise TaskError("Expected title, goal and stages")
@@ -361,7 +366,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/tasks/import/windows") and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -390,6 +395,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.submit(payload["tool"], payload["arguments"])
             elif path == "/api/v1/tasks":
                 result = app.create_plan(payload)
+            elif path == "/api/v1/tasks/import/windows":
+                result = app.import_windows(payload)
             elif path in ("/api/v1/model/enable", "/api/v1/model/disable"):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")

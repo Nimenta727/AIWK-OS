@@ -263,6 +263,29 @@ class WorkbenchTests(unittest.TestCase):
         self.assertIn("model.proposed",[e["action"] for e in events])
         self.assertNotIn("List guest project files",json.dumps(events))
 
+    def test_windows_workflow_import_is_not_executable(self):
+        csrf=self.request("GET","/api/v1/session")[1]["csrf"]
+        h={"X-AIWS-CSRF":csrf}
+        worktask={"Id":"f"*32,"Title":"Windows retained task","GraphMode":False,
+                  "Steps":[{"Id":"e"*32,"Title":"Unmapped Windows agent",
+                            "Agent":"Codex","Status":"Completed","DependsOn":[],
+                            "RequiresApproval":True,"ApprovalGranted":True,
+                            "Instructions":"WIN_PRIVATE_PROMPT","Result":"WIN_PRIVATE_OUTPUT"}],
+                  "Unified":{"SchemaVersion":1,"Goal":"Review Windows migration",
+                             "Plans":[],"Artifacts":[],"AgentRuns":[]}}
+        self.assertEqual(self.request("POST","/api/v1/tasks/import/windows",
+                         {"task":worktask})[0],403)
+        status,doc=self.request("POST","/api/v1/tasks/import/windows",
+                                 {"task":worktask},h)
+        self.assertEqual(status,202,doc)
+        self.assertEqual(doc["stages"][0]["state"],"unmapped")
+        self.assertFalse(doc["windowsImport"]["executable"])
+        self.assertEqual(self.request("POST","/api/v1/tasks/"+"f"*32+
+                                      "/stages/"+"e"*32+"/dispatch",{},h)[0],400)
+        self.assertNotIn("WIN_PRIVATE_PROMPT",json.dumps(
+            self.request("GET","/api/v1/tasks/"+"f"*32)[1]))
+        self.assertTrue(self.request("GET","/api/v1/tasks/"+"f"*32+"/audit")[1]["events"])
+
     def test_async_result(self):
         csrf = self.request("GET", "/api/v1/session")[1]["csrf"]
         _, job = self.request("POST", "/api/v1/jobs",
