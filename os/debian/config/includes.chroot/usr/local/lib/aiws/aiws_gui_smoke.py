@@ -1,6 +1,8 @@
 """In-guest browser click acceptance; no host access, no network adapter."""
 from pathlib import Path
 import os
+import json
+import urllib.request
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -64,8 +66,34 @@ def main():
         browser.find_element(By.XPATH,"//button[contains(.,'批准客体写操作')]").click()
         wait.until(lambda b:b.find_elements(By.XPATH,"//button[contains(.,'运行客户机阶段')]"))
         browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
-        wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
-        wait.until(lambda b:'"deployed": false' in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
+        # Read the same live guest API that backs the UI; print exact state on failure.
+        # A pass still requires both the GUI receipt and actual staged evidence.
+        def kernel_stage_state():
+            with urllib.request.urlopen(
+                    "http://127.0.0.1:17640/api/v1/tasks", timeout=5) as reply:
+                tasks=json.load(reply)["tasks"]
+            selected=next((x for x in tasks if x["title"]==
+                "验证并暂存客户机内核配置候选"), None)
+            if not selected:
+                return {"error":"kernel task not found"}
+            with urllib.request.urlopen(
+                    "http://127.0.0.1:17640/api/v1/tasks/"+selected["id"],
+                    timeout=5) as reply:
+                return json.load(reply)
+        try:
+            wait.until(lambda b:"COMPLETED" in b.find_element(
+                By.CSS_SELECTOR,".aiws-os-stage-status").text)
+            wait.until(lambda b:'"deployed": false' in b.find_element(
+                By.CSS_SELECTOR,".aiws-os-stage-status").text)
+            state=kernel_stage_state()
+            assert state["stages"][0]["state"]=="completed",state
+            assert state["stages"][0]["result"]["deployed"] is False,state
+        except Exception:
+            print("AIWS_GUI_KERNEL_DIAGNOSTIC: "+json.dumps(
+                kernel_stage_state(),ensure_ascii=False,default=str)[:3500],flush=True)
+            print("AIWS_GUI_KERNEL_DOM: "+browser.find_element(
+                By.CSS_SELECTOR,".aiws-os-studio").text[-2500:],flush=True)
+            raise
         print("AIWS_GUI_BROWSER: kernel candidate approved/staged without deployment",flush=True)
         print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional kernel=candidate-only",flush=True)
 
