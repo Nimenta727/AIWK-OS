@@ -2,13 +2,8 @@
 # XFCE autostart: activate the user service, then open the shared AIWS React UI.
 set -eu
 if [ "$(id -u)" -eq 0 ]; then exit 1; fi
-# Provision ONLY checksum-verified root-owned model data from the guest ISO.
-# Service stays disabled until the user explicitly enables it in AIWS.
-if [ -f /usr/local/share/aiws/model-preload/manifest.json ] &&
-   [ ! -f "$HOME/.local/share/aiws/models/registry.json" ]; then
-  python3 /usr/local/lib/aiws/aiws_model_registry.py --import-bundled ||
-    echo "Guest offline model preload refused; use deterministic Agent without model" >&2
-fi
+# The read-only bundled GGUF is verified and loaded in place by the model
+# service when the user explicitly enables it. No multi-GB overlay copy.
 systemctl --user start aiws-workbench.service || exit 1
 ready=0
 for i in $(seq 1 45); do

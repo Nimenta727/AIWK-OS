@@ -42,8 +42,11 @@ class LocalPlanner:
                   "automaticExecution": False, "cloudFallback": False,
                   "online": False,
                   "cpuOnly": True,
-                  "weightsPresent": (not (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_symlink() and
-                                     (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_file())}
+                  "weightsPresent": (
+                      (Path("/usr/local/share/aiws/model-preload/manifest.json").is_file() and
+                       Path("/usr/local/share/aiws/model-preload/aiws-local.gguf").is_file()) or
+                      (not (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_symlink() and
+                       (Path.home()/".local/share/aiws/models/aiws-local.gguf").is_file()))}
         if self.enabled:
             try:
                 with self.opener.open(self.url + "/health", timeout=1.5) as response:

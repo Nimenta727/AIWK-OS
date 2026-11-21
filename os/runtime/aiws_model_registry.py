@@ -172,14 +172,15 @@ class GuestModelRegistry:
             previous=None
         return self._activate(expected_sha256,previous)
 
-    def import_bundled(self, preload=None):
+    def import_bundled(self, preload=None, verify_only=False):
         """Import ONLY a root-owned, hash-pinned GGUF bundled in the guest image.
 
         Optional preload path exists only for isolated synthetic unit tests.
         Neither the model nor an untrusted request may choose a source path.
         """
         self._ready()
-        self._not_running()
+        if not verify_only:
+            self._not_running()
         root=Path("/usr/local/share/aiws/model-preload") if preload is None else Path(preload)
         meta=root/"manifest.json"
         artifact=root/"aiws-local.gguf"
@@ -207,6 +208,11 @@ class GuestModelRegistry:
         with artifact.open("rb") as stream:
             if stream.read(4)!=b"GGUF":
                 raise ModelArtifactError("Bundled model does not contain GGUF signature")
+        if verify_only:
+            return {"modelId":MODEL_ID,"sha256":digest,"verified":True,
+                    "guestOnly":True,"bundledReadonly":True,
+                    "weightsBytes":artifact.stat().st_size,
+                    "sourcePath":str(artifact)}
         versions=self.root/"versions"
         version=versions/(digest+".gguf")
         if version.is_symlink():
@@ -249,6 +255,7 @@ def main():
     group=p.add_mutually_exclusive_group(required=True)
     group.add_argument("--verify",action="store_true")
     group.add_argument("--import-bundled",action="store_true")
+    group.add_argument("--verify-bundled",action="store_true")
     group.add_argument("--import-guest",metavar="RELATIVE_GGUF")
     group.add_argument("--rollback",metavar="SHA256")
     p.add_argument("--sha256")
@@ -260,6 +267,7 @@ def main():
     registry=GuestModelRegistry(Path.home()/".local/share/aiws/models",workspace)
     try:
         result=(registry.verify() if args.verify else
+                registry.import_bundled(verify_only=True) if args.verify_bundled else
                 registry.import_bundled() if args.import_bundled else
                 registry.import_guest(args.import_guest,args.sha256,args.accept_source_license)
                 if args.import_guest is not None else

@@ -167,12 +167,17 @@ class Controller:
         # model-generated shell command or a host hypervisor API.
         require_guest_runtime()
         weights = Path.home() / ".local/share/aiws/models/aiws-local.gguf"
+        bundled = Path("/usr/local/share/aiws/model-preload/manifest.json").is_file()
         if enabled:
-            if weights.is_symlink() or not weights.is_file():
-                raise LocalModelError("Install a verified model inside the guest before enabling")
-            protect_guest_workspace((Path.home()/".local/share/aiws").resolve(),
-                                    weights.resolve(strict=True))
-            GuestModelRegistry(Path.home()/".local/share/aiws/models",self.workspace).verify()
+            registry=GuestModelRegistry(Path.home()/".local/share/aiws/models",self.workspace)
+            if bundled:
+                registry.import_bundled(verify_only=True)
+            else:
+                if weights.is_symlink() or not weights.is_file():
+                    raise LocalModelError("Install a verified model inside the guest before enabling")
+                protect_guest_workspace((Path.home()/".local/share/aiws").resolve(),
+                                        weights.resolve(strict=True))
+                registry.verify()
         folder = Path.home()/".config/aiws"
         folder.mkdir(parents=True,mode=0o700,exist_ok=True)
         if folder.is_symlink() or not folder.resolve().is_relative_to(Path.home().resolve()):

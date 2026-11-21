@@ -9,12 +9,21 @@ fi
 if ! systemd-detect-virt --vm --quiet; then
    echo 'Model requires a dedicated virtual machine' >&2; exit 1
 fi
-model="$HOME/.local/share/aiws/models/aiws-local.gguf"
-if [ -L "$model" ] || [ ! -f "$model" ]; then
-   echo 'No regular guest-local GGUF weights found' >&2; exit 1
-fi
-if ! python3 /usr/local/lib/aiws/aiws_model_registry.py --verify >/dev/null; then
-   echo 'GGUF version is not registered or SHA-256 verification failed' >&2; exit 1
+# Model-inclusive guest ISO: use the immutable root-owned image artifact
+# directly; never copy a second multi-GB GGUF into ephemeral overlay memory.
+if [ -f /usr/local/share/aiws/model-preload/manifest.json ]; then
+   if ! python3 /usr/local/lib/aiws/aiws_model_registry.py --verify-bundled >/dev/null; then
+      echo 'Bundled guest model does not pass source/sha validation' >&2; exit 1
+   fi
+   model="/usr/local/share/aiws/model-preload/aiws-local.gguf"
+else
+   model="$HOME/.local/share/aiws/models/aiws-local.gguf"
+   if [ -L "$model" ] || [ ! -f "$model" ]; then
+      echo 'No regular guest-local GGUF weights found' >&2; exit 1
+   fi
+   if ! python3 /usr/local/lib/aiws/aiws_model_registry.py --verify >/dev/null; then
+      echo 'GGUF version is not registered or SHA-256 verification failed' >&2; exit 1
+   fi
 fi
 if ! command -v llama-server >/dev/null 2>&1; then
    echo 'llama-server is unavailable inside this guest' >&2; exit 1

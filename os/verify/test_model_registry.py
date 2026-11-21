@@ -68,6 +68,9 @@ class GuestModelRegistryTests(unittest.TestCase):
         manifest={"modelId":"Qwen/Qwen3.5-2B","sha256":self.digest,
                   "source":"test-only fake bytes","licenseReviewed":True}
         (preload/"manifest.json").write_text(json.dumps(manifest))
+        read_only=self.reg.import_bundled(preload,verify_only=True)
+        self.assertTrue(read_only["bundledReadonly"])
+        self.assertFalse((self.root/"models/registry.json").exists())
         result=self.reg.import_bundled(preload)
         self.assertTrue(result["verified"])
         self.assertEqual(self.reg.import_bundled(preload)["sha256"],self.digest)
