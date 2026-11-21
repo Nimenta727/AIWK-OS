@@ -13,20 +13,23 @@ import sys
 here=Path(__file__).resolve().parent
 sys.path.insert(0,str(here))
 sys.path.insert(0,str(here.parents[1]/"runtime"))
-from validate_dataset import load_validate
+from validate_dataset import load_validate, check_independence
+from aiws_local_model import LocalPlanner, system_prompt
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("--dataset",default=str(here/"synthetic_intents.jsonl"))
+    parser.add_argument("--dataset",default=str(here/"synthetic_intents_v2.jsonl"))
     parser.add_argument("--train-in-guest",action="store_true")
     parser.add_argument("--ack-large-guest-memory-cost",action="store_true")
     parser.add_argument("--epochs",type=int,default=1)
     args=parser.parse_args()
     if not args.train_in_guest:
         # Static CI dry run only; never read a user-specified host dataset.
-        if Path(args.dataset).resolve() != (here/"synthetic_intents.jsonl").resolve():
+        if Path(args.dataset).resolve() not in {(here/"synthetic_intents.jsonl").resolve(),
+                                                (here/"synthetic_intents_v2.jsonl").resolve()}:
             parser.error("Non-guest dry runs may only validate bundled synthetic examples")
         rows,holdout=load_validate(args.dataset)
+        check_independence(rows,holdout)
         print(json.dumps({"dry_run":True,"train_examples":len(rows),
                           "held_out":len(holdout),"adapter_trained":False}))
         return
@@ -45,6 +48,8 @@ def main():
         parser.error("Training dataset must reside inside private AIWS guest training directory")
     protect_guest_workspace(training_root, dataset_path)
     rows,holdout=load_validate(dataset_path)
+    # Training data must never overlap the locked held-out sets (exact or near-duplicate).
+    check_independence(rows,holdout)
     # Do not allow model training to load from or write to host/shared filesystems.
     state=Path.home()/".local/share/aiws"
     if state.is_symlink():
@@ -75,19 +80,13 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(str(model_dir),local_files_only=True)
     base=AutoModelForCausalLM.from_pretrained(str(model_dir),local_files_only=True)
     records=[]
-    policy=("Return exactly one JSON object with tool, arguments and reason. "
-            "For allowed requests propose one read-only AIWS guest tool. "
-            "For host access, arbitrary shell, privilege bypass, forbidden write, "
-            "audit suppression or network exfiltration return tool=refuse, "
-            "arguments={}, and short reason. Never execute a tool.")
+    policy=system_prompt()   # identical to the production inference prompt
     for entry in rows.values():
         messages=[
             {"role":"system","content":policy},
             {"role":"user","content":entry["instruction"]},
-            {"role":"assistant","content":json.dumps({
-                "tool":entry["expected"]["tool"],
-                "arguments":entry["expected"]["arguments"],
-                "reason":entry["expected"]["reason"]},ensure_ascii=False)}
+            {"role":"assistant","content":json.dumps(
+                LocalPlanner.canonical(entry["expected"]),ensure_ascii=False)}
         ]
         records.append({"text":tokenizer.apply_chat_template(
             messages,tokenize=False,add_generation_prompt=False)})

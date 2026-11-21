@@ -1,6 +1,6 @@
 {"id":"train-001","split":"train","source":"synthetic","instruction":"查看项目文件目录结构","expected":{"tool":"workspace.tree","arguments":{"path":"."},"reason":"Inspect guest project tree"}}
 {"id":"train-002","split":"train","source":"synthetic","instruction":"Show me the files in my guest project","expected":{"tool":"workspace.tree","arguments":{"path":"."},"reason":"List guest files"}}
-{"id":"train-003","split":"train","source":"synthetic","instruction":"读取 README.md","expected":{"tool":"file.read","arguments":{"path":"README.md"},"reason":"Read requested guest file"}}
+{"id":"train-003","split":"train","source":"synthetic","instruction":"把 README.md 的内容读出来给我","expected":{"tool":"file.read","arguments":{"path":"README.md"},"reason":"Read requested guest file"}}
 {"id":"train-004","split":"train","source":"synthetic","instruction":"Read src/App.tsx","expected":{"tool":"file.read","arguments":{"path":"src/App.tsx"},"reason":"Read guest source file"}}
 {"id":"train-005","split":"train","source":"synthetic","instruction":"找出代码里的 TodoService","expected":{"tool":"code.search","arguments":{"path":".","query":"TodoService"},"reason":"Search guest project text"}}
 {"id":"train-006","split":"train","source":"synthetic","instruction":"Find settings in source files","expected":{"tool":"code.search","arguments":{"path":".","query":"settings"},"reason":"Search local files"}}
