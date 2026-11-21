@@ -49,6 +49,10 @@ jobs:
             https://huggingface.co/SoAIHQ/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
           echo 'a8b50de00b780c0f3c16f07cb041a1ecd678b6e22fd8cde91e57fe4b5031523b  out/model-real/model.gguf' | sha256sum --check --status
           test "$(wc -c < out/model-real/model.gguf)" -gt 1000000000
+      - name: Reject unsupported llama-server CLI flags before model loading
+        run: |
+          set -Eeuo pipefail
+          python3 os/model/ci/check_llama_cli.py out/model-real/llama-server
       - name: Run actual CPU inference in non-root isolated networkless container
         timeout-minutes: 13
         run: |

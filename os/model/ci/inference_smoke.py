@@ -14,15 +14,21 @@ import urllib.request
 URL="http://127.0.0.1:18080"
 SHA="a8b50de00b780c0f3c16f07cb041a1ecd678b6e22fd8cde91e57fe4b5031523b"
 
+def server_command(executable="/usr/local/bin/llama-server"):
+    # Maintained in one place so CI can validate the pinned server's CLI
+    # BEFORE attempting actual 2B GGUF loading on CPU.
+    return [
+        executable,"--model","/opt/aiws/model.gguf",
+        "--alias","aiws-local","--host","127.0.0.1","--port","18080",
+        "--ctx-size","2048","--gpu-layers","0","--threads","2",
+        "--parallel","1"
+    ]
+
+
 def main():
     started=time.monotonic()
     with open("/tmp/aiws-llama.log","wb") as log:
-        server=subprocess.Popen([
-            "/usr/local/bin/llama-server","--model","/opt/aiws/model.gguf",
-            "--alias","aiws-local","--host","127.0.0.1","--port","18080",
-            "--ctx-size","2048","--gpu-layers","0","--threads","2",
-            "--parallel","1","--no-mmap"
-        ],stdout=log,stderr=subprocess.STDOUT)
+        server=subprocess.Popen(server_command(),stdout=log,stderr=subprocess.STDOUT)
         try:
             healthy=False
             for i in range(240):
