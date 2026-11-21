@@ -72,3 +72,7 @@ zstd
 fonts-firacode
 fonts-jetbrains-mono
 fonts-hack
+
+# Document tools used by the workbench reader and the model's doc.text tool (read-only conversion, run without a shell)
+poppler-utils
+pandoc

@@ -1,10 +1,11 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,BrainCircuit,ChevronDown,ChevronRight,Code2,Eye,File as FileIcon,Folder,FolderTree,Layers3,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun} from 'lucide-react';
+import {Activity,BrainCircuit,ChevronDown,ChevronRight,Code2,Eye,File as FileIcon,Folder,FolderTree,Layers3,Globe,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun,Wrench} from 'lucide-react';
 import './OsWorkbench.css';
 import './shell.css';
 import {ActivityBar,CommandPalette,Panel,SideBar,StatusBar,TabBar} from './Shell';
 import type {Command,Tab} from './Shell';
 import FileViewer from './FileViewer';
+import BrowserView from './BrowserView';
 import useObservatoryData from './useObservatoryData';
 import {api} from './api';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
@@ -18,13 +19,15 @@ type Tool={name:string;description:string;inputSchema:{properties:Record<string,
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;brokerReady?:boolean;brokerScope?:string};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type View='observatory'|'overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
+type View='browser'|'observatory'|'overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
 type TreeNode={name:string;path:string;type:'dir'|'file';children:TreeNode[]};
+type AppRow={id:string;kind:string;category:string;zh:string;en:string;installed:boolean;path:string|null;launchable:boolean};
 type IdeState={installed:boolean;running:boolean;version?:string|null};
 const VIEWS:{id:View;zh:string;en:string;icon:typeof Activity}[]=[
  {id:'observatory',zh:'观察台',en:'Observatory',icon:Eye},
  {id:'overview',zh:'系统概览',en:'System overview',icon:Layers3},
+ {id:'browser',zh:'内置浏览器',en:'Preview browser',icon:Globe},
  {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
  {id:'code',zh:'代码智能',en:'Code Intelligence',icon:Code2},
  {id:'tasks',zh:'任务与证据',en:'Tasks & evidence',icon:BrainCircuit},
@@ -65,6 +68,8 @@ export default function OsWorkbench(){
  const [expanded,setExpanded]=useState<Set<string>>(new Set());
  const [ide,setIde]=useState<IdeState|null>(null);
  const [ideNote,setIdeNote]=useState('');
+ const [apps,setApps]=useState<AppRow[]>([]);
+ const [appNote,setAppNote]=useState('');
  const data=useObservatoryData();
 
  useEffect(()=>{if(storage)savePrefs(storage,{theme,sidebar,panel,activity});},[storage,theme,sidebar,panel,activity]);
@@ -80,6 +85,7 @@ export default function OsWorkbench(){
   }catch(e){setTreeNote(String(e instanceof Error?e.message:e));}
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[english]);
+ const loadApps=useCallback(async()=>{try{setApps((await api<{apps:AppRow[]}>('/apps')).apps);}catch{setApps([]);}},[]);
  const loadIde=useCallback(async()=>{try{setIde(await api<IdeState>('/ide'));}catch{setIde(null);}},[]);
  useEffect(()=>{
   let live=true;
@@ -87,7 +93,7 @@ export default function OsWorkbench(){
    .then(([state,session])=>{if(live){setSnapshot(state);setCsrf(session.csrf);}})
    .catch(e=>{if(live)setError(String(e));})
    .finally(()=>{if(live)setStarting(false);});
-  void loadTree();void loadIde();
+  void loadTree();void loadIde();void loadApps();
   return()=>{live=false;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[]);
@@ -120,6 +126,13 @@ export default function OsWorkbench(){
   try{await api('/ide/open',{method:'POST',headers:{'Content-Type':'application/json','X-AIWS-CSRF':csrf},body:'{}'});setIdeNote(tr('正在启动 AIWS Code…','Starting AIWS Code…'));window.setTimeout(()=>void loadIde(),2500);}
   catch(e){setIdeNote(String(e instanceof Error?e.message:e));}
  };
+ const launchApp=async(id:string)=>{
+  setAppNote('');
+  try{
+   const r=await api<{started:boolean;starting?:boolean}>('/apps/launch',{method:'POST',headers:{'Content-Type':'application/json','X-AIWS-CSRF':csrf},body:JSON.stringify({id})});
+   setAppNote(r.started?tr('正在启动…','Starting…'):tr('刚刚已经启动过，请稍等。','Already starting, please wait.'));
+  }catch(e){setAppNote(String(e instanceof Error?e.message:e));}
+ };
  const submitTool=async()=>{
   if(pending.current||!csrf||!chosen)return;
   const params:Record<string,string>={};
@@ -147,6 +160,7 @@ export default function OsWorkbench(){
   {id:'theme',label:tr('切换深色/浅色主题','Toggle dark/light theme'),keywords:'theme dark light',run:()=>setTheme(x=>x==='dark'?'light':'dark')},
   {id:'lang',label:tr('切换语言 中文/English','Switch language'),keywords:'language',run:()=>setLanguage(x=>x==='zh'?'en':'zh')},
   {id:'refresh',label:tr('刷新状态','Refresh status'),keywords:'reload',run:()=>{void refresh();void data.reload();void loadTree();}},
+  {id:'browser-cmd',label:tr('打开内置浏览器','Open preview browser'),keywords:'browser web preview localhost',run:()=>openView('browser')},
   {id:'ide',label:tr('打开 AIWS Code（完整代码编辑器）','Open AIWS Code (full code editor)'),keywords:'vscode editor ide code',run:()=>void openIde()},
   {id:'closetab',label:tr('关闭当前标签','Close current tab'),hint:'Alt+W',keywords:'close',run:()=>{if(active)close(active);}}
  // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,6 +198,19 @@ export default function OsWorkbench(){
    <div className="aiws-sh-section">{tr('文件整理','File operations')}</div>
    <button type="button" className="aiws-sh-row" onClick={()=>openView('files')}><FolderTree size={14}/>{tr('AI 文件管理（需审批）','AI file manager (approval required)')}</button>
   </SideBar>;
+  if(activity==='tools'){
+   const group=(kind:string,zh:string,en:string)=>{const rows=apps.filter(a=>a.kind===kind);return rows.length?<><div className="aiws-sh-section">{tr(zh,en)}</div>
+    {rows.map(a=>{const label=english?a.en:a.zh;
+     if(kind==='builtin')return <button type="button" key={a.id} className="aiws-sh-row" onClick={()=>openView(a.id==='viewer'?'files':(a.id==='browser'?'browser':'files'))}>{a.id==='browser'?<Globe size={14}/>:<FileIcon size={14}/>}<span>{label}</span></button>;
+     if(kind==='gui')return <button type="button" key={a.id} className="aiws-sh-row" disabled={!a.launchable||!csrf} title={a.installed?a.path||'':tr('本镜像未安装','Not installed in this image')} onClick={()=>void launchApp(a.id)}><Play size={14}/><span>{label}</span><small>{a.installed?tr('启动','start'):tr('未安装','missing')}</small></button>;
+     return <div key={a.id} className="aiws-sh-row" title={a.path||''}><SquareTerminal size={14}/><span>{label}</span><small>{a.installed?'✓':tr('未安装','missing')}</small></div>;})}</>:null;};
+   return <SideBar title={tr('工具','Tools')} actions={<button type="button" title={tr('刷新','Refresh')} aria-label={tr('刷新','Refresh')} onClick={()=>void loadApps()}><RefreshCw size={14}/></button>}>
+    <div className="aiws-sh-list">{tr('读取类工具由 AI 通过受审计的工具接口自动调用；桌面程序只在你点击时启动，AI 不会自行启动。','The AI calls read-only tools through the audited tool plane; desktop apps start only when you click them, never started by the AI itself.')}</div>
+    {group('builtin','内置','Built in')}{group('gui','桌面程序','Desktop apps')}{group('cli','命令行工具','Command-line tools')}
+    {appNote&&<div className="aiws-sh-list" role="status">{appNote}</div>}
+    {!apps.length&&<div className="aiws-sh-list">{tr('暂时读不到工具清单','The tool list is not available yet')}</div>}
+   </SideBar>;
+  }
   if(activity==='tasks')return <SideBar title={tr('任务','Tasks')}>
    <div className="aiws-sh-list">{summary?<>
     <div><b>{summary.tasks.tasks}</b> {tr('个任务','tasks')} · <b>{waiting}</b> {tr('待审批','awaiting approval')} · <b>{summary.tasks.failures.length}</b> {tr('失败','failed')}</div></>:tr('正在读取…','Reading…')}</div>
@@ -222,6 +249,7 @@ export default function OsWorkbench(){
   const t=tabs.find(x=>x.id===id);
   if(t?.kind==='file'&&t.path)return <FileViewer path={t.path} english={english}/>;
   const page=id as View;
+  if(page==='browser')return <BrowserView english={english} canOpenExternal={apps.some(a=>a.id==='chromium'&&a.launchable)} openExternal={()=>void launchApp('chromium')}/>;
   return <div className={'aiws-os-content'+(page==='observatory'?' obs':'')}>
    {page!=='observatory'&&<div className="aiws-os-heading"><small>AIWS OS / LINUX GUEST</small><h1>{viewTitle(page)}</h1></div>}
    {page==='observatory'&&<Observatory csrf={csrf} english={english} data={data} onOpenAdvanced={openView} onCommand={runCommand}/>}
@@ -263,6 +291,7 @@ export default function OsWorkbench(){
   <ActivityBar active={activity} sidebarOpen={sidebar} onSelect={selectActivity}
    items={[{id:'observatory',label:tr('观察台','Observatory'),icon:<Eye size={22}/>,badge:approvals},
     {id:'explorer',label:tr('资源管理器','Explorer'),icon:<FolderTree size={22}/>},
+    {id:'tools',label:tr('工具','Tools'),icon:<Wrench size={22}/>},
     {id:'tasks',label:tr('任务','Tasks'),icon:<Layers3 size={22}/>},
     {id:'ai',label:tr('AI','AI'),icon:<BrainCircuit size={22}/>},
     {id:'system',label:tr('系统','System'),icon:<ShieldCheck size={22}/>}]}

@@ -73,7 +73,7 @@ export function sanitizePrefs(value) {
     if (value.theme === 'dark' || value.theme === 'light') out.theme = value.theme;
     if (typeof value.sidebar === 'boolean') out.sidebar = value.sidebar;
     if (typeof value.panel === 'boolean') out.panel = value.panel;
-    if (['observatory', 'explorer', 'tasks', 'ai', 'system'].includes(value.activity)) out.activity = value.activity;
+    if (['observatory', 'explorer', 'tools', 'tasks', 'ai', 'system'].includes(value.activity)) out.activity = value.activity;
   }
   return out;
 }

@@ -40,6 +40,8 @@ TOOL_SPECS = [
     ("file.trash", "Move a file or directory to the reversible workspace trash; never deletes permanently", {"path": "string", "expectedSha256": "string"}),
     ("file.restore", "Restore a trashed item to its original path if still free", {"trashId": "string"}),
     ("file.replace", "Atomically replace a file with SHA-256 precondition; guest workspace write", {"path": "string", "text": "string", "expectedSha256": "string"}),
+    ("tools.list", "List the integrated applications and command-line tools of this workstation and whether each is installed (read-only)", {}),
+    ("doc.text", "Extract plain text from a workspace document: PDF (pdftotext), DOCX/ODT/EPUB (pandoc), HTML, or any small text file; bounded output", {"path": "string"}),
     ("code.search", "Search literal text in source files with bounded output", {"query": "string", "path": "string"}),
     ("git.inspect", "Read git status or diff (not commit/push)", {"view": "string"}),
     ("runtime.detect", "Discover installed language and build executables", {}),
@@ -60,7 +62,7 @@ def catalog():
         properties = {key: {"type": value} for key, value in fields.items()}
         required = (["query"] if name == "code.search" else
                     ["symbol"] if name == "code.references" else
-                    list(fields) if name in {"download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
+                    list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -76,7 +78,7 @@ DETECT_TOOLS = (
 
 # Single source of truth for tool classes. Every other module imports these.
 READ_TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
+    "workspace.tree", "file.read", "file.stat", "tools.list", "doc.text", "file.trashList", "code.search", "git.inspect",
     "runtime.detect", "browser.local_text", "platform.inspect", "code.symbols",
     "code.references", "code.dependencies", "code.platformApis",
     "system.info", "network.status", "download.list", "download.progress",
@@ -583,6 +585,47 @@ def _command(root, argv, timeout=20):
             "stdout": result.stdout[:24000], "stderr": result.stderr[:12000],
             "truncated": len(result.stdout) > 24000 or len(result.stderr) > 12000}
 
+DOC_MAX_BYTES = 32 * 1024 * 1024
+DOC_TEXT_LIMIT = 64 * 1024
+PANDOC_SUFFIXES = {".docx": "docx", ".odt": "odt", ".epub": "epub", ".rtf": "rtf"}
+
+def _doc_text(root, a):
+    """Text of a workspace document. Only fixed argv lists; output bounded; the file never leaves the workspace."""
+    path = _path(root, a["path"])
+    if not path.is_file():
+        raise ValueError("Not a regular file")
+    size = path.stat().st_size
+    if size > DOC_MAX_BYTES:
+        raise ValueError("Document is larger than 32 MiB")
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        exe, argv, source = shutil.which("pdftotext"), None, "pdftotext"
+        if not exe:
+            raise FileNotFoundError("poppler-utils (pdftotext) is not installed")
+        argv = [exe, "-q", "-layout", "-l", "60", str(path), "-"]
+    elif suffix in PANDOC_SUFFIXES:
+        exe, source = shutil.which("pandoc"), "pandoc"
+        if not exe:
+            raise FileNotFoundError("pandoc is not installed")
+        argv = [exe, "--sandbox", "-f", PANDOC_SUFFIXES[suffix], "-t", "plain", "--wrap=none", str(path)]
+    elif suffix in (".html", ".htm"):
+        text, source = _extract(_text_file(path)), "html"
+        return {"path": a["path"], "source": source, "text": text, "truncated": False, "bytes": size}
+    else:
+        text = _text_file(path)
+        return {"path": a["path"], "source": "text", "text": text[:DOC_TEXT_LIMIT],
+                "truncated": len(text) > DOC_TEXT_LIMIT, "bytes": size}
+    result = subprocess.run(argv, cwd=root, env=_safe_env(), capture_output=True, text=True, errors="replace",
+                            timeout=30, check=False)
+    if result.returncode != 0:
+        raise ValueError("The converter could not read this document")
+    return {"path": a["path"], "source": source, "text": result.stdout[:DOC_TEXT_LIMIT],
+            "truncated": len(result.stdout) > DOC_TEXT_LIMIT, "bytes": size}
+
+def _tools_list(root, a):
+    import aiws_apps
+    return {"apps": aiws_apps.listing(), "runtime": {name: shutil.which(name) for name in DETECT_TOOLS}}
+
 def _git(root, a):
     if a.get("view", "status") not in ("status", "diff"):
         raise ValueError("Only git status and diff are available")
@@ -704,6 +747,10 @@ def invoke(name, arguments):
                "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
     if handler is not None:
         return handler(root, arguments)
+    if name == "tools.list":
+        return _tools_list(root, arguments)
+    if name == "doc.text":
+        return _doc_text(root, arguments)
     if name == "code.search":
         return _search(root, arguments)
     if name == "git.inspect":

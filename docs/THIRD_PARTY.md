@@ -19,6 +19,7 @@
 | xterm.js 及 fit 插件 | 终端界面 | MIT | npm 依赖 |
 | Playwright | 浏览器自动化测试 | Apache-2.0 | 仅开发/测试依赖，不进入镜像 |
 | t3code（适配的 UI 思路与代码） | 前端来源之一 | MIT，© T3 Tools Inc. | 见 `third_party/t3code/NOTICE.md`，上游 MIT 全文保留 |
+| poppler-utils（pdftotext）、pandoc | 文档阅读器与 `doc.text` 的转换 | GPL（poppler）/ GPL（pandoc）：通过 Debian 包安装、以独立进程调用，不链接进本项目代码 | 随 ISO 分发时须满足 GPL 的源码提供义务 |
 | 字体（FiraCode、JetBrains Mono、Hack、Noto CJK 等） | 编程字体 | 各字体各自许可（多为 OFL） | Debian 包 |
 
 > 上表中的许可类别来自对这些项目通行许可的了解，**未逐个对最终锁定版本的许可文件做自动核验**。
@@ -28,5 +29,5 @@
 1. 为前端补 `package-lock.json`，并对 npm 依赖树生成许可清单。
 2. 对最终 ISO/镜像生成 SBOM（例如对 squashfs 内的 dpkg 数据库导出），核对每个包的许可与「是否需要提供源码」。
 3. 逐项确认本地模型权重的许可是否允许分发或必须由用户自行下载。
-4. 根目录 `LICENSE` 为 Apache-2.0，但目前**没有根 NOTICE 文件**，也未在 LICENSE 附录中填写版权人；须由仓库所有者确认后补全（并确认此前以 MIT 发布的代码的处理方式，见 `docs/AIWS_OS_BLUEPRINT.md`）。
+4. ~~根 NOTICE~~ 已补（`NOTICE`）。仓库所有提交均来自仓库所有者的账户（含其委托的助手提交），LICENSE 由所有者本人于 2026-11-21 添加为 Apache-2.0，此前仓库内没有任何 LICENSE 文件，故不存在“已按 MIT 发布”的授权需要保留；README 中过去的 MIT 说法已更正。若将来接受外部贡献，需要贡献者协议或逐个确认授权。
 5. 实际构建 AIWS Code 后，核对产物里确有上游 `LICENSE.txt` 与 `ThirdPartyNotices.txt`。

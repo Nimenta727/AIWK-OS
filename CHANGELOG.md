@@ -13,10 +13,13 @@
 - **官方 CLI 构建通道**：一次性授权（目录/预算/工具/时长）、专用低权限用户、nftables 出口限制 + 域名白名单代理、事件库与用量统计（只统计提供方上报数字）。
 - **开发者工具链**：额外 53 个 Debian 软件包（Ruby、PHP、Lua、TypeScript、Meson、g++、clangd、valgrind、shellcheck、gh、neovim、tmux 等），包名已对照真实 Debian 索引校验。
 - **AIWS Code**：Code - OSS（MIT）重新品牌化构建配方、webview 本地端点补丁、产品配置覆盖与端点/品牌扫描器、启动器、`/api/v1/ide` 接口；保留上游许可与声明。
+- **工具集成（以工作台为中心）**：`aiws_apps.py` 统一注册内置 / 桌面 / 命令行工具；`/api/v1/apps`、`/apps/launch`（固定命令、白名单环境、限速、仅按 id）；文档阅读器（Markdown 安全渲染、CSV、JSON、图片、PDF、DOCX 转文本、沙箱 HTML）；内置预览浏览器（只嵌入本机开发服务和工作区 HTML，外部网站交给系统浏览器）；新增 AI 只读工具 `tools.list`、`doc.text`；软件包 poppler-utils、pandoc。
+- **版权法律**：新增根 `NOTICE`；`package.json` 标明 Apache-2.0；`test_legal.py` 防止文档/许可再次不一致。
 - `os/runtime/MODULES`：运行时模块清单，由测试与 `build.sh` 共同使用，取代手写的长 `cp` 列表。
 - 文档：重写 README（定位）、`docs/THIRD_PARTY.md`、OS 预览发行说明。
 
 ### 变更
+- 本地模型输出 schema 用 `$defs` 让每个工具只描述一次（13 KB，原约 21 KB，低于网关 20 KB 限制并留有余量）。
 - 前端数据获取收敛到共享轮询 hook（页面隐藏时不轮询）；旧样式的硬编码颜色改为主题变量。
 - README 与 `os/` 文档中的许可证描述改为与 `LICENSE` 文件一致（Apache-2.0）。
 

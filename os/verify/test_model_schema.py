@@ -51,10 +51,13 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(a, json.dumps(ms.output_schema(), sort_keys=True))
         rf = json.dumps(ms.response_format())
         self.assertLess(len(rf), 20000)                           # the gate refuses larger response_format values
+        self.assertLess(len(rf), 16000)                           # keep headroom: each new model tool adds ~0.5 KB (defined once via $defs)
         self.assertEqual(ms.response_format()["type"], "json_schema")
 
     def test_covers_exactly_the_tools_the_model_may_propose(self):
-        tools = {s["properties"]["tool"]["const"] for s in SCHEMA["oneOf"] if "tool" in s["properties"]}
+        resolve = lambda s: SCHEMA["$defs"][s["$ref"].rsplit("/", 1)[1]] if "$ref" in s else s
+        entries = [resolve(s) for s in SCHEMA["oneOf"]]
+        tools = {s["properties"]["tool"]["const"] for s in entries if "tool" in s["properties"]}
         self.assertEqual(tools, READ_TOOLS | MODEL_WRITE_TOOLS | {"refuse"})
         for forbidden in ("file.replace", "browser.snapshot", "runtime.test", "project.scaffold", "download.start"):
             self.assertNotIn(forbidden, tools)

@@ -44,7 +44,8 @@ def output_schema():
     """Deterministic (sorted) schema: byte-identical on every call, which keeps the request prefix cacheable."""
     specs = {x["name"]: x["inputSchema"] for x in catalog()}
     tools = sorted(READ_TOOLS | MODEL_WRITE_TOOLS)
-    steps = [_step(t, specs[t]) for t in tools]
+    defs = {"s_" + t.replace(".", "_"): _step(t, specs[t]) for t in tools}      # each tool is described ONCE ($defs) so the schema stays small
+    steps = [{"$ref": "#/$defs/" + k} for k in sorted(defs)]
     refuse = {"type": "object",
               "properties": {"tool": {"const": "refuse"}, "arguments": {"type": "object", "maxProperties": 0},
                              "reason": {"type": "string", "minLength": 1, "maxLength": 500}},
@@ -53,18 +54,21 @@ def output_schema():
             "properties": {"steps": {"type": "array", "minItems": 1, "maxItems": MAX_STEPS, "items": {"oneOf": steps}},
                            "reason": {"type": "string", "minLength": 1, "maxLength": 500}},
             "required": ["steps", "reason"], "additionalProperties": False}
-    return {"oneOf": steps + [refuse, plan]}
+    return {"$defs": defs, "oneOf": steps + [refuse, plan]}
 
 def response_format():
     return {"type": "json_schema", "json_schema": {"name": "aiws_proposal", "strict": True, "schema": output_schema()}}
 
 # ---- minimal validator for the subset used above (tests only; not a general JSON Schema implementation) ----
-def validate(schema, value):
-    """True when `value` satisfies `schema`."""
+def validate(schema, value, _root=None):
+    """True when `value` satisfies `schema` (`$ref` resolves against the root's `$defs`)."""
+    root = _root if _root is not None else schema
+    if "$ref" in schema:
+        return validate(root["$defs"][schema["$ref"].rsplit("/", 1)[1]], value, root)
     if "oneOf" in schema:
-        return sum(validate(s, value) for s in schema["oneOf"]) == 1
+        return sum(validate(s, value, root) for s in schema["oneOf"]) == 1
     if "anyOf" in schema:
-        return any(validate(s, value) for s in schema["anyOf"])
+        return any(validate(s, value, root) for s in schema["anyOf"])
     if "const" in schema:
         return value == schema["const"] and not isinstance(value, bool)
     kind = schema.get("type")
@@ -78,11 +82,11 @@ def validate(schema, value):
             return False
         if "maxProperties" in schema and len(value) > schema["maxProperties"]:
             return False
-        return all(validate(props[k], v) for k, v in value.items() if k in props)
+        return all(validate(props[k], v, root) for k, v in value.items() if k in props)
     if kind == "array":
         if not isinstance(value, list) or not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 10 ** 9):
             return False
-        return all(validate(schema["items"], v) for v in value)
+        return all(validate(schema["items"], v, root) for v in value)
     if kind == "string":
         if not isinstance(value, str) or not schema.get("minLength", 0) <= len(value) <= schema.get("maxLength", 10 ** 9):
             return False

@@ -47,6 +47,7 @@
 - **语言与运行时**：Python（含 pip/venv/pipx）、Node.js + TypeScript、Go、Rust、Java（OpenJDK 21 + Maven）、Ruby、PHP、Lua、C/C++（gcc/g++/clang/clangd/cmake/meson/ninja）；清单见 `os/debian/config/package-lists/`，包名已对照真实 Debian 索引校验。
 - **常用开源工具**：git / gh / git-delta、ripgrep / fd / jq、tmux / neovim、gdb / valgrind、shellcheck / shfmt、SQLite / PostgreSQL 客户端、编程字体等。
 - **AIWS Code**：基于 [Code - OSS](https://github.com/microsoft/vscode)（MIT）源码的重新品牌化构建，保留上游版权与第三方声明，**不使用** Microsoft 的名称、图标、市场和服务；扩展来自 Open VSX。见 [os/ide/NOTICE.md](os/ide/NOTICE.md)。
+- **一切围绕工作台**：「工具」侧栏集中列出内置与外部工具——文档阅读器（Markdown / CSV / JSON / 图片 / PDF / DOCX / 沙箱 HTML）、内置预览浏览器（本机开发服务与工作区页面）、终端、Chromium、文件管理器、AIWS Code，以及 git / gh / rg / jq / sqlite / pandoc 等命令行工具。读取类工具（`tools.list`、`doc.text` 等）AI 可通过受审计的工具接口自动调用；桌面程序只在你点击时启动。
 - **工作台界面参照 VS Code 布局**：活动栏、侧边栏（真实文件树）、标签页、底部面板、状态栏、命令面板（`Ctrl+Shift+P`），深色/浅色主题。观察台是第一个、固定的标签页。
 
 > 有意没有包含的：.NET SDK、pnpm、black、ruff 不在 Debian 主仓库（可用 pipx/npm 自行安装）；Docker 因权限模型另行评估。说明见 [软件包清单](os/debian/config/package-lists/aiws-devtools.list.chroot) 开头的注释。
@@ -55,7 +56,7 @@
 
 | 部分 | 状态 |
 | --- | --- |
-| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 382 项、前端 61 项） |
+| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 404 项、前端 70 项） |
 | 前端（VS Code 风格外壳） | **已在真实浏览器里点过**（深/浅主题、标签、命令面板、文件查看） |
 | Debian 13 镜像构建、BIOS/UEFI 引导 | CI 工作流已有；**以对应提交的 Actions 结论为准** |
 | AIWS Code 的真实构建与浏览器内运行 | **配方、补丁、扫描器已验证；完整构建尚未在本仓库环境里执行** |
@@ -135,7 +136,7 @@ python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监�
 - **Built for developers**: common language toolchains and open-source tools are preinstalled, and **AIWS Code** — a rebranded build of the MIT-licensed Code - OSS (no Microsoft names, logos, marketplace or services; upstream credits kept) — opens on demand. The workbench UI follows the VS Code layout (activity bar, side bar, tabs, panel, status bar, command palette; dark/light themes).
 - **Token- and resource-frugal by design**: the local model unloads when idle, and usage numbers are only what the provider reports.
 
-**Status: engineering preview.** Code and unit/contract tests exist (Python 382, frontend 61) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
+**Status: engineering preview.** Code and unit/contract tests exist (Python 404, frontend 70) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
 
 Repository code is licensed under Apache-2.0 (see `LICENSE`); third-party components keep their own licenses ([docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)).
 Start at [Documentation](docs/README.md), [Codebase map](docs/CODEBASE_MAP.md), [OS build](os/README.md) and [Routine log](docs/routine/README.md).

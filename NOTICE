@@ -1,0 +1,22 @@
+AIWK-OS
+Copyright 2026 AIWK-OS contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes or builds upon third-party software that keeps its own license and copyright:
+
+  * T3 Code (https://github.com/pingdotgg/t3code) - MIT License, Copyright (c) 2026 T3 Tools Inc.
+    Three small UI primitives were adapted; see third_party/t3code/NOTICE.md (the upstream MIT text is kept there).
+
+  * Code - OSS (https://github.com/microsoft/vscode) - MIT License, Copyright (c) Microsoft Corporation.
+    NOT stored in this repository. It is fetched at a pinned commit and rebuilt as "AIWS Code" (see os/ide/).
+    Every AIWS Code build must ship the upstream LICENSE.txt and ThirdPartyNotices.txt unchanged.
+    "Visual Studio Code", "VS Code" and Microsoft's logos are trademarks of Microsoft and are not used by this product.
+    This product is not affiliated with or endorsed by Microsoft.
+
+  * Debian GNU/Linux packages, the Linux kernel and other operating-system components are referenced by package name and
+    downloaded at image-build time under their own licenses. See docs/THIRD_PARTY.md for the inventory and the
+    obligations that apply before an image is redistributed.
+
+  * "Claude", "Claude Code", "Codex" and other product names belong to their owners. This product only starts the
+    vendors' official command-line tools under the user's own account; it does not bundle them or store their credentials.

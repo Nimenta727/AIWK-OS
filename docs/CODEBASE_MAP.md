@@ -57,6 +57,7 @@ AIWK-OS/
 | `aiws_model_gate.py` / `aiws_model_schema.py` / `aiws_model_router.py` | 本地模型的懒启动与空闲卸载、受约束输出、规则→本地→官方 CLI 路由 | 本地模型离线；只提议 |
 | `aiws_mandate.py` / `aiws_supervisor.py` / `aiws_cli_adapters.py` | 一次性授权、官方 CLI 监督与用户隔离、输出解析 | 不保存 API 密钥；预算超限即停止 |
 | `aiws_egress_proxy.py` | 构建通道的域名白名单 CONNECT 代理 | 只绑定 127.0.0.1，拒绝 IP 字面量和非公网地址 |
+| `aiws_apps.py` | 集成应用注册表（内置/桌面/命令行）与固定命令启动 | 不接收参数；环境白名单；限速 |
 | `aiws_workbench.py`（IDE 部分） | `/api/v1/ide` 与 `/ide/open`：固定命令、白名单环境、限速 | 不接收任何参数 |
 
 新增运行时模块时，**先把文件名加入 `os/runtime/MODULES`**；`test_runtime_manifest.py` 会在清单与目录不一致时失败。
@@ -68,6 +69,8 @@ AIWK-OS/
 | `src/os/OsWorkbench.tsx` | Linux 模式的 VS Code 风格外壳：状态、标签、侧栏内容、命令、状态栏 |
 | `src/os/Shell.tsx` | 通用外壳组件：活动栏、侧栏、标签栏、面板、状态栏、命令面板 |
 | `src/os/Observatory.tsx` + `useObservatoryData.ts` | 观察台视图；单一轮询 hook（页面隐藏时停止） |
+| `src/os/BrowserView.tsx` | 内置预览浏览器：只嵌入本机开发服务与沙箱 HTML | 外部网站不嵌入 |
+| `src/model/apps.mjs` | 查看器分派、Markdown 安全解析、CSV、浏览器地址校验 | 无 DOM，有单元测试 |
 | `src/os/FileViewer.tsx` / `GuestFiles.tsx` / `GuestTaskStudio.tsx` / `GuestSystemConsole.tsx` | 文件查看、AI 文件管理（需审批）、任务/本地 AI、系统控制 |
 | `src/os/api.ts` / `observatoryTypes.ts` | 对 guest 本地服务的唯一调用入口与响应类型 |
 | `src/os/shell.css` / `OsWorkbench.css` | 主题变量（`--c-*`，深色默认）与布局；旧样式颜色已转为变量 |
