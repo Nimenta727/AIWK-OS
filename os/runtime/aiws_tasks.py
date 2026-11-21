@@ -273,9 +273,17 @@ class GuestTaskStore:
                 "SELECT source_sha256,evidence_json FROM windows_imports WHERE task_id=?",
                 (task_id,)).fetchone()
             if legacy is not None:
+                evidence=json.loads(legacy["evidence_json"])
+                receipt=self.db.execute(
+                    "SELECT details FROM audit WHERE task_id=? AND "
+                    "action='windows.history_imported' ORDER BY seq LIMIT 1",
+                    (task_id,)).fetchone()
+                expected=hashlib.sha256(encode(evidence).encode("utf-8")).hexdigest()
+                if receipt is None or json.loads(receipt["details"]).get("evidenceSha256") != expected:
+                    raise TaskError("Imported Windows evidence checksum mismatch")
                 response["windowsImport"]={
                     "sourceSha256":legacy["source_sha256"],
-                    "evidence":json.loads(legacy["evidence_json"]),
+                    "evidence":evidence,
                     "requiresToolMapping":True,
                     "executable":False
                 }
@@ -311,6 +319,7 @@ class GuestTaskStore:
             self._event(tid,None,"windows.history_imported",{
                 "windowsTaskId":tid,"sourceSha256":evidence["sourceSha256"],
                 "stageCount":len(safe["stages"]),
+                "evidenceSha256":hashlib.sha256(encode(evidence).encode("utf-8")).hexdigest(),
                 "autoExecuted":False,
                 "toolMappingRequired":True,
             })

@@ -59,6 +59,28 @@ class WindowsCompatTests(unittest.TestCase):
         with self.assertRaises(WindowsImportError):
             convert_windows_task(bad)
 
+    def test_import_evidence_is_bound_to_audited_digest(self):
+        with tempfile.TemporaryDirectory() as home:
+            store=GuestTaskStore(Path(home)/"aiws")
+            doc=store.import_windows(legacy())
+            self.assertTrue(doc["windowsImport"]["evidence"]["planRevisionSha256"])
+            receipt=[x for x in store.audit(TASK)
+                     if x["action"]=="windows.history_imported"]
+            self.assertEqual(len(receipt),1)
+            details=json.loads(receipt[0]["details"])
+            self.assertEqual(len(details["evidenceSha256"]),64)
+            # A database row mutation cannot silently alter migration history.
+            previous=store.db.execute(
+                "SELECT evidence_json FROM windows_imports WHERE task_id=?",(TASK,)).fetchone()[0]
+            store.db.execute("UPDATE windows_imports SET evidence_json=? WHERE task_id=?",
+                             ('{"graphMode":true}',TASK))
+            with self.assertRaises(TaskError):
+                store.get(TASK)
+            store.db.execute("UPDATE windows_imports SET evidence_json=? WHERE task_id=?",
+                             (previous,TASK))
+            self.assertTrue(store.verify_audit()["valid"])
+            store.close()
+
     def test_import_appears_in_single_durable_guest_store_but_never_dispatches(self):
         with tempfile.TemporaryDirectory() as home:
             root=Path(home)/"aiws"

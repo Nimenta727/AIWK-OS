@@ -78,3 +78,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 12:09 — Windows 历史 WorkTask/DAG 导入同一 Linux Agent（不可执行）](2026-11-21_1209-windows-dag-history-safe-import.md)
 - [2026-11-21 12:15 — AIWS Shell 导入 Windows WorkTask GUI 及真实点击验收](2026-11-21_1215-windows-worktask-import-guest-gui.md)
 - [2026-11-21 12:21 — 本地 2B 模型获取受界 guest 文件与 Agent 任务摘要](2026-11-21_1221-local-model-guest-context-budget.md)
+- [2026-11-21 12:27 — Windows 历史迁移元数据与审计 SHA256 绑定](2026-11-21_1227-windows-import-evidence-audit-digest.md)
