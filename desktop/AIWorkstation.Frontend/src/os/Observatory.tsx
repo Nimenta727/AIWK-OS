@@ -1,64 +1,34 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useState} from 'react';
 import type {ReactNode} from 'react';
 import {Activity,AlertTriangle,Check,ChevronDown,ChevronRight,CircleDot,Send,ShieldCheck,X} from 'lucide-react';
 import {agentBars,attentionFirst,basisText,budgetState,clock,formatTokens,lightTone,stateSegments} from '../model/observatory.mjs';
 
-type Bilingual={zh:string;en:string};
-type Totals={in:number|null;out:number|null;cacheRead:number|null;cacheWrite:number|null;knownSessions:number;unknownSessions:number;unverifiedSessions:number};
-type SessionRow={session:string;agent:string;status:string;events:number;toolCalls:number;toolErrors:number;errors:number;unrecognizedEvents:number;
- tokens:{in:number|null;out:number|null;cacheRead:number|null;cacheWrite:number|null;basis:string;verified:boolean;unknownUsageEvents:number};costUsd:number|null;truncated:boolean};
-type Waiting={taskId:string;stageKey:string;tool:string;label:string;taskTitle:string;ready:boolean};
-type Failure={taskId:string;stageKey:string;tool:string;label:string;error:string};
-type RecentTask={id:string;title:string;createdAt:number;stages:Record<string,number>};
-type Budget={mandateId:string;used:number;limit:number;input:{used:number;limit:number};output:{used:number;limit:number}};
-type RunApproval={runId:string;category:string;tool:string;detail:string};
-type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number};
-type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{isolation?:{mode:string;user:string};active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
-type Summary={demo:boolean;runApprovals:RunApproval[];
- status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean;gate?:{loaded:boolean;rssMiB?:number}|null};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
- tokens:{total:Totals;byAgent:Record<string,Totals>;budget:Budget|null};
- tasks:{tasks:number;stages:Record<string,number>;needsApproval:Waiting[];failures:Failure[];recent:RecentTask[]};
- sessions:SessionRow[];recent:Array<{ts:number;source:string;label:string;status:string}>;
- verdict:{level:string;sentences:Bilingual[]};audit:{valid:boolean;events:number}};
-type EventRow={seq:number;ts:number;kind:string;tool?:string;status?:string;detail?:string;tokens?:{in:number|null;out:number|null;source:string;scope:string}};
+import {api} from './api';
+import type {Bilingual,Summary,BuilderInfo,Waiting,EventRow} from './observatoryTypes';
 
-async function api<T>(url:string,options?:RequestInit):Promise<T>{
- const response=await fetch('/api/v1'+url,{cache:'no-store',credentials:'omit',...options});
- const data=await response.json() as T&{error?:string};
- if(!response.ok)throw new Error(data.error||'Guest service request failed');
- return data;
-}
+export type ObservatoryData={summary:Summary|null;builder:BuilderInfo|null;error:string;reload:()=>Promise<void>};
 
-export default function Observatory({csrf,english,onOpenAdvanced,onCommand}:{
- csrf:string;english:boolean;onOpenAdvanced:(page:'files'|'plans'|'tasks'|'local'|'system')=>void;onCommand:(text:string)=>boolean
+
+export default function Observatory({csrf,english,onOpenAdvanced,onCommand,data}:{
+ csrf:string;english:boolean;onOpenAdvanced:(page:'files'|'plans'|'tasks'|'local'|'system')=>void;onCommand:(text:string)=>boolean;data:ObservatoryData
 }){
  const tr=(zh:string,en:string)=>english?en:zh;
- const [summary,setSummary]=useState<Summary|null>(null);
- const [error,setError]=useState('');
+ const {summary,builder,reload:load}=data;
+ const [actionError,setActionError]=useState('');
+ const error=actionError||data.error;
+ const setError=setActionError;
  const [open,setOpen]=useState<string|null>(null);
  const [events,setEvents]=useState<EventRow[]>([]);
  const [showAll,setShowAll]=useState(false);
  const [text,setText]=useState('');
  const [reply,setReply]=useState<string>('');
  const [busy,setBusy]=useState(false);
- const [builder,setBuilder]=useState<BuilderInfo|null>(null);
  const [form,setForm]=useState({provider:'claude',projectDir:'',prompt:'',inputK:'200',outputK:'60',minutes:'30',turns:'30',tools:'Read,Edit,Write,Bash(npm test)',
   del:true,install:true,push:true});
  const [formOpen,setFormOpen]=useState(false);
  const [inboxAll,setInboxAll]=useState(false);
  const headers={'Content-Type':'application/json','X-AIWS-CSRF':csrf};
- const timer=useRef<number|undefined>(undefined);
- const load=useCallback(async()=>{
-  try{const [a,b]=await Promise.all([api<Summary>('/observatory'),api<BuilderInfo>('/builder')]);setSummary(a);setBuilder(b);setError('');}
-  catch(e){setError(String(e instanceof Error?e.message:e));}
- },[]);
- // Resource-saving: poll only while the tab is visible; refresh immediately when it becomes visible again.
- useEffect(()=>{
-  const start=()=>{window.clearInterval(timer.current);timer.current=window.setInterval(()=>{if(!document.hidden)void load();},5000);};
-  const onVisible=()=>{if(!document.hidden)void load();};
-  void load();start();document.addEventListener('visibilitychange',onVisible);
-  return()=>{window.clearInterval(timer.current);document.removeEventListener('visibilitychange',onVisible);};
- },[load]);
+
  const openSession=async(id:string)=>{
   if(open===id){setOpen(null);return;}
   setOpen(id);setEvents([]);

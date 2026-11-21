@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import socket
+import subprocess
 import threading
 import time
 from urllib.parse import urlsplit
@@ -27,7 +29,6 @@ import aiws_observatory
 from aiws_mandate import MandateStore, MandateError
 from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
-import subprocess
 
 HOST = "127.0.0.1"
 PORT = 17640
@@ -102,6 +103,46 @@ class Controller:
         self._emit("local", "local", "usage", tokens=tokens)
         notes = ("+retry" if info["retried"] else "") + ("+schema-fallback" if info["schemaFallback"] else "")
         self._emit("local", "local", "message", detail=(outcome + notes)[:60])
+
+    # ---- AIWS Code (the IDE) ----
+    IDE_LAUNCHER = "/usr/local/bin/aiws-code"
+    IDE_ENV = ("HOME", "PATH", "LANG", "DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
+               "DBUS_SESSION_BUS_ADDRESS", "AIWS_CODE_ROOT", "AIWS_CODE_PORT")
+
+    def ide_status(self):
+        root = Path(os.environ.get("AIWS_CODE_ROOT", "/opt/aiws-code"))
+        installed = (root / "bin/aiws-code-server").is_file() and (root / "out/server-main.js").is_file()
+        port = int(os.environ.get("AIWS_CODE_PORT", "18090"))
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.3).close()
+            running = True
+        except OSError:
+            running = False
+        version = None
+        try:
+            version = json.loads((root / "PROVENANCE.json").read_text(encoding="utf-8")).get("upstreamTag")
+        except (OSError, ValueError, AttributeError):
+            pass
+        launcher = getattr(self, "ide_launcher", self.IDE_LAUNCHER)
+        return {"installed": installed, "launcherPresent": Path(launcher).is_file(), "running": running,
+                "version": version if isinstance(version, str) and len(version) <= 32 else None, "port": port}
+
+    def ide_open(self):
+        """Start AIWS Code (fixed command, no user-supplied arguments). Already running: nothing is started."""
+        status = self.ide_status()
+        if not status["installed"] or not status["launcherPresent"]:
+            raise SupervisorError("AIWS Code is not installed in this image (see os/ide/README.md)")
+        if status["running"]:
+            return {"started": False, "running": True}
+        now = time.monotonic()
+        if now - getattr(self, "_ide_last", -10) < 5:
+            return {"started": False, "running": False, "starting": True}
+        self._ide_last = now
+        env = {k: os.environ[k] for k in self.IDE_ENV if k in os.environ}
+        env["AIWS_WORKSPACE"] = str(self.workspace)
+        subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
+        return {"started": True, "running": False}
 
     # ---- builder (official CLI under a user mandate) ----
     @staticmethod
@@ -578,6 +619,8 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(session) or after < 0:
                 return self.reply(400, {"error": "A valid session id is required"})
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/ide":
+            return self.reply(200, app.ide_status())
         if path == "/api/v1/builder":
             return self.reply(200, app.builder_overview())
         if path == "/api/v1/route/config":
@@ -628,7 +671,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -666,6 +709,10 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/ide/open":
+                if payload:
+                    raise ValueError("No arguments allowed")
+                result = app.ide_open()
             elif path == "/api/v1/builder/mandates":
                 result = app.builder_grant(payload)
             elif path == "/api/v1/builder/runs":
