@@ -84,7 +84,7 @@
 ## 10. 实施顺序与验收
 | 步骤 | 内容 | 能否在此环境验证 |
 | --- | --- | --- |
-| O1 | 事件模式 + 适配器 + 假 CLI 录制回放 + 事件存储 | 能（单元测试） |
+| O1 | 事件模式 + 适配器 + 假 CLI 录制回放 + 事件存储 | **已完成（25 项测试；样本为手写近似数据，非真实录制）** |
 | O2 | 观察台首页（预算、任务板、审计结论、收件箱）+ “高级”抽屉；主导航瘦身 | 能（浏览器端到端） |
 | O3 | 授权令牌 + 监督器（超预算/越界终止） | 能（用假 CLI） |
 | O4 | 构建通道：独立 UID、域名白名单代理、nftables 规则 | **需在 QEMU 客体里实测** |
@@ -97,3 +97,11 @@
 - 用户级 systemd 的 `IPAddressDeny` 是否生效未实测；nftables 的 UID 规则在客体内是否可用未实测。
 - 同内核的构建通道隔离弱于独立虚拟机；远期可升级。
 - 多智能体任务板的可读性需要真实多智能体数据做可用性验证。
+
+## 12. O1 实现记录（2026-11-22）
+- `os/runtime/aiws_events.py`：`aiws.event.v1` 严格校验；`EventStore`（SQLite，0700，WAL；每会话最多 20000 条事件、超出后计数仍准确；`prune` 限制会话数）。
+- `os/runtime/aiws_cli_adapters.py`：`ClaudeStreamAdapter`、`CodexJsonAdapter`（支持 `method/params` 变体）、`replay`。适配器**绝不抛异常**，不认识的事件记为 `unrecognized`，垃圾输入合并限流。
+- **token 规则**：只记录提供方上报的数字；没有就 `source=unknown`；从未上报的字段保持 `null`，不显示为 0。用量分三种范围：`delta`（确定增量）、`total`（确定累计，优先）、`turn`（逐轮上报，累计还是增量**未验证**，汇总会标“未验证”）。Claude 同一条消息重复上报的用量按消息 id 去重。
+- 事件**不含消息正文**：只存长度、工具名和已脱敏的短摘要（命令行密钥、`Bearer` 令牌被替换）。
+- 测试发现并修复：`Authorization: Bearer <令牌>` 的令牌曾在脱敏后泄漏；Codex 未上报的 `cacheWrite` 曾显示为 0。
+- 样本在 `os/verify/fixtures/cli/`，README 标明为合成数据。**真实 CLI 的字段名与 token 语义仍需 O6 用真机录制核对。**

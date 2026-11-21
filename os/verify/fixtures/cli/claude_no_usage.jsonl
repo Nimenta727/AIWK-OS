@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"c-nu"}
+{"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"hello"}]}}
+{"type":"result","subtype":"success","is_error":false,"session_id":"c-nu"}

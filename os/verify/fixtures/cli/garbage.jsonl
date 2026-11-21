@@ -1,0 +1,6 @@
+this is not json
+["an","array"]
+{"type":"brand_new_event_type","payload":{"x":1}}
+{"type":"assistant","message":"not-a-dict"}
+
+{"type":"user","message":{"content":"plain string"}}

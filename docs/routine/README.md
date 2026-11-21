@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-22 01:00 — O1：事件模式、CLI 适配器、事件存储](2026-11-22_0100-observatory-o1-events.md)
 - [2026-11-22 00:10 — 观察台总体方案（仅文档）](2026-11-22_0010-observatory-plan.md)
 - [2026-11-21 23:00 — 阶段 4：模型路由](2026-11-21_2300-stage4-model-router.md)
 - [2026-11-21 21:30 — 数据集 v2、锁定评测集 v2、独立性检查与发布门槛](2026-11-21_2130-dataset-v2-heldout-release-gate.md)
