@@ -237,6 +237,12 @@ class EventStore:
                                    (session, int(after), limit)).fetchall()
         return [{"seq": r["seq"], **json.loads(r["body"])} for r in rows]
 
+    def recent(self, limit=12):
+        limit = max(1, min(int(limit), 50))
+        with self.lock:
+            rows = self.db.execute("SELECT seq, body FROM events ORDER BY seq DESC LIMIT ?", (limit,)).fetchall()
+        return [{"seq": r["seq"], **json.loads(r["body"])} for r in rows]
+
     def prune(self, max_sessions=200):
         """Keep only the newest sessions: bounded disk use."""
         with self.lock:

@@ -1,17 +1,20 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,BrainCircuit,Code2,FolderTree,Layers3,Play,RefreshCw,ShieldCheck} from 'lucide-react';
+import {Activity,BrainCircuit,ChevronDown,ChevronRight,Code2,Eye,FolderTree,Layers3,Play,RefreshCw,ShieldCheck} from 'lucide-react';
 import './OsWorkbench.css';
 import GuestFiles from './GuestFiles';
 import GuestTaskStudio from './GuestTaskStudio';
 import GuestSystemConsole from './GuestSystemConsole';
+import Observatory from './Observatory';
+import {parseCommand} from '../model/fileOps.mjs';
 
 type Tool={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;desktopInstalled:boolean;displayManagerInstalled:boolean;uiBundled:boolean;brokerReady?:boolean;brokerScope?:string};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type Page='overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
+type Page='observatory'|'overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
 const MENU:{id:Page;zh:string;en:string;icon:typeof Activity}[]=[
+ {id:'observatory',zh:'观察台',en:'Observatory',icon:Eye},
  {id:'overview',zh:'操作系统工作台',en:'OS Workbench',icon:Layers3},
  {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
  {id:'code',zh:'跨平台代码智能',en:'Code Intelligence',icon:Code2},
@@ -31,7 +34,8 @@ async function api<T>(url:string,options?:RequestInit):Promise<T>{
 export default function OsWorkbench(){
  const [language,setLanguage]=useState<Language>('zh');
  const tr=(zh:string,en:string)=>language==='zh'?zh:en;
- const [page,setPage]=useState<Page>('overview');
+ const [page,setPage]=useState<Page>('observatory');
+ const [advancedOpen,setAdvancedOpen]=useState(false);
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
  const [csrf,setCsrf]=useState('');
  const [error,setError]=useState('');
@@ -91,21 +95,25 @@ export default function OsWorkbench(){
    <aside className="aiws-os-sidebar">
     <div className="aiws-os-brand"><div className="aiws-os-mark"><Layers3 size={22}/></div><span><strong>AIWS OS</strong><small>AI-NATIVE WORKSTATION</small></span></div>
     <div className="aiws-os-category">{tr('统一操作入口','UNIFIED SYSTEM INTERFACE')}</div>
-    <nav aria-label={tr('工作台导航','Workbench navigation')}>{MENU.map(({id,zh,en,icon:Icon})=>
-     <button type="button" key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={17}/>{language==='zh'?zh:en}</button>)}</nav>
+    <nav aria-label={tr('工作台导航','Workbench navigation')}>
+     <button type="button" className={page==='observatory'?'active':''} onClick={()=>setPage('observatory')}><Eye size={17}/>{tr('观察台','Observatory')}</button>
+     <button type="button" className="aiws-os-advanced-toggle" aria-expanded={advancedOpen||page!=='observatory'} onClick={()=>setAdvancedOpen(v=>!v)}>
+      {(advancedOpen||page!=='observatory')?<ChevronDown size={15}/>:<ChevronRight size={15}/>}{tr('高级工具（按需打开）','Advanced tools (open when needed)')}</button>
+     {(advancedOpen||page!=='observatory')&&MENU.filter(m=>m.id!=='observatory').map(({id,zh,en,icon:Icon})=>
+      <button type="button" key={id} className={'aiws-os-sub '+(page===id?'active':'')} onClick={()=>setPage(id)}><Icon size={16}/>{language==='zh'?zh:en}</button>)}</nav>
     <div className="aiws-os-foot">{health?tr('本地系统服务已响应','GUEST SERVICE RESPONDING'):tr('正在检查系统服务','CHECKING SERVICE')}<small>127.0.0.1 · {health?.mode||'not connected'}</small></div>
    </aside>
    <main className="aiws-os-body">
     <header className="aiws-os-top"><span>AIWS / <strong>{MENU.find(x=>x.id===page)?.[language]}</strong></span>
-     <form className="aiws-os-command" role="search" onSubmit={e=>{e.preventDefault();submitCommand();}}>
+     {page!=='observatory'&&<form className="aiws-os-command" role="search" onSubmit={e=>{e.preventDefault();submitCommand();}}>
       <input value={commandText} onChange={e=>setCommandText(e.target.value)} spellCheck={false}
        aria-label={tr('指令栏','Command bar')}
        placeholder={tr('指令栏：移动 a.txt 到 docs/a.txt · 删除 b.txt · 新建文件夹 论文','Command: mv a.txt docs/a.txt · rm b.txt · mkdir notes')}/>
-      <button type="submit" disabled={!csrf||!commandText.trim()}>{tr('预览','Preview')}</button></form><div>
+      <button type="submit" disabled={!csrf||!commandText.trim()}>{tr('预览','Preview')}</button></form>}<div>
      <button type="button" onClick={()=>setLanguage(x=>x==='zh'?'en':'zh')}>{language==='zh'?'EN':'中文'}</button>
      <button type="button" onClick={()=>void refresh()} title={tr('刷新','Refresh')} aria-label={tr('刷新','Refresh')}><RefreshCw size={16}/></button></div></header>
     <div className="aiws-os-content">
-     <div className="aiws-os-heading"><small>AIWS OS / LINUX GUEST</small>
+     {page!=='observatory'&&<div className="aiws-os-heading"><small>AIWS OS / LINUX GUEST</small>
       <h1>{page==='overview'?tr('工作台与操作系统，真正贯通','One workspace, integrated with Linux'):
         page==='files'?tr('AI 工作区文件管理','AI-managed guest files'):
         page==='code'?tr('跨平台代码智能引擎','Cross-platform code intelligence'):
@@ -114,7 +122,9 @@ export default function OsWorkbench(){
         page==='local'?tr('本地小模型与离线规划','Local model and offline planning'):
         tr('系统服务与安全边界','System services and security')}</h1>
       <p>{tr('通过同一套工作台调度 Linux 能力；所有执行结果都可查看。','Call guest-native capabilities from one workbench and inspect every result.')}</p>
-     </div>
+     </div>}
+     {page==='observatory'&&<Observatory csrf={csrf} english={language==='en'} onOpenAdvanced={setPage}
+      onCommand={text=>{if(!(parseCommand(text) as {ok:boolean}).ok)return false;setPage('files');setCommand({text,nonce:Date.now()});return true;}}/>}
      {starting&&<p>{tr('正在加载系统状态…','Loading guest status…')}</p>}
      {error&&<div className="aiws-os-error" role="alert">{error}</div>}
      {page==='overview'&&<div className="aiws-os-grid">

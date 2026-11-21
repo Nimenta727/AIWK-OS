@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import threading
 import urllib.error
 import urllib.request
 
@@ -68,6 +69,7 @@ class LocalPlanner:
         self.request_timeout = request_timeout
         self.url = "http://" + HOST + ":" + str(port)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self._tls = threading.local()
 
     def status(self):
         marker=Path.home()/".config/aiws/local-model-enabled"
@@ -206,6 +208,12 @@ class LocalPlanner:
             + encoded
         )
 
+    def take_usage(self):
+        """Usage the local server reported for this thread's last call (or None); read once."""
+        usage = getattr(self._tls, "usage", None)
+        self._tls.usage = None
+        return usage
+
     def suggest(self, instruction, context=None):
         if not self.status()["configured"]:
             raise LocalModelError("No local model configured; deterministic guest tools remain available")
@@ -232,8 +240,15 @@ class LocalPlanner:
                     raise LocalModelError("Local model response size limit exceeded")
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise LocalModelError("Local guest inference service unavailable") from exc
+        self._tls.usage = None
         try:
             response = json.loads(data)
+            usage = response.get("usage") if isinstance(response, dict) else None
+            if isinstance(usage, dict):       # reported by llama-server itself; never estimated
+                prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
+                ok = lambda v: isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 9
+                if ok(prompt) or ok(completion):
+                    self._tls.usage = {"in": prompt if ok(prompt) else None, "out": completion if ok(completion) else None}
             proposal = json.loads(response["choices"][0]["message"]["content"])
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise LocalModelError("Model returned invalid structured JSON") from exc

@@ -352,7 +352,9 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("os/runtime/" + module + ".py", build, module)
         # every aiws_* module imported by the workbench must be in the image
         wb = (ROOT / "runtime/aiws_workbench.py").read_text(encoding="utf-8")
-        for module in set(re.findall(r"^from (aiws_\w+) import", wb, flags=re.M)):
+        imported = set(re.findall(r"^from (aiws_\w+) import", wb, flags=re.M)) | set(re.findall(r"^import (aiws_\w+)", wb, flags=re.M))
+        self.assertIn("aiws_observatory", imported)           # the check must see plain `import x` too
+        for module in imported:
             self.assertIn("os/runtime/" + module + ".py", build, module)
 
 class AgentRouteOpTests(unittest.TestCase):

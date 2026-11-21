@@ -97,6 +97,9 @@ class AgentCore:
             action=self.tasks.dispatch(a["id"],a["key"])
             self.pool.submit(self._run,action)
             return self.tasks.get(a["id"])
+        if op=="task.overview":
+            fields(a,set())
+            return self.tasks.overview()
         if op=="task.route":
             fields(a,{"id","route"})
             return self.tasks.record_route(a["id"],a["route"])

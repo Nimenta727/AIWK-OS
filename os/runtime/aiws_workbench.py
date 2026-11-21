@@ -21,6 +21,9 @@ from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as 
 from aiws_model_registry import GuestModelRegistry
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
+from aiws_events import EventStore, EventError, SAFE_NAME, make_event
+from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
+import aiws_observatory
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 import subprocess
 
@@ -63,6 +66,51 @@ class Controller:
             self.tasks = GuestTaskStore(state_home / "aiws", singleton=False)
             self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
+        self.events = EventStore(state_home / "aiws-observatory")
+        if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
+            self._seed_demo()
+
+    def _seed_demo(self):
+        """Development only: replay SYNTHETIC fixtures so the observatory can be seen without a real CLI."""
+        folder = Path(__file__).resolve().parents[1] / "verify" / "fixtures" / "cli"
+        existing = {s["session"] for s in self.events.sessions(200)}
+        for name, cls, session in (("claude_basic", ClaudeStreamAdapter, "demo-claude"),
+                                   ("codex_basic", CodexJsonAdapter, "demo-codex"),
+                                   ("codex_failed", CodexJsonAdapter, "demo-codex-failed")):
+            if session not in existing and (folder / (name + ".jsonl")).is_file():
+                replay(folder / (name + ".jsonl"), cls(session), self.events)
+
+    def _emit(self, agent, prefix, kind, **fields):
+        """Observability must never break a request: failures are swallowed."""
+        try:
+            self.events.append(make_event(time.time(), agent, prefix + "-" + time.strftime("%Y%m%d"), kind, **fields))
+        except (EventError, OSError, ValueError, __import__("sqlite3").Error):
+            pass
+
+    def _emit_local_call(self, outcome):
+        usage = self.model.take_usage()
+        tokens = ({"in": usage["in"], "out": usage["out"], "cacheRead": None, "cacheWrite": None,
+                   "source": "reported", "scope": "delta"} if usage else {"source": "unknown", "scope": "delta"})
+        self._emit("local", "local", "usage", tokens=tokens)
+        self._emit("local", "local", "message", detail=outcome[:60])
+
+    def observatory(self):
+        overview = self.tasks.overview()
+        sessions = self.events.sessions(30)
+        try:
+            router = load_config()
+        except RouterError:
+            router = {"externalEnabled": False}
+        recent = [{"ts": a["ts"], "source": "task", "label": a["action"] + (" · " + a["tool"] if a["tool"] else ""),
+                   "status": "error" if a["action"].endswith("failed") else "ok"} for a in overview["activity"]]
+        for e in self.events.recent(12):
+            recent.append({"ts": e["ts"], "source": e["agent"],
+                           "label": e["kind"] + (" · " + e["tool"] if e.get("tool") else ""),
+                           "status": e.get("status", "ok")})
+        recent.sort(key=lambda x: -x["ts"])
+        return aiws_observatory.build_summary(
+            sessions=sessions, overview=overview, audit=self.tasks.verify_audit(), model=self.model.status(),
+            router=router, demo=any(s["session"].startswith("demo-") for s in sessions), recent_events=recent[:16])
 
     def health(self):
         agent_health = self.agent.request("health") if self.agent is not None else {}
@@ -219,6 +267,7 @@ class Controller:
         """Route first (rules), then persist a validated local model plan. Read-only leading
         stages run automatically; every file-changing stage waits for an explicit approval."""
         decision = self.route_decision(instruction)
+        self._emit("router", "router", "message", detail=("%s/%s" % (decision["route"], decision["rule"]))[:60])
         if decision["route"] != "local":
             # Not a local-model task: nothing is sent anywhere; the user decides what to do next.
             return {"routed": decision["route"], "decision": decision, "executed": False}
@@ -226,9 +275,11 @@ class Controller:
             proposal = self.local_suggest(instruction)
         except LocalModelError as exc:
             message = str(exc)
+            self._emit_local_call("failed")
             outcome = "unavailable" if ("unavailable" in message.lower() or "No local model" in message) else "invalid"
             return {"routed": "local-failed", "decision": decision, "outcome": outcome,
                     "followUp": after_local(decision, outcome), "error": message[:200], "executed": False}
+        self._emit_local_call("refused" if proposal["tool"] == "refuse" else "planned")
         if proposal["tool"] == "refuse":
             # Explicit refusals are terminal decisions, never DAG tool nodes, never escalated.
             return {"refused": True, "proposal": proposal, "executed": False,
@@ -462,6 +513,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, app.guest_ops.execute("kernel.inspect", {}))
             except (PermissionError, ValueError, OSError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/observatory":
+            try:
+                return self.reply(200, app.observatory())
+            except (AgentUnavailable, AgentError) as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
+        if path == "/api/v1/observatory/events":
+            from urllib.parse import parse_qs
+            query = parse_qs(urlsplit(self.path).query)
+            session = (query.get("session") or [""])[0]
+            try:
+                after = int((query.get("after") or ["0"])[0])
+            except ValueError:
+                return self.reply(400, {"error": "after must be an integer"})
+            if not SAFE_NAME.match(session) or after < 0:
+                return self.reply(400, {"error": "A valid session id is required"})
+            return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
         if path == "/api/v1/route/config":
             try:
                 config = load_config()
