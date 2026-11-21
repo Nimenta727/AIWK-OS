@@ -21,6 +21,7 @@ from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as 
 from aiws_model_registry import GuestModelRegistry
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
+from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 import subprocess
 
 HOST = "127.0.0.1"
@@ -205,13 +206,33 @@ class Controller:
         return self.model.suggest(
             instruction, context=self.local_guest_context() if configured else None)
 
+    def route_decision(self, instruction):
+        """Side-effect free: no model call, no task, no network. Rules only."""
+        return classify(instruction, load_config())
+
+    @staticmethod
+    def _route_record(decision):
+        keys = ("route", "rule", "agent", "instructionSha256", "forbidden", "externalAllowed", "externalEnabled")
+        return {k: decision[k] for k in keys}
+
     def model_plan(self, instruction):
-        """Persist a validated local model plan. Read-only leading stages run automatically;
-        every file-changing stage waits for an explicit user approval."""
-        proposal = self.local_suggest(instruction)
+        """Route first (rules), then persist a validated local model plan. Read-only leading
+        stages run automatically; every file-changing stage waits for an explicit approval."""
+        decision = self.route_decision(instruction)
+        if decision["route"] != "local":
+            # Not a local-model task: nothing is sent anywhere; the user decides what to do next.
+            return {"routed": decision["route"], "decision": decision, "executed": False}
+        try:
+            proposal = self.local_suggest(instruction)
+        except LocalModelError as exc:
+            message = str(exc)
+            outcome = "unavailable" if ("unavailable" in message.lower() or "No local model" in message) else "invalid"
+            return {"routed": "local-failed", "decision": decision, "outcome": outcome,
+                    "followUp": after_local(decision, outcome), "error": message[:200], "executed": False}
         if proposal["tool"] == "refuse":
-            # Explicit refusals are terminal decisions, never DAG tool nodes.
-            return {"refused": True, "proposal": proposal, "executed": False}
+            # Explicit refusals are terminal decisions, never DAG tool nodes, never escalated.
+            return {"refused": True, "proposal": proposal, "executed": False,
+                    "decision": decision, "followUp": after_local(decision, "refused")}
         if self.agent is not None:
             # Production: independent systemd user Agent revalidates the raw model output,
             # computes fingerprints, owns durable state and records prompt/proposal hashes.
@@ -224,8 +245,45 @@ class Controller:
             self.tasks.record_model_proposal(
                 saved["task"]["id"], "aiws-local", instruction, proposal)
             doc = self.tasks.get(saved["task"]["id"])
+        try:
+            doc = self.tasks.route(doc["task"]["id"], self._route_record(decision)) if self.agent is not None \
+                else self.tasks.record_route(doc["task"]["id"], self._route_record(decision))
+        except TaskError:
+            pass   # routing evidence is best effort; the plan itself is already durable
         self._autorun_reads(doc["task"]["id"])
         return doc
+
+    def create_handoff(self, instruction, agent):
+        """Prepare (never send) an external-CLI handoff file. Needs config, a permitted request
+        and, afterwards, explicit approval of the file-writing stages."""
+        config = load_config()
+        decision = classify(instruction, config)
+        if agent not in ("claude", "codex", "dual"):
+            raise ValueError("Unknown external agent")
+        wanted = ("claude", "codex") if agent == "dual" else (agent,)
+        if (not config["externalEnabled"] or not decision["externalAllowed"]
+                or any(not config["providers"].get(name) for name in wanted)):
+            raise PermissionError("External handoff is not permitted for this request or configuration")
+        tree = self.file_tools.invoke("workspace.tree", {"path": "."}) if self.file_tools is not None \
+            else invoke("workspace.tree", {"path": "."})
+        handoff = build_handoff(instruction, agent, decision, [f for f in tree.get("files", []) if isinstance(f, str)])
+        try:
+            (self.file_tools.invoke("file.stat", {"path": "handoff"}) if self.file_tools is not None
+             else invoke("file.stat", {"path": "handoff"}))
+            folder_exists = True
+        except (ValueError, OSError):
+            folder_exists = False
+        saved = self.tasks.create(("Handoff for " + agent)[:160],
+                                  "Prepare a reviewable handoff file for an official CLI. Nothing is sent.",
+                                  handoff_stages(handoff, folder_exists))
+        record = {**self._route_record(decision), "route": "external", "rule": "L2-handoff", "agent": agent}
+        try:
+            self.tasks.route(saved["task"]["id"], record) if self.agent is not None \
+                else self.tasks.record_route(saved["task"]["id"], record)
+        except TaskError:
+            pass
+        return {"task": saved["task"], "stages": saved["stages"], "handoff": {
+            "path": handoff["path"], "sha256": handoff["sha256"], "dataShared": handoff["dataShared"]}}
 
     def _autorun_reads(self, task_id):
         """Run the leading local read-only stages; stop at the first stage that needs approval."""
@@ -404,6 +462,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, app.guest_ops.execute("kernel.inspect", {}))
             except (PermissionError, ValueError, OSError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/route/config":
+            try:
+                config = load_config()
+            except RouterError as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+            return self.reply(200, {"config": config, "file": "~/.config/aiws/routes.json", "editableInUi": False})
         if path == "/api/v1/model/status":
             return self.reply(200, app.model.status())
         if path == "/api/v1/health":
@@ -446,7 +510,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/tasks/import/windows") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows") and not (
                 len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
                 and route[4] == "stages" and route[6] in ("approve", "dispatch")):
             return self.reply(404, {"error": "Not found"})
@@ -481,6 +545,14 @@ class Handler(BaseHTTPRequestHandler):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/route":
+                if set(payload) != {"instruction"}:
+                    raise ValueError("Expected instruction")
+                result = app.route_decision(payload["instruction"])
+            elif path == "/api/v1/route/handoff":
+                if set(payload) != {"instruction", "agent"}:
+                    raise ValueError("Expected instruction and agent")
+                result = app.create_handoff(payload["instruction"], payload["agent"])
             elif path == "/api/v1/model/plan":
                 if set(payload) != {"instruction"}:
                     raise ValueError("Expected instruction")

@@ -321,6 +321,24 @@ class GuestTaskStore:
             })
         return self.get(tid)
 
+    ROUTE_KEYS = {"route", "rule", "agent", "instructionSha256", "forbidden", "externalAllowed", "externalEnabled"}
+
+    def record_route(self, task_id, decision):
+        """Audit WHERE a request was routed. Only the instruction hash is stored, never its text."""
+        if (not isinstance(decision, dict) or set(decision) != self.ROUTE_KEYS
+                or decision["route"] not in ("local", "external", "manual")
+                or not isinstance(decision["rule"], str) or len(decision["rule"]) > 48
+                or decision["agent"] not in ("local", "claude", "codex", "dual")
+                or not isinstance(decision["instructionSha256"], str) or len(decision["instructionSha256"]) != 64
+                or not isinstance(decision["forbidden"], list) or len(decision["forbidden"]) > 16
+                or any(not isinstance(x, str) or len(x) > 32 for x in decision["forbidden"])
+                or not isinstance(decision["externalAllowed"], bool) or not isinstance(decision["externalEnabled"], bool)):
+            raise TaskError("Invalid route decision")
+        self.get(task_id)
+        with self.lock, self._transition():
+            self._event(task_id, None, "route.decided", dict(decision))
+        return self.get(task_id)
+
     def record_model_proposal(self, task_id, model_name, prompt, proposal):
         """Link a model proposal to a durable task without storing the prompt."""
         if not isinstance(prompt, str) or not isinstance(proposal, dict):

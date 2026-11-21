@@ -11,7 +11,8 @@
 | `aiws_mcp.py` | 只读 MCP stdio 门面，经 Agent/Broker 转发 |
 | `aiws_toolplane.py` | 工具实现和静态工具清单；不是安全沙箱 |
 | `aiws_guest_ops.py` | 受限的客户机服务/内核候选操作 |
-| `aiws_local_model.py` | 可选 GGUF/llama.cpp 建议及拒绝协议 |
+| `aiws_local_model.py` | 可选 GGUF/llama.cpp 建议、读/写分级、多步计划及拒绝协议 |
+| `aiws_model_router.py` | 规则路由（本地 / 外部官方 CLI / 询问用户）、拒绝不升级、交接文件；不联网、不启动进程 |
 | `aiws_windows_compat.py` | Windows 历史证据导入，不继承审批 |
 | `aiws_guest_boundary.py` | 客户机路径/运行环境约束；不构成宿主隔离 |
 

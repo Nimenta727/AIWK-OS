@@ -58,6 +58,8 @@ class TaskProxy:
         return self.agent.request("task.dispatch",{"id":identifier,"key":key})
     def model_plan(self,instruction,proposal):
         return self.agent.request("task.model",{"instruction":instruction,"proposal":proposal})
+    def route(self,identifier,decision):
+        return self.agent.request("task.route",{"id":identifier,"route":decision})
     def verify_audit(self):
         return self.agent.request("audit.verify")
     def close(self):

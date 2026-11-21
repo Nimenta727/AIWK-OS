@@ -12,6 +12,11 @@ type WindowsHistory={sourceSha256:string;executable:boolean;requiresToolMapping:
 type TaskDetail={task:TaskHeader;stages:Stage[];windowsImport?:WindowsHistory};
 type ModelStatus={configured:boolean;online:boolean;cloudFallback:boolean;model:string;automaticExecution:boolean;cpuOnly:boolean;weightsPresent:boolean};
 type Step={tool:string;arguments:Record<string,string>;reason:string;grade?:string};
+type Bilingual={zh:string;en:string};
+type Decision={route:string;agent:string;rule:string;reason:Bilingual;forbidden:string[];externalAllowed:boolean;externalEnabled:boolean;
+ providers:Record<string,{enabled:boolean;installed:boolean}>;requiresConsent:boolean};
+type FollowUp={escalate:boolean;final:boolean;action:string;agent?:string;reason?:Bilingual};
+type RouteInfo={decision:Decision;followUp?:FollowUp;error?:string;refused?:boolean};
 type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean;refused?:boolean;grade?:string;steps?:Step[]};
 const READ_ONLY=new Set(['workspace.tree','file.read','file.stat','file.trashList','code.search','git.inspect','runtime.detect','browser.local_text','platform.inspect','code.symbols','code.references','code.dependencies','code.platformApis','system.info','network.status','download.list','download.progress']);
 
@@ -37,6 +42,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
  const [instruction,setInstruction]=useState('');
  const [model,setModel]=useState<ModelStatus|null>(null);
  const [proposal,setProposal]=useState<Proposal|null>(null);
+ const [routeInfo,setRouteInfo]=useState<RouteInfo|null>(null);
+ const [routeCfg,setRouteCfg]=useState<{externalEnabled:boolean}|null>(null);
  const [error,setError]=useState('');
  const [busy,setBusy]=useState(false);
  const headers={'Content-Type':'application/json','X-AIWS-CSRF':csrf};
@@ -44,7 +51,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   try{
    const rows=await request<{tasks:TaskHeader[]}>('/tasks');
    setTaskList(rows.tasks);
-   if(focus==='model')setModel(await request<ModelStatus>('/model/status'));
+   if(focus==='model'){setModel(await request<ModelStatus>('/model/status'));
+    setRouteCfg((await request<{config:{externalEnabled:boolean}}>('/route/config')).config);}
   }catch(e){setError(String(e));}
  },[focus]);
  useEffect(()=>{void update();},[update]);
@@ -151,12 +159,24 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   try{
    // The model proposes one tool or an ordered plan. The server persists an audited DAG:
    // local read-only stages run automatically; file-changing stages wait for approval.
-   const item=await request<TaskDetail|{refused:true;proposal:Proposal}>('/model/plan',{
+   setRouteInfo(null);
+   const item=await request<TaskDetail|{refused:true;proposal:Proposal;decision:Decision;followUp:FollowUp}|
+    {routed:string;decision:Decision;followUp?:FollowUp;error?:string}>('/model/plan',{
     method:'POST',headers,body:JSON.stringify({instruction})
    });
-   if('refused' in item){setProposal(item.proposal);return;}
+   if('refused' in item){setProposal(item.proposal);setRouteInfo({decision:item.decision,followUp:item.followUp,refused:true});return;}
+   if('routed' in item){setRouteInfo({decision:item.decision,followUp:item.followUp,error:item.error});return;}
    await update();
    await open(item.task.id);
+  }catch(e){setError(String(e));}
+  finally{setBusy(false);}
+ };
+ const createHandoff=async(agent:string)=>{
+  if(!csrf||busy||!instruction.trim())return;
+  setBusy(true);setError('');
+  try{
+   const out=await request<{task:{id:string}}>('/route/handoff',{method:'POST',headers,body:JSON.stringify({instruction,agent})});
+   await update();await open(out.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
@@ -191,6 +211,21 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     onClick={()=>void suggest()}><BrainCircuit size={16}/>{tr('生成本地工具建议','Suggest a local tool')}</button>
    <button type="button" disabled={!model?.online||!csrf||busy||!instruction.trim()}
     onClick={()=>void createOfflinePlan()}>{tr('生成并保存待审核任务','Create a pending audited task')}</button>
+   <p className="aiws-os-muted">{routeCfg?.externalEnabled?
+    tr('外部官方 CLI 已在 routes.json 启用：仅在你确认后生成交接文件，AIWS 不会自动调用它们。','External official CLIs are enabled in routes.json: a handoff file is only prepared after your consent; AIWS never launches them.'):
+    tr('外部模型默认关闭，所有请求只在本机离线处理（可在 ~/.config/aiws/routes.json 启用交接）。','External models are off by default: everything stays on this machine (enable handoff in ~/.config/aiws/routes.json).')}</p>
+   {routeInfo&&<div className="aiws-os-proposal" role="status" data-aiws="route-card">
+    <strong>{tr('路由决定','Routing decision')}: {routeInfo.decision.route}{routeInfo.decision.agent!=='local'?' → '+routeInfo.decision.agent:''}</strong>
+    <p>{english?routeInfo.decision.reason.en:routeInfo.decision.reason.zh}</p>
+    {routeInfo.decision.forbidden.length>0&&<p className="aiws-os-muted">{tr('命中受限类别：','Restricted categories: ')}{routeInfo.decision.forbidden.join(', ')}</p>}
+    {routeInfo.error&&<p className="aiws-os-muted">{routeInfo.error}</p>}
+    {routeInfo.followUp?.reason&&<p>{english?routeInfo.followUp.reason.en:routeInfo.followUp.reason.zh}</p>}
+    {(routeInfo.decision.route==='external'||routeInfo.followUp?.action==='propose-handoff')&&routeInfo.decision.externalAllowed&&
+     <><p className="aiws-os-muted">{tr('将写入工作区 handoff/ 的文件只含指令和文件名，不含文件内容或凭据；写入本身需要你批准。','The file written to handoff/ holds only your instruction and file names: no contents or credentials; writing it needs your approval.')}</p>
+      <button type="button" disabled={busy||!csrf} onClick={()=>void createHandoff(routeInfo.followUp?.agent||routeInfo.decision.agent)}>
+       {tr('生成交接文件（需批准）','Prepare handoff file (needs approval)')}</button></>}
+    {Object.entries(routeInfo.decision.providers).map(([name,p])=><span key={name} className="aiws-os-muted"> {name}: {p.enabled?tr('已启用','enabled'):tr('未启用','disabled')} / {p.installed?tr('已安装','installed'):tr('本机未安装','not installed here')} </span>)}
+   </div>}
    {proposal&&<div className="aiws-os-proposal">
     <strong>{proposal.steps?tr('多步计划','Multi-step plan')+' ('+proposal.steps.length+')':proposal.tool}</strong><p>{proposal.reason}</p>
     {proposal.steps?<ol>{proposal.steps.map((s,i)=><li key={i}><code>{s.tool}</code> {JSON.stringify(s.arguments)} — {s.reason}
