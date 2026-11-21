@@ -1,60 +1,44 @@
-# Documentation / 文档总导航
+# 文档中心 / Documentation
 
-> v1.9.0-preview.1 · Engineering Preview. Historical documents retain their original claims; read the current README for active behavior.
->
-> **中文：** 历史资料继续保留原始修改、验证和限制。此页面提供中英简介和新版发行入口。
->
-> **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
+> **当前事实优先 / Current status first.** 本索引区分正在维护的工程规范、版本历史资料和开发日志。旧文档的“已完成”陈述仅对其当时版本有效，不应当作当前发行承诺。
 
-## AIWS OS / AI 虚拟机操作系统
-- [Permission Broker / 独立权限决策](AIWS_PERMISSION_BROKER.md) — same-UID PDP、SQLite 执行证据、拒绝和未来内核隔离边界
-- [OS 生产级验收 / Firmware, native Shell and permission architecture](AIWS_OS_PRODUCTION_GATES.md) — 固件启动、桌面输入闭环及权限隔离分层验收
-- [内置模型微调与独立评测 / Fine-tuning and held-out evaluation standard](AIWS_MODEL_FINETUNING_STANDARD.md) — 供外部贡献者执行的数据、拒绝率、延迟/RSS、质量门禁、LoRA 与回滚规范
-- [Windows → Linux Agent 历史投影 / Migration mapping](AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md) — 计划版本、AgentRun、WorkItems、ExecutionRecords 的不可执行受界映射
-- [AIWS 小模型与本地推理 / Offline local assistant](AIWS_LOCAL_MODEL.md) — guest-only llama.cpp、模型权限、评测与 LoRA 准备
-- [AIWS OS 强制四项验收 / Four priority acceptance gates](AIWS_OS_PRIORITY_GATES.md) — P0 GUI、P0 Linux 统一任务/DAG、P1 NixOS 真正构建与启动、P1 guest-only 权限与恢复
-- [模块化系统重构 / Modular AI-native OS](AIWS_MODULAR_OS.md) — NixOS/Debian 镜像适配、共用 React、系统 Agent 和真实开机验证
-- [代码智能索引 / Cross-platform code intelligence](AIWS_CODE_INTELLIGENCE.md) — C#/Swift 符号、跨文件引用候选、MSBuild/SwiftPM 依赖与平台 API 证据
-- [Windows/macOS 跨平台源码 / Cross-platform authoring](AIWS_CROSS_PLATFORM_AUTHORING.md) — 在 Linux 客户机生成、阅读、编辑 Windows/macOS 源工程；无需专有 SDK
-- [AI 原生工具接口 / Agent tool fabric](AIWS_AGENT_TOOL_FABRIC.md) — MCP stdio、代码、浏览器、语言运行与隔离约束 / machine-callable guest tools
-- [OS 工程 / OS project](../os/README.md) — Debian Live 镜像、内置开发工具和宿主离线启动 / image build, bundled developer tools, offline-first host launch
-- [OS 深度定制蓝图 / OS kernel & isolation blueprint](AIWS_OS_BLUEPRINT.md) — 内核选项、Agent 管理员权限、虚拟机外部安全边界 / kernel profile, privileged agents, external VM boundaries
+## 从这里开始 / Start here
 
-## 当前版本 / Current release
-- [主 README / Main README](../README.md) — 双语安装、使用和安全说明 / bilingual installation, usage and safety
-- [发行说明 / Release notes](RELEASE_NOTES_V19.md) — 当前预览内容 / preview changes
-- [发行检查 / Release checklist](RELEASE_CHECKLIST.md) — CI 与 Hyper-V 手动验收 / automated versus manual gates
-- [内部执行透视 / Internal Observatory](INTERNAL_OBSERVATORY_V19.md) — 调用证据、上下文和 Git 结构 / evidence-linked internal execution
-- [安全边界 / Security](SECURITY.md) — 权限与凭据 / permissions and credentials
-- [路线图 / Roadmap](ROADMAP.md) — 计划与未完成能力 / future work, not shipped claims
+| 主题 | 主要文档 | 内容 |
+| --- | --- | --- |
+| 产品和安装 | [Root README](../README.md) | Windows 工作台与 Linux OS 的区别、使用方式和限制 |
+| 代码结构 | [CODEBASE_MAP](CODEBASE_MAP.md) | 目录职责、入口、数据流、可修改边界 |
+| Linux 系统构建 | [OS README](../os/README.md) | Debian 构建、QEMU、NixOS 与验证命令 |
+| Windows 版本发布 | [Release checklist](RELEASE_CHECKLIST.md) | 自动与人工验收、发行包要求 |
+| 安全与权限 | [SECURITY](SECURITY.md) · [Permission Broker](AIWS_PERMISSION_BROKER.md) | 信任边界、应用层授权、未完成的强制隔离 |
+| 当前 OS 验收 | [OS production gates](AIWS_OS_PRODUCTION_GATES.md) | 固件、Shell、权限、模型和真实证据 |
+| 开发记录 | [Routine](routine/README.md) | 每次提交的时间、改动、验证和下一步 |
+| 旧版技术设计 | [History](HISTORY.md) | 历史版本索引及 Git 保留方式 |
 
-## 设计与版本资料 / Versioned technical notes
-- [ARCHITECTURE.md](ARCHITECTURE.md) — 架构与上游参考 / Architecture and upstream references
-- [DESKTOP_REBUILD.md](DESKTOP_REBUILD.md) — Windows 原生桌面 / Windows native desktop
-- [DEVELOPER_MODULES_V11.md](DEVELOPER_MODULES_V11.md) — Git 工具及权限 / Git tools and permissions
-- [EXECUTION_ATLAS_V17.md](EXECUTION_ATLAS_V17.md) — 执行调用与结构演化 / Execution and structural changes
-- [EXECUTION_BASE_REVIEW_V07.md](EXECUTION_BASE_REVIEW_V07.md) — 执行持久化与恢复 / Execution persistence and recovery
-- [IMPLEMENTATION_V13_V16.md](IMPLEMENTATION_V13_V16.md) — Worktree、ConPTY、事件账本、DAG / Worktrees, ConPTY, ledger, DAG
-- [MODULAR_RECOMPOSITION_V1.md](MODULAR_RECOMPOSITION_V1.md) — 独立前端模块重组 / Independent modular front-end
-- [PLAN_STUDIO_V171.md](PLAN_STUDIO_V171.md) — Markdown 计划中心 / Markdown Plan Studio
-- [PROFESSIONAL_FRONTENDS.md](PROFESSIONAL_FRONTENDS.md) — 旧上游整套前端方案 / Legacy hosted upstream UIs
-- [PROJECT_EVIDENCE_V12.md](PROJECT_EVIDENCE_V12.md) — Git 文件证据 / Project/Git evidence
-- [REQUEST_TRACE.md](REQUEST_TRACE.md) — 请求追踪与 Token / Request tracing and tokens
-- [ROADMAP.md](ROADMAP.md) — 产品规划 / Product roadmap
-- [SECURITY.md](SECURITY.md) — 安全边界 / Security boundaries
-- [TOKEN_EFFICIENCY_V172.md](TOKEN_EFFICIENCY_V172.md) — 上下文预算与消耗控制 / Context budgets and token optimization
-- [UI_STUDIO_V181.md](UI_STUDIO_V181.md) — Studio UI 与交互 / Studio UI and interaction tests
-- [UNIFIED_AGENT_CONTROL_PLANE.md](UNIFIED_AGENT_CONTROL_PLANE.md) — 统一 Agent 控制平面 / Unified agent control plane
-- [UNIFIED_ORCHESTRATION_V18.md](UNIFIED_ORCHESTRATION_V18.md) — 多 Agent 调度 / Agent orchestration
-- [UNIFIED_TASK_IMPLEMENTATION.md](UNIFIED_TASK_IMPLEMENTATION.md) — 统一任务与上下文编译 / Unified tasks and context compilation
-- [UPSTREAM_MIGRATION.md](UPSTREAM_MIGRATION.md) — 开源迁移与许可 / Upstream migration and licensing
-- [V03_OPERATIONS.md](V03_OPERATIONS.md) — 旧版 Python 原型 / Legacy Python operations
+## AIWS OS / Linux 系统工程
 
-## 历史记录 / Historical records
-[完整时间索引 / Complete chronology](routine/README.md) · [GitHub Actions](https://github.com/Nimenta727/Windows-AI-Workstation/actions)
+- [Guest Agent、系统服务、内核候选](AIWS_GUEST_AGENT_SYSTEM_KERNEL.md) — 持久任务 DAG、systemd 和实验性引导管理。
+- [Permission Broker](AIWS_PERMISSION_BROKER.md) — 独立同 UID 决策服务；**不是**内核 MAC。
+- [OS production gates](AIWS_OS_PRODUCTION_GATES.md) — ISO BIOS/UEFI、GUI、模型、权限验收。
+- [OS priority gates](AIWS_OS_PRIORITY_GATES.md) — 早期 P0/P1 阶段检查；以最新 production gates 为准。
+- [Modular OS](AIWS_MODULAR_OS.md) — Debian/NixOS 适配架构。
+- [Agent tool fabric](AIWS_AGENT_TOOL_FABRIC.md) — 只读 MCP、Agent/Broker 调用链和工具边界。
+- [Local model](AIWS_LOCAL_MODEL.md) — GGUF/llama.cpp 本地推理与受控建议。
+- [Fine-tuning standard](AIWS_MODEL_FINETUNING_STANDARD.md) — 数据、LoRA、独立评测、延迟/RSS 与回滚。
+- [Windows → Linux mapping](AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md) — 历史记录不可执行投影。
+- [Code intelligence](AIWS_CODE_INTELLIGENCE.md) · [Cross-platform authoring](AIWS_CROSS_PLATFORM_AUTHORING.md) — C#/Swift 代码阅读和源码工程支持。
+- [OS kernel and isolation blueprint](AIWS_OS_BLUEPRINT.md) — 目标设计；**不等于已交付内核**。
 
-> 本次添加双语导读和索引，**不等于逐句完成所有历史资料全文翻译**。原始记录保持可审计。
-> 
-> Bilingual abstracts and links are supplied without claiming word-for-word translations of every historical page.
+## Windows 工作台 / Desktop workstation
 
-- [AIWS OS unified guest model, persistent agent, system services and kernel candidate pipeline](AIWS_GUEST_AGENT_SYSTEM_KERNEL.md) — 客户机系统整合进展与验收条件
+- [Desktop rebuild](DESKTOP_REBUILD.md) — WPF/.NET 与 WebView2。
+- [Unified Agent control plane](UNIFIED_AGENT_CONTROL_PLANE.md) — Windows Agent 控制层设计。
+- [Unified tasks](UNIFIED_TASK_IMPLEMENTATION.md) · [Orchestration](UNIFIED_ORCHESTRATION_V18.md) — 任务、DAG、执行器与上下文。
+- [Internal observatory](INTERNAL_OBSERVATORY_V19.md) — 执行证据与 UI 可视化。
+- [Release notes](RELEASE_NOTES_V19.md) · [Release checklist](RELEASE_CHECKLIST.md) — v1.9 Windows 预览发行资料。
+
+## 历史、设计草案和审计 / History and evidence
+
+旧版 V0.x/V1.x 技术资料仍可在 [历史导航](HISTORY.md) 找到；它们是**版本快照**，不是当前功能表。每次开发变更的完整证据在 [docs/routine](routine/README.md)，旧 README 和代码可从 Git 提交历史读取。
+
+**English:** Use the current README and OS production gates for present capabilities. Historical versioned documents and dated logs remain available for traceability, but their implementation and acceptance claims are scoped to their original commits.
