@@ -68,3 +68,9 @@ class ReadOnlySystemProxy:
         if approved or tool not in READ_TOOLS:
             raise AgentError("Guest system writes must be approved as persistent DAG stages")
         return self.agent.request("guest.read",{"tool":tool,"arguments":args})
+
+class ReadOnlyToolProxy:
+    def __init__(self,agent):
+        self.agent=agent
+    def invoke(self,tool,args):
+        return self.agent.request("tool.read",{"tool":tool,"arguments":args})

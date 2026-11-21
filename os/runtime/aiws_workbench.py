@@ -19,7 +19,7 @@ from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_model_registry import GuestModelRegistry
-from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, AgentUnavailable, AgentError
+from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError
 import subprocess
 
@@ -54,6 +54,7 @@ class Controller:
             state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
             protect_guest_workspace(state_home.resolve(strict=True))
         self.agent = AgentClient() if singleton else None
+        self.file_tools = ReadOnlyToolProxy(self.agent) if self.agent is not None else None
         if self.agent is not None:
             self.agent.request("health")
             self.tasks = TaskProxy(self.agent)
@@ -277,9 +278,13 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == "/api/v1/workspace/tree":
             try:
-                result = invoke("workspace.tree", {"path": "."})
-                audit("workspace.tree", {"path": "."}, True)
+                result = (app.file_tools.invoke("workspace.tree", {"path": "."})
+                          if app.file_tools is not None else invoke("workspace.tree", {"path": "."}))
+                if app.file_tools is None:
+                    audit("workspace.tree", {"path": "."}, True)
                 return self.reply(200, result)
+            except AgentUnavailable as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/workspace/file":
@@ -288,8 +293,10 @@ class Handler(BaseHTTPRequestHandler):
             if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
                 return self.reply(400, {"error": "One bounded guest-workspace path required"})
             try:
-                result = invoke("file.read", {"path": paths[0]})
-                audit("file.read", {"path": paths[0]}, True)
+                result = (app.file_tools.invoke("file.read", {"path": paths[0]})
+                          if app.file_tools is not None else invoke("file.read", {"path": paths[0]}))
+                if app.file_tools is None:
+                    audit("file.read", {"path": paths[0]}, True)
                 return self.reply(200, result)
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})

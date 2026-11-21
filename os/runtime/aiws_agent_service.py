@@ -14,7 +14,7 @@ from aiws_guest_boundary import protect_guest_workspace, require_guest_runtime
 from aiws_guest_ops import GuestOperations, TOOLS as SYSTEM_TOOLS, READ_TOOLS
 from aiws_local_model import LocalPlanner
 from aiws_tasks import GuestTaskStore, TaskError
-from aiws_toolplane import invoke, audit
+from aiws_toolplane import invoke, audit, catalog as tool_catalog
 
 class AgentError(ValueError):
     pass
@@ -97,6 +97,22 @@ class AgentCore:
         if op=="audit.verify":
             fields(a,set())
             return self.tasks.verify_audit()
+        if op=="tool.read":
+            fields(a,{"tool","arguments"})
+            readonly={"workspace.tree","file.read","code.search","git.inspect",
+                      "runtime.detect","browser.local_text","platform.inspect",
+                      "code.symbols","code.references","code.dependencies","code.platformApis"}
+            if a["tool"] not in readonly:
+                raise AgentError("Direct guest tool IPC limited to read-only actions")
+            if not isinstance(a["arguments"],dict):
+                raise AgentError("Tool arguments object required")
+            spec=next((t["inputSchema"] for t in tool_catalog() if t["name"]==a["tool"]),None)
+            if spec is None or set(a["arguments"])-set(spec["properties"]) or any(
+                    k not in a["arguments"] for k in spec["required"]):
+                raise AgentError("Invalid read-only tool arguments")
+            result=invoke(a["tool"],a["arguments"])
+            audit(a["tool"],a["arguments"],True)
+            return result
         if op=="guest.read":
             fields(a,{"tool","arguments"})
             if a["tool"] not in READ_TOOLS:

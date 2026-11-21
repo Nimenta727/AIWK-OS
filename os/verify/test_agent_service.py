@@ -62,6 +62,19 @@ class StandaloneAgentTests(unittest.TestCase):
         self.assertTrue(self.client.request("audit.verify")["valid"])
         self.assertTrue(self.client.request("task.list"))
 
+    def test_file_reads_are_guest_agent_ops_not_host_or_direct_write(self):
+        result=self.client.request("tool.read",
+            {"tool":"workspace.tree","arguments":{"path":"."}})
+        self.assertIn("source.txt",result["files"])
+        doc=self.client.request("tool.read",
+            {"tool":"file.read","arguments":{"path":"source.txt"}})
+        self.assertEqual(doc["text"],"Guest only")
+        with self.assertRaises(AgentError):
+            self.client.request("tool.read",{"tool":"file.replace",
+                "arguments":{"path":"source.txt","text":"host","expectedSha256":""}})
+        with self.assertRaises(AgentError):
+            self.client.request("tool.read",{"tool":"runtime.test","arguments":{"language":"python"}})
+
     def test_model_proposal_pending_and_kernel_write_guard(self):
         proposal={"tool":"file.read","arguments":{"path":"source.txt"},
                   "reason":"Review guest file"}
