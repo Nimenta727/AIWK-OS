@@ -335,12 +335,26 @@ class GuestTaskStore:
             if row["state"] != "running":
                 raise TaskError("Expected running stage")
             state = "failed" if error else "completed"
-            # Audit only evidence metadata, not arbitrary workspace file contents.
-            digest = hashlib.sha256(encode(result).encode("utf-8")).hexdigest() if result is not None else None
+            # Never truncate raw JSON text: a completed task must remain
+            # readable after the independent guest Agent and UI both restart.
+            stored, digest, truncated = None, None, False
+            if result is not None:
+                original = encode(result).encode("utf-8")
+                digest = hashlib.sha256(original).hexdigest()
+                if len(original) > 65536:
+                    truncated = True
+                    stored = encode({
+                        "truncated": True,
+                        "preview": original[:32000].decode("utf-8", errors="ignore"),
+                        "originalSha256": digest,
+                    })
+                else:
+                    stored = original.decode("utf-8")
             self.db.execute(
                 "UPDATE stages SET state=?,result_json=?,error=? WHERE id=?",
-                (state, encode(result)[:65536] if result is not None else None,
-                 str(error)[:240] if error else None, row["id"]))
+                (state, stored, str(error)[:240] if error else None, row["id"]))
+            # Audit only hash/size metadata, never arbitrary workspace content.
             self._event(task_id, row["id"], "stage." + state,
-                        {"result_sha256": digest, "error": str(error)[:240] if error else None})
+                        {"result_sha256": digest, "truncated": truncated,
+                         "error": str(error)[:240] if error else None})
             return self.get(task_id)

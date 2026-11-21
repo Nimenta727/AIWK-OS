@@ -138,6 +138,33 @@ class TaskStoreTests(unittest.TestCase):
             (self.folder/suffix).unlink(missing_ok=True)
         self.store=GuestTaskStore(self.folder)
 
+    def test_large_unicode_result_remains_valid_json_and_hash_after_guest_restart(self):
+        import hashlib
+        doc=self.store.create("Large guest result","",[stage("inspect")])
+        tid=doc["task"]["id"]
+        self.store.dispatch(tid,"inspect")
+        self.store.started(tid,"inspect")
+        raw={"text":"项目" * 60000, "other":{"count":1}}
+        original_hash=hashlib.sha256(
+            json.dumps(raw,sort_keys=True,separators=(",",":"),
+                       ensure_ascii=False).encode("utf-8")).hexdigest()
+        output=self.store.finished(tid,"inspect",result=raw)
+        value=output["stages"][0]["result"]
+        self.assertEqual(output["stages"][0]["state"],"completed")
+        self.assertTrue(value["truncated"])
+        self.assertEqual(value["originalSha256"],original_hash)
+        self.assertLess(len(json.dumps(value).encode("utf-8")),65536)
+        evidence=[x for x in self.store.audit(tid) if x["action"]=="stage.completed"]
+        self.assertEqual(len(evidence),1)
+        self.assertEqual(json.loads(evidence[0]["details"])["result_sha256"],original_hash)
+        self.assertTrue(self.store.verify_audit()["valid"])
+        self.store.close()
+        self.store=GuestTaskStore(self.folder)
+        persisted=self.store.get(tid)["stages"][0]["result"]
+        self.assertTrue(persisted["truncated"])
+        self.assertEqual(persisted["originalSha256"],original_hash)
+        self.assertTrue(self.store.verify_audit()["valid"])
+
     def test_restart_marks_queued_and_running_interrupted(self):
         doc = self.store.create("Recover", "", [stage("first")])
         taskid = doc["task"]["id"]
