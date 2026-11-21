@@ -8,10 +8,6 @@ on:
       - 'release/PREVIEW.env'
   workflow_dispatch:
 
-concurrency:
-  group: release-preview
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
