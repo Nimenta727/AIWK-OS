@@ -42,9 +42,9 @@ while IFS= read -r module; do
   cp -a -- "$repo/os/runtime/$module" "$out/config/includes.chroot/usr/local/lib/aiws/$module"
 done < "$repo/os/runtime/MODULES"
 cp -- "$repo/os/verify/aiws_guest_lifecycle_smoke.py" "$out/config/includes.chroot/usr/local/lib/aiws/aiws_guest_lifecycle_smoke.py"
-ui="$repo/desktop/AIWorkstation.Frontend/dist"
+ui="$repo/workbench/dist"
 if [[ ! -s "$ui/index.html" ]]; then
-  echo "ERROR: Build the shared React workbench first (cd desktop/AIWorkstation.Frontend && npm install && npm run build)." >&2
+  echo "ERROR: Build the React workbench first (cd workbench && npm install && npm run build)." >&2
   exit 1
 fi
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"

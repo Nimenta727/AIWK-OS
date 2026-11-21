@@ -710,8 +710,6 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/v1/jobs/"):
             job = app.job(path.removeprefix("/api/v1/jobs/"))
             return self.reply(200, job) if job else self.reply(404, {"error": "Unknown job"})
-        if path == "/os-bridge.js":
-            return self.reply(200, b"window.__AIWS_OS_WORKBENCH__ = true;\n", "text/javascript")
         if path == "/":
             try:
                 source = (app.ui / "index.html").read_text(encoding="utf-8")
@@ -719,7 +717,6 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Missing head")
             except (OSError, ValueError):
                 return self.reply(503, {"error": "React workbench assets missing"})
-            source = source.replace("</head>", '<script src="/os-bridge.js"></script></head>', 1)
             return self.reply(200, source.encode("utf-8"), "text/html; charset=utf-8")
         if not path.startswith("/assets/"):
             return self.reply(404, {"error": "Not found"})

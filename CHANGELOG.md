@@ -31,4 +31,4 @@
 - 发行前仍需 SBOM、模型权重许可确认与根 NOTICE（见 `docs/THIRD_PARTY.md`）。
 
 ## 1.9.0-preview.1
-Windows 原生工作台预览（WPF/.NET + WebView2）。详见 [docs/RELEASE_NOTES_V19.md](docs/RELEASE_NOTES_V19.md)。
+Windows 原生工作台预览（WPF/.NET + WebView2）。详见 [docs/history/RELEASE_NOTES_V19.md](docs/history/RELEASE_NOTES_V19.md)（该产品线已移入 Git 历史）。

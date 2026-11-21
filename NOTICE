@@ -5,8 +5,9 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 This product includes or builds upon third-party software that keeps its own license and copyright:
 
-  * T3 Code (https://github.com/pingdotgg/t3code) - MIT License, Copyright (c) 2026 T3 Tools Inc.
-    Three small UI primitives were adapted; see third_party/t3code/NOTICE.md (the upstream MIT text is kept there).
+  * Historical note: earlier revisions adapted three small UI primitives from T3 Code (MIT License, Copyright (c) 2026 T3 Tools Inc.)
+    in the Windows UI. That UI was removed from the working tree; the code and the upstream MIT text remain in git history
+    (commit f6d5090 and earlier, path third_party/t3code/NOTICE.md).
 
   * Code - OSS (https://github.com/microsoft/vscode) - MIT License, Copyright (c) Microsoft Corporation.
     NOT stored in this repository. It is fetched at a pinned commit and rebuilt as "AIWS Code" (see os/ide/).

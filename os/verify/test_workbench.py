@@ -62,7 +62,7 @@ class WorkbenchTests(unittest.TestCase):
         self.assertFalse(health["agentPrivileged"])
         status, html = self.request("GET", "/")
         self.assertEqual(status, 200)
-        self.assertIn(b"os-bridge.js", html)
+        self.assertNotIn(b"os-bridge.js", html)                       # one UI only: no Windows/Linux mode switch any more
         self.assertEqual(self.request("GET", "/assets/main.js")[0], 200)
         self.assertEqual(self.request("GET", "/../../etc/passwd")[0], 404)
         self.assertEqual(self.request("GET", "/api/v1/health", headers={"Host": "attacker.invalid"})[0], 403)

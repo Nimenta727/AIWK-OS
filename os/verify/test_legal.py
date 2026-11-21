@@ -12,18 +12,19 @@ class LegalConsistencyTests(unittest.TestCase):
         self.assertIn("Apache-2.0", self.read("README.md"))
         for rel in ("README.md", "os/README.md", "docs/CODEBASE_MAP.md"):
             self.assertNotRegex(self.read(rel), r"(当前|currently)\s*MIT|仓库.{0,6}MIT 许可证", rel)
-        self.assertEqual(json.loads(self.read("desktop/AIWorkstation.Frontend/package.json")).get("license"), "Apache-2.0")
+        self.assertEqual(json.loads(self.read("workbench/package.json")).get("license"), "Apache-2.0")
 
     def test_notice_credits_third_parties_and_disclaims_trademarks(self):
         n = self.read("NOTICE")
-        for needle in ("Apache License, Version 2.0", "T3 Tools Inc.", "Code - OSS", "Microsoft Corporation",
+        for needle in ("Apache License, Version 2.0", "Code - OSS", "Microsoft Corporation",
                        "not affiliated with or endorsed by Microsoft", "ThirdPartyNotices.txt"):
             self.assertIn(needle, n)
 
-    def test_adapted_mit_code_keeps_its_license_text(self):
-        t = self.read("third_party/t3code/NOTICE.md")
-        self.assertIn("Permission is hereby granted, free of charge", t)
-        self.assertIn("Copyright (c) 2026 T3 Tools Inc.", t)
+    def test_no_third_party_source_is_vendored_in_the_tree(self):
+        # The only adapted third-party UI code (T3 Code primitives) lived in the removed Windows UI; it is in git history
+        # together with its MIT notice. Nothing third-party is stored in the working tree any more.
+        self.assertFalse((ROOT / "third_party").exists())
+        self.assertFalse(list((ROOT / "workbench/src").rglob("T3*")))
 
     def test_repository_does_not_vendor_microsoft_code_or_marks(self):
         # Code - OSS is fetched at build time; nothing of it (or its logo) may be committed here.

@@ -74,7 +74,7 @@ jobs:
         timeout-minutes: 36
         run: |
           set -Eeuo pipefail
-          cd desktop/AIWorkstation.Frontend
+          cd workbench
           npm install --no-audit --no-fund
           npm run build
           cd "$GITHUB_WORKSPACE"

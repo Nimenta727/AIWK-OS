@@ -18,7 +18,6 @@
 | lucide-react | 图标 | ISC | npm 依赖 |
 | xterm.js 及 fit 插件 | 终端界面 | MIT | npm 依赖 |
 | Playwright | 浏览器自动化测试 | Apache-2.0 | 仅开发/测试依赖，不进入镜像 |
-| t3code（适配的 UI 思路与代码） | 前端来源之一 | MIT，© T3 Tools Inc. | 见 `third_party/t3code/NOTICE.md`，上游 MIT 全文保留 |
 | poppler-utils（pdftotext）、pandoc | 文档阅读器与 `doc.text` 的转换 | GPL（poppler）/ GPL（pandoc）：通过 Debian 包安装、以独立进程调用，不链接进本项目代码 | 随 ISO 分发时须满足 GPL 的源码提供义务 |
 | 字体（FiraCode、JetBrains Mono、Hack、Noto CJK 等） | 编程字体 | 各字体各自许可（多为 OFL） | Debian 包 |
 
