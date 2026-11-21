@@ -1,0 +1,8 @@
+#!/bin/sh
+# Interactive guest-administrator-only kernel A/B manager. No AI, no host.
+set -eu
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Only a manually authorized guest root session may manage EFI kernel slots" >&2
+  exit 1
+fi
+exec python3 /usr/local/lib/aiws/aiws_boot_slots.py "$@"
