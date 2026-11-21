@@ -56,9 +56,26 @@ class AiwsOsContract(unittest.TestCase):
         self.assertIn("windowactivate --sync", smoke)
         self.assertIn("El Torito boot img", firmware)
         self.assertIn("AIWS_FIRMWARE_ISO_PASS", firmware)
+        executable = "\n".join(x for x in firmware.splitlines()
+                               if not x.strip().startswith("#"))
         for forbidden in (" -kernel ", " -initrd ", "-virtfs", "-nic user"):
-            self.assertNotIn(forbidden, firmware)
+            self.assertNotIn(forbidden, executable)
         self.assertIn("firmware: [bios, uefi]", workflow)
+
+    def test_independent_broker_is_packaged_and_required(self):
+        build = (ROOT / "os/debian/build.sh").read_text()
+        agent = (CONFIG / "includes.chroot/etc/systemd/user/aiws-agent.service").read_text()
+        broker = (CONFIG / "includes.chroot/etc/systemd/user/aiws-permission-broker.service").read_text()
+        boot = (CONFIG / "includes.chroot/usr/local/bin/aiws-boot-smoke").read_text()
+        mcp = (ROOT / "os/runtime/aiws_mcp.py").read_text()
+        self.assertIn("aiws_permission_broker.py", build)
+        self.assertIn("aiws-broker", build)
+        self.assertIn("Requires=aiws-permission-broker.service", agent)
+        self.assertIn("NoNewPrivileges=yes", broker)
+        self.assertIn("RestrictAddressFamilies=AF_UNIX", broker)
+        self.assertIn("brokerReady", boot)
+        self.assertIn('AgentClient().request("tool.read"', mcp)
+
 
 if __name__ == "__main__":
     unittest.main()

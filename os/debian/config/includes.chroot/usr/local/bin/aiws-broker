@@ -1,0 +1,5 @@
+#!/bin/sh
+# Never elevate; no host interface and no network listener.
+set -eu
+if [ "$(id -u)" -eq 0 ]; then echo 'No root permission Broker' >&2; exit 1; fi
+exec python3 /usr/local/lib/aiws/aiws_permission_broker.py

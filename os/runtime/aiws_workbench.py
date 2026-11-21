@@ -66,9 +66,13 @@ class Controller:
         self.model = LocalPlanner()
 
     def health(self):
+        agent_health = self.agent.request("health") if self.agent is not None else {}
         return {"system": "AIWS OS", "mode": "linux-guest",
                 "agent": "systemd-user-agent" if self.agent else "embedded-test-agent",
-                "agentIndependentService": self.agent is not None, "llmConnected": self.model.status()["online"],
+                "agentIndependentService": self.agent is not None,
+                "brokerReady": bool(agent_health.get("brokerReady")),
+                "brokerScope": "same-uid-policy-only" if self.agent is not None else "embedded-test",
+                "llmConnected": self.model.status()["online"],
                 "agentPrivileged": False, "guestOnly": True,
                 "workspace": str(self.workspace),
                 "desktopInstalled": bool(shutil.which("xfce4-session")),
@@ -76,7 +80,7 @@ class Controller:
                 "uiBundled": (self.ui / "index.html").is_file(),
                 "toolCount": len(EXPOSED) + len(GUEST_OP_TOOLS), "tasksPersistent": True,
                 "serviceScope": "guest-user-allowlist", "kernelChanges": "candidate-only",
-                "note": "Optional offline LLM makes suggestions only; no guest privilege broker or host VM access."}
+                "note": "Optional offline LLM suggests only; same-UID unprivileged Broker is not mandatory OS sandboxing or host VM access."}
 
     def _remote_job(self, identifier):
         try:
@@ -347,7 +351,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.reply(200, {"services": [
                     app.guest_ops.execute("service.inspect", {"service": name})
-                    for name in ("aiws-workbench.service", "aiws-local-model.service")]})
+                    for name in ("aiws-workbench.service", "aiws-agent.service",
+                                 "aiws-permission-broker.service", "aiws-local-model.service")]})
             except (PermissionError, ValueError, OSError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/guest/kernel":

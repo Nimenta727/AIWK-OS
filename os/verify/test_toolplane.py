@@ -33,9 +33,23 @@ class ToolPlaneTests(unittest.TestCase):
         self.assertTrue({"file.read", "file.replace", "code.search",
                          "git.inspect", "runtime.test", "browser.snapshot"}.issubset(names))
         message = aiws_mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
-        self.assertEqual(len(message["result"]["tools"]), len(names))
+        mcp_names={item["name"] for item in message["result"]["tools"]}
+        self.assertTrue(mcp_names.issubset(names))
+        self.assertIn("file.read", mcp_names)
+        self.assertIn("code.symbols", mcp_names)
+        self.assertNotIn("file.replace", mcp_names)
+        self.assertNotIn("runtime.test", mcp_names)
+        self.assertNotIn("project.scaffold", mcp_names)
         init = aiws_mcp.handle({"jsonrpc": "2.0", "id": 2, "method": "initialize"})
         self.assertIn("serverInfo", init["result"])
+
+    def test_mcp_cannot_bypass_approval_with_mutating_tools(self):
+        response = aiws_mcp.handle({"jsonrpc": "2.0", "id": 17,
+            "method": "tools/call", "params": {"name": "file.replace",
+                "arguments": {"path": "escape.txt", "text": "bypass",
+                              "expectedSha256": ""}}})
+        self.assertTrue(response["result"]["isError"])
+        self.assertFalse((self.root / "escape.txt").exists())
 
     def test_file_read_write_sha_precondition(self):
         first = plane.invoke("file.replace",

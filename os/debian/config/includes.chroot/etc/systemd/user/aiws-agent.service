@@ -1,6 +1,7 @@
 [Unit]
 Description=AIWS persistent guest-only system Agent
-After=default.target
+After=default.target aiws-permission-broker.service
+Requires=aiws-permission-broker.service
 Before=aiws-workbench.service
 [Service]
 Type=simple

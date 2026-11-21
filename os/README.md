@@ -84,3 +84,19 @@ tests and separate ESP A/B fixture. Passing these CI tests is not proof
 of physical boot, CJK IME completeness, installer, secure update, or
 non-bypassable worker sandbox. See the
 [OS production gates](../docs/AIWS_OS_PRODUCTION_GATES.md).
+
+## Independent guest Permission Broker — experimental
+
+A second unprivileged systemd-user service verifies the exact persisted
+running DAG stage, tool argument JSON and approval state before the
+independent Agent dispatches the tool. All Agent direct reads and the
+public read-only MCP stdio catalog route through this Broker; missing
+Broker means denial, never a fallback. Once-per-run receipts and
+conservative cumulative write limits add application-level safeguards.
+The web UI reports whether the Broker actually responds.
+
+This is **same UID** as the Agent, not OS-mandatory enforcement, not
+TPM-backed tamper-proof logs, and not security against malicious guest
+users/root or host escape. Next build isolates the worker under distinct
+credentials with LSM/Landlock tests. Read
+[exact Broker threat model](../docs/AIWS_PERMISSION_BROKER.md).

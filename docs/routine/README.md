@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 13:30 — 独立权限 Broker 和 Agent/MCP 审批闭环](2026-11-21_1330-broker-pdp-policy-agent.md)
 - [2026-11-21 13:10 — 原生 BIOS/UEFI ISO 启动与桌面 Shell](2026-11-21_1310-firmware-iso-native-shell.md)
 
 - [2026-11-20 21:30 — 独立 AIWS OS 客户机工程 / Independent guest OS bootstrap](2026-11-20_2130-aiws-os-guest-bootstrap.md)

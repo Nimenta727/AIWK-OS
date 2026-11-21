@@ -43,8 +43,9 @@ The existing same-UID Agent and SQLite DAG gate high-risk writes by
 approval and tool allowlists. This is valuable application-level checking
 but **not** a Linux mandatory access-control boundary.
 
-Target in stages: a separate fail-closed, non-root Permission Broker that
-reads the persisted DAG and approves only its exact running stage,
+Implemented application-level candidate: a separate fail-closed, non-root
+same-UID Permission Broker that reads the persisted DAG and approves only
+its exact running stage,
 arguments and approval state; no forged Boolean from UI may authorize
 writes. Bind decisions to capability, workspace, execution identity,
 stage, risk budget and TTL. Test denial and loss of the Broker, malformed
@@ -78,9 +79,11 @@ tool calls, risk and retries, with fail-closed per-tool authorization.
 | --- | --- | --- |
 | Firmware | Two ISO firmware matrix jobs plus old direct-kernel diagnosis | Successful results for new CI, actual hardware and installer |
 | Shell | XFCE panel, Openbox, normal app, X11 input/clipboard checks | Full Chinese IME, all desktop UX and real-world peripherals |
-| Broker | Existing Agent-side allowlists and durable approvals | Separate PDP, then truly mandatory OS isolation |
+| Broker | Separate same-UID policy server, Agent/MCP fail-closed route and tests (CI pending) | Truly mandatory OS isolation under separate worker credentials |
 | Model | Qwen3.5-2B guest benchmark harness | Accepted model results and robust autonomous loop |
 | Migration | Windows evidence imported as non-executable history | Complete native live DAG mapping and review of tools |
 | Release | Debian experimental CI recipe | Update/rollback/installer/license/SBOM/accessibility/hardware |
 
 Always report implementation, CI evidence, and physical acceptance separately.
+
+Current code and limitations: [Independent Permission Broker](AIWS_PERMISSION_BROKER.md).

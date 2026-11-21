@@ -158,3 +158,12 @@ focus/Unicode clipboard check extends the existing real GUI/DAG tests.
 These are new acceptance mechanisms, not a claim of successful CI runs,
 bare-metal installation, mandatory sandboxing or stable OS release.
 See [production engineering gates](docs/AIWS_OS_PRODUCTION_GATES.md).
+
+### AIWS OS independent permission policy service (2026-11-21)
+
+The guest now includes a non-root, separate systemd user Permission Broker
+for persisted-running-stage and approval checks, one-use receipts, bounded
+write-stage budgets, and fail-closed Agent/MCP tool authorization.
+**This is a same-UID policy prototype, not a non-bypassable Linux sandbox.**
+See [Broker architecture](docs/AIWS_PERMISSION_BROKER.md). Real CI
+acceptance of this integration is separate from implementing the code.

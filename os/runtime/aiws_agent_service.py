@@ -14,6 +14,7 @@ from aiws_guest_boundary import protect_guest_workspace, require_guest_runtime
 from aiws_guest_ops import GuestOperations, TOOLS as SYSTEM_TOOLS, READ_TOOLS
 from aiws_local_model import LocalPlanner
 from aiws_tasks import GuestTaskStore, TaskError
+from aiws_permission_broker import BrokerClient, BrokerDenied
 from aiws_toolplane import invoke, audit, catalog as tool_catalog
 
 class AgentError(ValueError):
@@ -27,7 +28,8 @@ def socket_path():
     return expected/"aiws-agent"/"agent.sock"
 
 class AgentCore:
-    def __init__(self,workspace,state,singleton=True):
+    def __init__(self,workspace,state,singleton=True,broker=None):
+        self.broker=broker if broker is not None else BrokerClient()
         self.workspace=Path(workspace).resolve(strict=True)
         self.tasks=GuestTaskStore(Path(state)/"aiws",singleton=singleton)
         self.ops=GuestOperations(self.workspace,Path(state)/"aiws/kernel-candidates")
@@ -42,6 +44,9 @@ class AgentCore:
         try:
             self.tasks.started(tid,key)
             tool,args=action["tool"],action["arguments"]
+            # Policy is bound to the exact persisted, running DAG state.
+            # A missing Broker is a failed execution, never a permissive fallback.
+            self.broker.authorize_stage(tid,key,tool,args)
             result=(self.ops.execute(tool,args,approved=action["approvalGranted"])
                     if tool in SYSTEM_TOOLS else invoke(tool,args))
             serial=json.dumps(result,ensure_ascii=False)
@@ -62,7 +67,13 @@ class AgentCore:
         op,a=req["op"],req["args"]
         if op=="health":
             fields(a,set())
-            return {"ready":True,"scope":"guest-user","engine":"persistent-systemd-dag"}
+            try:
+                self.broker.authorize_read("runtime.detect",{})
+                broker_ready=True
+            except (BrokerDenied,OSError):
+                broker_ready=False
+            return {"ready":True,"scope":"guest-user","engine":"persistent-systemd-dag",
+                    "brokerReady":broker_ready,"brokerScope":"same-uid-policy-only"}
         if op=="task.list":
             fields(a,set())
             return self.tasks.list()
@@ -115,6 +126,7 @@ class AgentCore:
             if spec is None or set(a["arguments"])-set(spec["properties"]) or any(
                     k not in a["arguments"] for k in spec["required"]):
                 raise AgentError("Invalid read-only tool arguments")
+            self.broker.authorize_read(a["tool"],a["arguments"])
             result=invoke(a["tool"],a["arguments"])
             audit(a["tool"],a["arguments"],True)
             return result
@@ -122,6 +134,7 @@ class AgentCore:
             fields(a,{"tool","arguments"})
             if a["tool"] not in READ_TOOLS:
                 raise AgentError("Guest direct system operations are read-only")
+            self.broker.authorize_read(a["tool"],a["arguments"])
             return self.ops.execute(a["tool"],a["arguments"])
         raise AgentError("Unknown guest Agent operation")
 

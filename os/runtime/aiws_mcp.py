@@ -1,7 +1,15 @@
-"""AIWS guest tools: experimental MCP stdio tool server (not a privilege boundary)."""
+"""AIWS guest MCP: read-only requests always go through Agent/Broker IPC.
+
+The underlying Python toolplane is not a same-UID security sandbox.
+"""
 import json
 import sys
-from aiws_toolplane import audit, catalog, invoke
+from aiws_toolplane import catalog
+from aiws_agent_client import AgentClient
+from aiws_permission_broker import DIRECT_READ
+
+MCP_CATALOG = [item for item in catalog() if item["name"] in DIRECT_READ]
+MCP_TOOLS = frozenset(item["name"] for item in MCP_CATALOG)
 
 VERSION = "2025-11-25"
 
@@ -24,18 +32,19 @@ def handle(message):
     elif method == "ping":
         result = {}
     elif method == "tools/list":
-        result = {"tools": catalog()}
+        result = {"tools": MCP_CATALOG}
     elif method == "tools/call":
         name, args = params.get("name"), params.get("arguments", {})
         try:
-            data = invoke(name, args)
+            if name not in MCP_TOOLS:
+                raise PermissionError("MCP only permits read-only tools via Agent/Broker")
+            data = AgentClient().request("tool.read", {"tool": name,
+                                                     "arguments": args})
             result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}],
                       "isError": False}
-            audit(name, args, True)
         except (ValueError, PermissionError, FileNotFoundError, OSError,
                 RuntimeError, TimeoutError, subprocess_exception()) as error:
             result = {"content": [{"type": "text", "text": str(error)}], "isError": True}
-            audit(name, args, False)
     else:
         return {"jsonrpc": "2.0", "id": request_id,
                 "error": {"code": -32601, "message": "Method not found"}}
@@ -47,7 +56,7 @@ def subprocess_exception():
 
 def main():
     if len(sys.argv) == 2 and sys.argv[1] == "--list":
-        print(json.dumps({"tools": catalog()}, ensure_ascii=False))
+        print(json.dumps({"tools": MCP_CATALOG}, ensure_ascii=False))
         return
     for line in sys.stdin:
         try:

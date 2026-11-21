@@ -7,7 +7,7 @@ import GuestSystemConsole from './GuestSystemConsole';
 
 type Tool={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
-type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;desktopInstalled:boolean;displayManagerInstalled:boolean;uiBundled:boolean};
+type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;desktopInstalled:boolean;displayManagerInstalled:boolean;uiBundled:boolean;brokerReady?:boolean;brokerScope?:string};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
 type Page='overview'|'files'|'code'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
@@ -114,9 +114,12 @@ export default function OsWorkbench(){
       <section><BrainCircuit size={21}/><h2>{tr('AI 调用能力','Tool capabilities')}</h2><strong>{health?.toolCount??'–'}</strong><p>{tr('只读接口','Read-only interfaces')}</p></section>
       <section><FolderTree size={21}/><h2>{tr('客户机工作区','Guest workspace')}</h2><strong className="aiws-os-path">{health?.workspace||'–'}</strong><p>{tr('不自动共享宿主文件夹','No host folder mount')}</p></section>
       <section><ShieldCheck size={21}/><h2>{tr('权限','Privileges')}</h2><strong>{health?.agentPrivileged?'ELEVATED':'USER ONLY'}</strong><p>{tr('默认无 root 权限','No root privileges by default')}</p></section>
+      <section><ShieldCheck size={21}/><h2>{tr('独立权限 Broker','Independent Permission Broker')}</h2>
+       <strong>{health?.brokerReady?'CONNECTED':'UNAVAILABLE'}</strong>
+       <p>{tr('已接入独立用户态决策服务；不构成内核强制隔离','Independent same-UID policy process; not mandatory OS isolation')}</p></section>
       <section className="aiws-os-wide"><h2>{tr('系统运行架构','Unified execution route')}</h2>
-       <p>{tr('工作台 → 本地任务控制器 → 工具接口 → Linux 工作区 → 执行证据',
-        'Workbench → guest task controller → tool interface → Linux workspace → execution evidence')}</p>
+       <p>{tr('工作台 → 持久 Agent → 独立权限 Broker → 客户机工具 → 审计证据',
+        'Workbench → persistent Agent → independent permission broker → guest tools → audit evidence')}</p>
        <button type="button" className="aiws-os-primary" onClick={()=>setPage('code')}>{tr('打开代码智能','Open code intelligence')}</button>
       </section>
      </div>}

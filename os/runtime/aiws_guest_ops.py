@@ -22,7 +22,8 @@ from aiws_model_registry import GuestModelRegistry
 READ_TOOLS = frozenset({"service.inspect", "kernel.inspect", "kernel.verify", "kernel.recovery_plan"})
 WRITE_TOOLS = frozenset({"service.restart", "service.enable", "service.disable", "kernel.stage", "kernel.abandon"})
 TOOLS = READ_TOOLS | WRITE_TOOLS
-SERVICES = frozenset({"aiws-workbench.service", "aiws-local-model.service"})
+SERVICES = frozenset({"aiws-workbench.service", "aiws-local-model.service",
+                      "aiws-agent.service", "aiws-permission-broker.service"})
 RESTARTABLE = frozenset({"aiws-local-model.service"})
 FRAGMENT_KEYS = frozenset({
     "CONFIG_VIRTIO", "CONFIG_VIRTIO_PCI", "CONFIG_VIRTIO_BLK",

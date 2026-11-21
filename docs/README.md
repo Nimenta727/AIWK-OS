@@ -7,6 +7,7 @@
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
 ## AIWS OS / AI 虚拟机操作系统
+- [Permission Broker / 独立权限决策](AIWS_PERMISSION_BROKER.md) — same-UID PDP、SQLite 执行证据、拒绝和未来内核隔离边界
 - [OS 生产级验收 / Firmware, native Shell and permission architecture](AIWS_OS_PRODUCTION_GATES.md) — 固件启动、桌面输入闭环及权限隔离分层验收
 - [内置模型微调与独立评测 / Fine-tuning and held-out evaluation standard](AIWS_MODEL_FINETUNING_STANDARD.md) — 供外部贡献者执行的数据、拒绝率、延迟/RSS、质量门禁、LoRA 与回滚规范
 - [Windows → Linux Agent 历史投影 / Migration mapping](AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md) — 计划版本、AgentRun、WorkItems、ExecutionRecords 的不可执行受界映射

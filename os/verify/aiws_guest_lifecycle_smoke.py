@@ -31,7 +31,7 @@ def wait_healthy():
     for _ in range(100):
         try:
             health=get("/api/v1/health")
-            if health.get("agentIndependentService") and health.get("guestOnly") and health.get("tasksPersistent"):
+            if health.get("agentIndependentService") and health.get("brokerReady") and health.get("guestOnly") and health.get("tasksPersistent"):
                 audit=get("/api/v1/audit/verify")
                 if audit.get("valid") is True:
                     return
@@ -51,12 +51,15 @@ def main():
     if len(before)<2:
         raise RuntimeError("Expected both GUI-created DAG and kernel candidate evidence")
     agent_pid=pid("aiws-agent.service")
+    broker_pid=pid("aiws-permission-broker.service")
     ui_pid=pid("aiws-workbench.service")
     subprocess.run(["systemctl","--user","restart","aiws-workbench.service"],
                    check=True,timeout=14)
     wait_healthy()
     if pid("aiws-agent.service")!=agent_pid:
         raise RuntimeError("Guest Agent must survive a workbench restart")
+    if pid("aiws-permission-broker.service")!=broker_pid:
+        raise RuntimeError("Broker must survive a workbench restart")
     if pid("aiws-workbench.service")==ui_pid:
         raise RuntimeError("Workbench restart did not replace its process")
     after_ui={item["id"] for item in get("/api/v1/tasks")["tasks"]}
@@ -67,11 +70,14 @@ def main():
     wait_healthy()
     if pid("aiws-agent.service")==agent_pid:
         raise RuntimeError("Independent Agent restart did not replace its process")
+    if pid("aiws-permission-broker.service")!=broker_pid:
+        raise RuntimeError("Permission Broker must survive the Agent restart")
     after_agent={item["id"] for item in get("/api/v1/tasks")["tasks"]}
     if after_agent!=before or not get("/api/v1/audit/verify")["valid"]:
         raise RuntimeError("Agent restart lost persistent DAG or audit integrity")
     print("AIWS_GUEST_LIFECYCLE_PASS "+json.dumps({
         "ui_restart":True,"agent_independent":True,"agent_restart":True,
+        "broker_independent":True,"broker_healthy":True,
         "persistent_task_ids":len(after_agent),"audit_chain_valid":True,
         "host_access":False},sort_keys=True),flush=True)
 

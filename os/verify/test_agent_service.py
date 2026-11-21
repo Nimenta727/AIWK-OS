@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"runtime"))
 from aiws_agent_client import AgentClient, AgentError, AgentUnavailable
 from aiws_agent_service import AgentCore, serve
+from aiws_permission_broker import BrokerClient, BrokerPolicy, serve as serve_broker
 
 @unittest.skipUnless(os.name=="posix" and hasattr(socket,"SO_PEERCRED"),
                      "Linux guest private peer credentials required")
@@ -27,9 +28,18 @@ class StandaloneAgentTests(unittest.TestCase):
         self.p1=patch("aiws_toolplane.protect_guest_workspace",return_value=True)
         self.p2=patch("aiws_guest_ops.protect_guest_workspace",return_value=True)
         self.p1.start();self.p2.start()
-        self.core=AgentCore(self.workspace,self.root/"state",singleton=False)
         self.sockdir=self.root/"runtime"
         self.sockdir.mkdir(mode=0o700)
+        self.broker_socket=self.sockdir/"broker.sock"
+        self.core=AgentCore(self.workspace,self.root/"state",singleton=False,
+                            broker=BrokerClient(self.broker_socket))
+        self.broker_server=serve_broker(BrokerPolicy(
+            self.root/"state"/"aiws"/"tasks.sqlite3",
+            self.root/"state"/"aiws"/"broker-decisions.sqlite3"),
+            self.broker_socket)
+        self.broker_thread=threading.Thread(
+            target=self.broker_server.serve_forever,daemon=True)
+        self.broker_thread.start()
         self.socket=self.sockdir/"agent.sock"
         self.server=serve(self.core,self.socket)
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
@@ -40,9 +50,24 @@ class StandaloneAgentTests(unittest.TestCase):
         self.server.shutdown()
         self.thread.join(timeout=3)
         self.server.server_close()
+        self.broker_server.shutdown()
+        self.broker_thread.join(timeout=3)
+        self.broker_server.server_close()
         self.core.close()
         self.p2.stop();self.p1.stop();self.env.stop()
         self.temp.cleanup()
+
+    def test_broker_denies_direct_execution_when_unavailable(self):
+        self.assertTrue(self.client.request("health")["brokerReady"])
+        saved=self.core.broker
+        self.core.broker=BrokerClient(self.sockdir/"unavailable.sock")
+        try:
+            self.assertFalse(self.client.request("health")["brokerReady"])
+            with self.assertRaises(AgentError):
+                self.client.request("tool.read",{"tool":"workspace.tree",
+                    "arguments":{"path":"."}})
+        finally:
+            self.core.broker=saved
 
     def test_agent_ipc_persistent_task_lifecycle(self):
         self.assertTrue(self.client.request("health")["ready"])
