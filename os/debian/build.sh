@@ -47,6 +47,10 @@ if [[ ! -s "$ui/index.html" ]]; then
   echo "ERROR: Build the React workbench first (cd workbench && npm install && npm run build)." >&2
   exit 1
 fi
+# Trusted skills ship read-only; the manifest pins each file's hash (a changed skill is not loaded).
+mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/skills"
+cp -- "$repo"/os/skills/*.md "$out/config/includes.chroot/usr/local/share/aiws/skills/"
+python3 "$repo/os/skills/build_manifest.py" "$out/config/includes.chroot/usr/local/share/aiws/skills" >/dev/null
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
 cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
 

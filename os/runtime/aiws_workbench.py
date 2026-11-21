@@ -28,6 +28,8 @@ from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
 import aiws_apps
 import aiws_system
+import aiws_capabilities
+import aiws_changes
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -74,6 +76,8 @@ class Controller:
             self.guest_ops = GuestOperations(self.workspace, state_home / "aiws" / "kernel-candidates")
         self.model = LocalPlanner()
         self.system = aiws_system.SystemControls()
+        self.memory = aiws_capabilities.MemoryStore(state_home / "aiws" / "memory.jsonl")
+        self.capabilities = self._build_capabilities()
         self.events = EventStore(state_home / "aiws-observatory")
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
         self.supervisor = Supervisor(self.mandates, self.events, self.workspace)
@@ -148,6 +152,33 @@ class Controller:
         subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
         return {"started": True, "running": False}
+
+    SKILLS_DIR = "/usr/local/share/aiws/skills"
+
+    def _build_capabilities(self):
+        docs = [(t["name"], t["description"]) for t in catalog() if t["name"] in EXPOSED]
+        docs += [(t["name"], t["description"]) for t in guest_catalog()]
+        skills = Path(os.environ.get("AIWS_SKILLS_DIR", self.SKILLS_DIR))
+        pinned = None
+        try:
+            pinned = {k: v for k, v in json.loads((skills / "manifest.json").read_text(encoding="utf-8")).items()
+                      if isinstance(k, str) and isinstance(v, str)}
+        except (OSError, ValueError, AttributeError):
+            pinned = {}                                   # no readable manifest: no trusted skill is loaded
+        return aiws_capabilities.Capabilities(docs, skill_dirs=[(skills, True)], pinned=pinned, memory=self.memory)
+
+    def memory_op(self, payload):
+        try:
+            if set(payload) == {"forget"}:
+                result = self.memory.forget(str(payload["forget"])[:32])
+            elif set(payload) <= {"text", "kind"} and "text" in payload:
+                result = self.memory.add(payload["text"], payload.get("kind", "fact"))
+            else:
+                raise ValueError("Expected {text, kind} or {forget}")
+        except aiws_capabilities.CapabilityError as exc:
+            raise SupervisorError(str(exc))
+        self.capabilities.refresh()
+        return result
 
     def system_op(self, kind, payload):
         """Display / input method / network / power. Strict per-operation payloads, a shared 2 s rate limit."""
@@ -698,6 +729,28 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(session) or after < 0:
                 return self.reply(400, {"error": "A valid session id is required"})
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/capabilities":
+            from urllib.parse import parse_qs
+            qs = parse_qs(urlsplit(self.path).query)
+            query = (qs.get("q") or [""])[0][:300]
+            try:
+                k = int((qs.get("k") or ["6"])[0])
+                kinds = [x for x in (qs.get("kind") or [""])[0].split(",") if x] or None
+                hits = app.capabilities.select(query, k, kinds) if query else []
+            except (ValueError, aiws_capabilities.CapabilityError) as exc:
+                return self.reply(400, {"error": str(exc)[:120]})
+            return self.reply(200, {"hits": hits, "counts": app.capabilities.counts()})
+        if path == "/api/v1/memory":
+            return self.reply(200, {"memory": app.memory.list()})
+        if path in ("/api/v1/changes", "/api/v1/changes/diff"):
+            from urllib.parse import parse_qs
+            qs = parse_qs(urlsplit(self.path).query)
+            try:
+                if path.endswith("/diff"):
+                    return self.reply(200, aiws_changes.diff(app.workspace, (qs.get("path") or ["."])[0], (qs.get("file") or [""])[0]))
+                return self.reply(200, aiws_changes.changes(app.workspace, (qs.get("path") or ["."])[0]))
+            except aiws_changes.ChangesError as exc:
+                return self.reply(400, {"error": str(exc)})
         if path == "/api/v1/system":
             return self.reply(200, app.system.status())
         if path == "/api/v1/ide":
@@ -757,7 +810,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -797,6 +850,8 @@ class Handler(BaseHTTPRequestHandler):
                 if set(payload) != {"id"}:
                     raise ValueError("Expected the application id only")
                 result = app.apps_launch(payload["id"])
+            elif path == "/api/v1/memory":
+                result = app.memory_op(payload)
             elif path.startswith("/api/v1/system/"):
                 result = app.system_op(path.rsplit("/", 1)[1], payload)
             elif path == "/api/v1/ide/open":

@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
-import {Activity,BrainCircuit,ChevronDown,ChevronRight,Eye,File as FileIcon,Folder,FolderTree,Layers3,Globe,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun,Wrench} from 'lucide-react';
+import {Activity,BrainCircuit,ChevronDown,ChevronRight,Eye,File as FileIcon,Folder,FolderTree,GitCompare,Layers3,Globe,Moon,Play,RefreshCw,ShieldCheck,SquareTerminal,Sun,Wrench} from 'lucide-react';
 import './OsWorkbench.css';
 import './shell.css';
 import {ActivityBar,CommandPalette,Panel,SideBar,StatusBar,TabBar} from './Shell';
@@ -9,6 +9,7 @@ import BrowserView from './BrowserView';
 import useObservatoryData from './useObservatoryData';
 import {api,onCsrfChange,refreshCsrf} from './api';
 import SystemControls from './SystemControls';
+import ChangesView from './ChangesView';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
 import {closeTab,cycleTab,fileTabId,fileTitle,flattenTree,isEditableTarget,loadPrefs,matchKey,openTab,savePrefs} from '../model/shell.mjs';
 import GuestFiles from './GuestFiles';
@@ -20,7 +21,7 @@ type Tool={name:string;description:string;inputSchema:{properties:Record<string,
 type Job={id:string;tool:string;status:string;result:unknown;error:string|null;submittedAt:number};
 type Health={mode:string;workspace:string;agent:string;toolCount:number;guestOnly:boolean;agentPrivileged:boolean;llmConnected:boolean;brokerReady?:boolean;brokerScope?:string};
 type Snapshot={health:Health;capabilities:Tool[];jobs:Job[]};
-type View='browser'|'observatory'|'overview'|'files'|'tasks'|'plans'|'local'|'system';
+type View='browser'|'observatory'|'overview'|'changes'|'files'|'tasks'|'plans'|'local'|'system';
 type Language='zh'|'en';
 type TreeNode={name:string;path:string;type:'dir'|'file';children:TreeNode[]};
 type AppRow={id:string;kind:string;category:string;zh:string;en:string;installed:boolean;path:string|null;launchable:boolean};
@@ -29,6 +30,7 @@ const VIEWS:{id:View;zh:string;en:string;icon:typeof Activity}[]=[
  {id:'observatory',zh:'观察台',en:'Observatory',icon:Eye},
  {id:'overview',zh:'系统概览',en:'System overview',icon:Layers3},
  {id:'browser',zh:'内置浏览器',en:'Preview browser',icon:Globe},
+ {id:'changes',zh:'变更审查',en:'Review changes',icon:GitCompare},
  {id:'files',zh:'AI 文件管理',en:'AI Files',icon:FolderTree},
  {id:'tasks',zh:'任务与证据',en:'Tasks & evidence',icon:BrainCircuit},
  {id:'plans',zh:'持久任务与 DAG',en:'Persistent DAG',icon:Layers3},
@@ -174,6 +176,8 @@ export default function OsWorkbench(){
     {r.type==='dir'?<Folder size={14}/>:<FileIcon size={14}/>}<span>{r.name}</span></button>)}
    {!treeRows.length&&<div className="aiws-sh-list">{treeNote||tr('工作区为空','The workspace is empty')}</div>}
    {treeNote&&treeRows.length>0&&<div className="aiws-sh-list">{treeNote}</div>}
+   <div className="aiws-sh-section">{tr('审查','Review')}</div>
+   <button type="button" className="aiws-sh-row" onClick={()=>openView('changes')}><GitCompare size={14}/>{tr('变更审查（diff）','Review changes (diff)')}</button>
    <div className="aiws-sh-section">{tr('文件整理','File operations')}</div>
    <button type="button" className="aiws-sh-row" onClick={()=>openView('files')}><FolderTree size={14}/>{tr('AI 文件管理（需审批）','AI file manager (approval required)')}</button>
   </SideBar>;
@@ -239,6 +243,7 @@ export default function OsWorkbench(){
     <section className="aiws-os-wide"><h2>{tr('系统运行架构','Unified execution route')}</h2>
      <p>{tr('自然语言 → 本地模型中转 → 审批 → 客户机工具 / 官方 CLI → 审计证据','Natural language → local relay model → approval → guest tools / official CLI → audit evidence')}</p></section>
    </div>}
+   {page==='changes'&&<ChangesView english={english} folders={tree.filter(n=>n.type==='dir').map(n=>n.path)}/>}
    {page==='files'&&<GuestFiles csrf={csrf} english={english} command={command} onPlanCreated={()=>openView('plans')}/>}
    {page==='tasks'&&<div className="aiws-os-stack">
     <section className="aiws-os-card"><h2>{tr('任务队列','Task queue')}</h2>{snapshot?.jobs.length?snapshot.jobs.map(item=>

@@ -4,6 +4,7 @@ import {Activity,AlertTriangle,Check,ChevronDown,ChevronRight,CircleDot,Send,Shi
 import {agentBars,attentionFirst,basisText,budgetState,clock,formatTokens,lightTone,stateSegments} from '../model/observatory.mjs';
 
 import {api} from './api';
+import {ActivityTimeline,TokenBurn} from './Timeline';
 import type {Bilingual,Summary,BuilderInfo,Waiting,EventRow} from './observatoryTypes';
 
 export type ObservatoryData={summary:Summary|null;builder:BuilderInfo|null;error:string;reload:()=>Promise<void>};
@@ -224,6 +225,7 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand,data}
 
   <section className="aiws-os-card" data-aiws="activity">
    <h2><Activity size={16}/> {tr('正在发生','Activity')}</h2>
+   <ActivityTimeline rows={s?.recent||[]} english={english}/>
    {s?.recent.length?<ul className="aiws-obs-feed">{s.recent.map((r,i)=><li key={i} className={r.status==='error'?'fail':''}>
     <time>{clock(r.ts)}</time><b>{r.source}</b><span>{r.label}</span></li>)}</ul>:<p className="aiws-os-muted">{tr('暂无活动。','No activity yet.')}</p>}
   </section>
@@ -236,6 +238,7 @@ export default function Observatory({csrf,english,onOpenAdvanced,onCommand,data}
      {open===x.session?<ChevronDown size={14}/>:<ChevronRight size={14}/>}
      <b>{x.agent}</b><span>{x.session}</span><em>{x.status}</em>
      <small>{formatTokens(x.tokens.in)}/{formatTokens(x.tokens.out)} · {basisText(x.tokens,english)}</small></button>
+    {open===x.session&&<TokenBurn events={events} limit={s?.tokens.budget?.limit??null} english={english}/>}
     {open===x.session&&<table className="aiws-obs-events"><tbody>{events.map(e=><tr key={e.seq}>
      <td>{clock(e.ts)}</td><td>{e.kind}</td><td>{e.tool||''}</td><td>{e.status||''}</td>
      <td>{e.tokens?(e.tokens.source==='unknown'?tr('用量未知','usage unknown'):formatTokens(e.tokens.in)+'/'+formatTokens(e.tokens.out)+' '+e.tokens.scope):(e.detail||'')}</td></tr>)}

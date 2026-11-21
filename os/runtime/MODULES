@@ -7,6 +7,8 @@ aiws_agent_service.py
 aiws_agent_client.py
 aiws_mcp.py
 aiws_apps.py
+aiws_changes.py
+aiws_capabilities.py
 aiws_system.py
 aiws_launcher.py
 aiws_exttools.py
@@ -22,6 +24,7 @@ aiws_boot_slots.py
 # Local model and router
 aiws_local_model.py
 aiws_model_gate.py
+aiws_model_channel.py
 aiws_model_schema.py
 aiws_model_router.py
 aiws_model_registry.py
