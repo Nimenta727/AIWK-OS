@@ -85,3 +85,16 @@ All above lives inside a dedicated unprivileged guest. No guest agent API can co
 - An independent unprivileged systemd Agent with private AF_UNIX IPC now owns persistent DAG state. The newer guest lifecycle smoke requires separate UI/Agent restarts, PID separation, task persistence and audit chain validity; that stricter new acceptance must pass before claiming long-term guest service reliability.
 - The model-inclusive Debian ISO is **opt-in** and the default ISO remains without model weights. The guest model boot test is opt-in and must use a licensed SHA-verified builder artifact. A real 2B model in a networkless container, if passed, is still distinct from a real guest model test.
 
+
+
+## Verified QEMU guest Agent lifecycle evidence — run 44851455808
+
+A real Debian ISO was built and booted by QEMU, using the independent aiws-agent.service behind the AIWS Workbench. Guest ChromeDriver clicked file explorer and created/runs the kernel candidate approval DAG. After GUI completion, the **guest itself** restarted aiws-workbench.service while the independently supervised aiws-agent.service PID remained unchanged. The guest then restarted aiws-agent.service and verified the same two durable task IDs and valid audit chain were still accessible. This workflow completed **successfully** and serial logs contain:
+
+    AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional kernel=candidate-only
+    AIWS_GUEST_LIFECYCLE_PASS {"agent_independent": true, "agent_restart": true, "audit_chain_valid": true, "host_access": false, "persistent_task_ids": 2, "ui_restart": true}
+    AIWS_BOOT_SMOKE_PASS: lightdm=active shell=aiws chromium=visible workbench=active tools=mcp gui=clicked
+
+Source: https://github.com/Nimenta727/Windows-AI-Workstation/actions/runs/44851455808
+
+**Important exclusions**: this is a controlled service restart and SQLite recovery smoke, not simulated sudden VM power loss, long-term load, guest-root tamper resistance, or real kernel boot rollback. A/B EFI and actual Qwen Q4 CPU/QEMU inference remained in separate pending/failed CI jobs at the time of this record.

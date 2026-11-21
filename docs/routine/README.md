@@ -68,3 +68,6 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 11:35 — 真实模型加载故障 stderr/ldd 诊断](2026-11-21_1135-real-model-loader-stderr-diagnostics.md)
 - [2026-11-21 11:44 — 小模型启停也必须经过持久 DAG 审批](2026-11-21_1144-model-service-lifecycle-reviewed-agent-dag.md)
 - [2026-11-21 11:50 — 恢复模型 DAG 保存入口和动态模型开关](2026-11-21_1150-repair-model-plan-and-live-status.md)
+
+- [2026-11-21 11:55 — SQLite 任务状态和审计原子事务](2026-11-21_1155-atomic-agent-state-audit-transitions.md)
+- [2026-11-21 12:00 — QEMU Agent/UI 重启恢复验收通过](2026-11-21_1200-qemu-agent-lifecycle-verified.md)
