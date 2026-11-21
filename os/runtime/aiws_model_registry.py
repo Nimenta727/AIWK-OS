@@ -172,6 +172,68 @@ class GuestModelRegistry:
             previous=None
         return self._activate(expected_sha256,previous)
 
+    def import_bundled(self, preload=None):
+        """Import ONLY a root-owned, hash-pinned GGUF bundled in the guest image.
+
+        Optional preload path exists only for isolated synthetic unit tests.
+        Neither the model nor an untrusted request may choose a source path.
+        """
+        self._ready()
+        self._not_running()
+        root=Path("/usr/local/share/aiws/model-preload") if preload is None else Path(preload)
+        meta=root/"manifest.json"
+        artifact=root/"aiws-local.gguf"
+        if any(p.is_symlink() for p in (root,meta,artifact)):
+            raise ModelArtifactError("Bundled model paths must not be symlinks")
+        if not root.is_dir() or not meta.is_file() or not artifact.is_file():
+            raise ModelArtifactError("No valid bundled guest model")
+        if preload is None:
+            for path in (root,meta,artifact):
+                st=path.stat()
+                if st.st_uid!=0 or st.st_mode & 0o022:
+                    raise ModelArtifactError("Bundled guest artifacts must be root-owned and read-only")
+        try:
+            data=json.loads(meta.read_text(encoding="utf-8"))
+        except (OSError,ValueError) as exc:
+            raise ModelArtifactError("Bundled manifest cannot be read") from exc
+        if not isinstance(data,dict) or set(data)!={"modelId","sha256","source","licenseReviewed"}:
+            raise ModelArtifactError("Bundled model manifest schema invalid")
+        digest=data["sha256"]
+        if (data["modelId"]!=MODEL_ID or not isinstance(digest,str) or
+                not DIGEST.fullmatch(digest) or data["licenseReviewed"] is not True):
+            raise ModelArtifactError("Model hash or license review missing")
+        if not 1024<=artifact.stat().st_size<=MAX_BYTES or _sha256(artifact)!=digest:
+            raise ModelArtifactError("Bundled model file integrity failure")
+        with artifact.open("rb") as stream:
+            if stream.read(4)!=b"GGUF":
+                raise ModelArtifactError("Bundled model does not contain GGUF signature")
+        versions=self.root/"versions"
+        version=versions/(digest+".gguf")
+        if version.is_symlink():
+            raise ModelArtifactError("Bundled version symlink denied")
+        if version.exists():
+            if _sha256(version)!=digest:
+                raise ModelArtifactError("Cached guest version corrupted")
+        else:
+            fd,temporary=tempfile.mkstemp(dir=versions,prefix=".preload-")
+            try:
+                os.chmod(temporary,0o600)
+                with os.fdopen(fd,"wb") as out,artifact.open("rb") as inp:
+                    shutil.copyfileobj(inp,out,length=1024*1024)
+                    out.flush()
+                    os.fsync(out.fileno())
+                if _sha256(temporary)!=digest:
+                    raise ModelArtifactError("Copied guest GGUF integrity failure")
+                os.replace(temporary,version)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+        if (self.root/"registry.json").exists():
+            if self._manifest()["sha256"]!=digest:
+                raise ModelArtifactError("Existing model must not be overwritten by image preload")
+            return self.verify()
+        return self._activate(digest,None)
+
     def rollback(self, digest):
         if not isinstance(digest,str) or not DIGEST.fullmatch(digest):
             raise ModelArtifactError("Rollback requires exact candidate SHA-256")
@@ -186,6 +248,7 @@ def main():
     p=argparse.ArgumentParser(description="Verify/provision offline model within AIWS guest only")
     group=p.add_mutually_exclusive_group(required=True)
     group.add_argument("--verify",action="store_true")
+    group.add_argument("--import-bundled",action="store_true")
     group.add_argument("--import-guest",metavar="RELATIVE_GGUF")
     group.add_argument("--rollback",metavar="SHA256")
     p.add_argument("--sha256")
@@ -197,6 +260,7 @@ def main():
     registry=GuestModelRegistry(Path.home()/".local/share/aiws/models",workspace)
     try:
         result=(registry.verify() if args.verify else
+                registry.import_bundled() if args.import_bundled else
                 registry.import_guest(args.import_guest,args.sha256,args.accept_source_license)
                 if args.import_guest is not None else
                 registry.rollback(args.rollback))

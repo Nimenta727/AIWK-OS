@@ -59,6 +59,23 @@ class GuestModelRegistryTests(unittest.TestCase):
         with self.assertRaises(ModelArtifactError):
             self.reg.verify()
 
+    def test_bundled_image_requires_checked_manifest_and_refuses_replacement(self):
+        import json
+        preload=self.root/"preload"
+        preload.mkdir()
+        bundled=preload/"aiws-local.gguf"
+        bundled.write_bytes(self.weights.read_bytes())
+        manifest={"modelId":"Qwen/Qwen3.5-2B","sha256":self.digest,
+                  "source":"test-only fake bytes","licenseReviewed":True}
+        (preload/"manifest.json").write_text(json.dumps(manifest))
+        result=self.reg.import_bundled(preload)
+        self.assertTrue(result["verified"])
+        self.assertEqual(self.reg.import_bundled(preload)["sha256"],self.digest)
+        bundled.write_bytes(b"GGUF"+b"x"*2048)
+        with self.assertRaises(ModelArtifactError):
+            self.reg.import_bundled(preload)
+        self.assertEqual(self.reg.verify()["sha256"],self.digest)
+
     def test_guest_guard_and_source_mount_are_mandatory(self):
         bad=GuestModelRegistry(self.root/"models",self.project,
             guard=lambda:(_ for _ in ()).throw(PermissionError("not guest")))
