@@ -62,6 +62,36 @@ jobs:
           compression-level: 0
           retention-days: 3
 
+  uefi-kernel-ab:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ab-boot]')
+    needs: debian-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: aiws-os-debian-live-smoke-iso
+          path: out/aiws-os-smoke
+      - name: Install firmware, EFI bootloader and FAT/GPT tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf systemd-boot-efi gdisk dosfstools mtools xorriso
+      - name: Real OVMF B failure and automatic A recovery
+        timeout-minutes: 23
+        run: |
+          bash os/kernel/ci/uefi-ab-boot.sh out/aiws-os-smoke/live-image-amd64.hybrid.iso out/aiws-ab
+      - name: Upload EFI fault injection boot receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-os-uefi-ab-evidence
+          path: |
+            out/aiws-ab/boot-serial.log
+            out/aiws-ab/aiws-A.conf
+            out/aiws-ab/aiws-B+2.conf
+          retention-days: 14
+
   debian-boot:
     needs: debian-image
     runs-on: ubuntu-latest
