@@ -44,6 +44,52 @@ class WindowsCompatTests(unittest.TestCase):
         for secret in ("SECRET_WINDOWS_PROMPT","SECRET_WINDOWS_RESULT","SECRET_WINDOWS_EVIDENCE"):
             self.assertNotIn(secret,dump)
 
+    def test_plan_agent_workitem_and_execution_ledger_are_safe_history(self):
+        task=legacy()
+        task["Unified"]["Plans"]=[{"Id":"e"*32,"Sha256":HASH,
+            "RelativePath":"private/SECRET_PLAN.md","LinkedAt":"2026-11-21T04:00:00+00:00"}]
+        task["Unified"]["WorkItems"]=[{"Id":A,"StageId":A,"Title":"Planning",
+            "Status":"Completed","Agent":"Codex","DependsOn":[]}]
+        task["Unified"]["AgentRuns"][0].update({
+            "AdapterId":"SECRET_ADAPTER","Evidence":"local-intent",
+            "StartedAt":"2026-11-21T04:01:00Z"})
+        task["ExecutionRecords"]=[{"Id":"f"*32,"StageId":A,"RunId":"c"*32,
+            "Kind":"stage.finished","Evidence":"observed","Source":"aiws.local",
+            "At":"2026-11-21T04:02:00Z","Metadata":"SECRET_WINDOWS_EVIDENCE"}]
+        with tempfile.TemporaryDirectory() as home:
+            store=GuestTaskStore(Path(home)/"aiws")
+            doc=store.import_windows(task)
+            evidence=doc["windowsImport"]["evidence"]
+            self.assertEqual(evidence["planRevisions"][0]["sha256"],HASH)
+            self.assertEqual(evidence["planRevisions"][0]["id"],"e"*32)
+            self.assertEqual(evidence["agentRuns"][0]["evidence"],"local-intent")
+            self.assertEqual(evidence["workItems"][0]["linuxState"],"unmapped")
+            self.assertEqual(evidence["executionRecords"][0]["kind"],"stage.finished")
+            self.assertEqual(evidence["workflowStages"][0]["sourceStatus"],"Completed")
+            self.assertTrue(all(s["state"]=="unmapped" for s in doc["stages"]))
+            self.assertTrue(all(s["approval"]==0 for s in doc["stages"]))
+            serialized=json.dumps(doc,ensure_ascii=False)
+            for forbidden in ("SECRET_WINDOWS_EVIDENCE","SECRET_ADAPTER","SECRET_PLAN.md",
+                              "SECRET_WINDOWS_PROMPT","SECRET_WINDOWS_RESULT"):
+                self.assertNotIn(forbidden,serialized)
+            with self.assertRaises(TaskError):
+                store.dispatch(TASK,A)
+            store.close()
+            reopened=GuestTaskStore(Path(home)/"aiws")
+            self.assertEqual(reopened.get(TASK)["windowsImport"]["evidence"],evidence)
+            self.assertTrue(reopened.verify_audit()["valid"])
+            reopened.close()
+
+    def test_reject_malformed_windows_event_provenance(self):
+        task=legacy()
+        task["ExecutionRecords"]=[{"Kind":"stage.finished","Metadata":23}]
+        with self.assertRaises(WindowsImportError):
+            convert_windows_task(task)
+        task=legacy()
+        task["Unified"]["WorkItems"]=[{"StageId":A,"Status":"Escalated","Agent":"Codex"}]
+        with self.assertRaises(WindowsImportError):
+            convert_windows_task(task)
+
     def test_sequential_mode_preserves_windows_execution_order(self):
         value=convert_windows_task(legacy(graph=False))
         self.assertEqual(value["stages"][0]["dependsOn"],[])

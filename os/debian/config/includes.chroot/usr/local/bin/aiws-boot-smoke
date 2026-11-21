@@ -76,7 +76,7 @@ if ! runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 \
 fi
 if [ -f /etc/aiws/guest-model-acceptance ]; then
     if ! runuser -u user -- env DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 \
-        python3 /usr/local/lib/aiws/aiws_model_guest_smoke.py; then
+        python3 /usr/local/lib/aiws/aiws_model_guest_smoke.py > /dev/ttyS0 2>&1; then
         emit "AIWS_BOOT_SMOKE_FAIL: real-offline-model-inference"
         exit 1
     fi

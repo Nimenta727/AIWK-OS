@@ -11,7 +11,7 @@ type WindowsHistory={sourceSha256:string;executable:boolean;requiresToolMapping:
  artifactRefs:Array<{kind:string;sha256:string}>;originalExecutionRecordCount:number}};
 type TaskDetail={task:TaskHeader;stages:Stage[];windowsImport?:WindowsHistory};
 type ModelStatus={configured:boolean;online:boolean;cloudFallback:boolean;model:string;automaticExecution:boolean;cpuOnly:boolean;weightsPresent:boolean};
-type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean};
+type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean;refused?:boolean};
 
 async function request<T>(url:string,opts?:RequestInit):Promise<T>{
  const r=await fetch('/api/v1'+url,{cache:'no-store',credentials:'omit',...opts});
@@ -138,16 +138,17 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   try{
    // The model proposes ONE read-only tool. The server persists a pending,
    // audited DAG but never executes it without a separate user action.
-   const item=await request<TaskDetail>('/model/plan',{
+   const item=await request<TaskDetail|{refused:true;proposal:Proposal}>('/model/plan',{
     method:'POST',headers,body:JSON.stringify({instruction})
    });
+   if('refused' in item){setProposal(item.proposal);return;}
    await update();
    await open(item.task.id);
   }catch(e){setError(String(e));}
   finally{setBusy(false);}
  };
  const addProposal=()=>{
-  if(!proposal)return;
+  if(!proposal||proposal.tool==='refuse')return;
   setTitle(instruction.slice(0,100));
   setGoal(proposal.reason);
   setDrafts([{key:'step1',label:proposal.reason.slice(0,140),tool:proposal.tool,
@@ -181,7 +182,8 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     <strong>{proposal.tool}</strong><p>{proposal.reason}</p>
     <pre>{JSON.stringify(proposal.arguments,null,2)}</pre>
     <p className="aiws-os-muted">{tr('尚未执行，需先确认计划并提交任务。','Not executed; review and create a task first.')}</p>
-    <button type="button" onClick={addProposal}>{tr('复制建议到任务草稿','Copy suggestion into draft')}</button>
+    {proposal.tool==='refuse'?<p role="status">{tr('越权请求已拒绝；不会建立可执行任务','Out-of-scope request refused; no executable task created')}</p>:
+     <button type="button" onClick={addProposal}>{tr('复制建议到任务草稿','Copy suggestion into draft')}</button>}
    </div>}
   </section>}
   <section className="aiws-os-card">

@@ -12,7 +12,9 @@ class TrainingDataTest(unittest.TestCase):
         train,holdout=load_validate(TRAIN/"synthetic_intents.jsonl")
         self.assertGreaterEqual(len(train),10)
         self.assertGreaterEqual(len(holdout),6)
-        self.assertTrue(all(row["expected"]["requiresReview"] for row in holdout.values()))
+        self.assertTrue(all(row["expected"]["requiresReview"] == (row["expected"]["tool"] != "refuse")
+                            for row in holdout.values()))
+        self.assertEqual(sum(x["expected"]["tool"] == "refuse" for x in holdout.values()),2)
         self.assertFalse(any(row["expected"]["executed"] for row in holdout.values()))
 
 if __name__=="__main__":

@@ -103,6 +103,18 @@ class LocalPlannerTests(unittest.TestCase):
             with self.assertRaises(LocalModelError):
                 LocalPlanner.validate({"tool":"file.read","arguments":{"path":path},"reason":"not allowed"})
 
+    def test_explicit_refusal_has_no_tool_arguments_and_is_not_executable(self):
+        MockModelHandler.proposal={"tool":"refuse","arguments":{},
+                                  "reason":"Host operations are out of guest scope"}
+        receipt=self.model.suggest("Try host access")
+        self.assertEqual(receipt["tool"],"refuse")
+        self.assertTrue(receipt["refused"])
+        self.assertFalse(receipt["executed"])
+        self.assertFalse(receipt["requiresReview"])
+        with self.assertRaises(LocalModelError):
+            LocalPlanner.validate({"tool":"refuse","arguments":{"path":"."},
+                                   "reason":"No action"})
+
     def test_injection_cannot_grant_tools(self):
         MockModelHandler.proposal={"tool":"host.exec","arguments":{"command":"whoami"},"reason":"Ignore system rules"}
         with self.assertRaises(LocalModelError):

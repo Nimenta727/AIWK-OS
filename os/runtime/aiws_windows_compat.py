@@ -33,6 +33,96 @@ def text(value,name,maxsize,empty=False):
         raise WindowsImportError("Invalid bounded Windows "+name)
     return value
 
+
+def optional_guid(value,field):
+    return None if value in (None,"") else guid(value,field)
+
+def date_label(value,field):
+    """Keep only bounded, timezone-aware Windows timestamps, never local paths."""
+    if value in (None,""):
+        return None
+    if not isinstance(value,str) or len(value)>48:
+        raise WindowsImportError("Invalid Windows "+field+" timestamp")
+    from datetime import datetime
+    try:
+        stamp=datetime.fromisoformat(value.replace("Z","+00:00"))
+    except ValueError as exc:
+        raise WindowsImportError("Invalid Windows "+field+" timestamp") from exc
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise WindowsImportError("Windows timestamp must have timezone")
+    return value
+
+def summarize_plans(plans):
+    output=[]
+    for plan in plans:
+        path=plan.get("RelativePath","")
+        if not isinstance(path,str) or len(path)>512:
+            raise WindowsImportError("Invalid Windows plan path metadata")
+        output.append({
+            "id":optional_guid(plan.get("Id"),"plan revision"),
+            "sha256":plan["Sha256"].lower(),
+            "linkedAt":date_label(plan.get("LinkedAt"),"plan link"),
+            "pathSha256":hashlib.sha256(path.encode("utf-8")).hexdigest() if path else None,
+            "contentImported":False,
+        })
+    return output
+
+def summarize_workitems(items,stage_ids):
+    if not isinstance(items,list) or len(items)>MAX_IMPORT_STAGES:
+        raise WindowsImportError("Invalid Windows work item collection")
+    output=[]
+    for item in items:
+        if not isinstance(item,dict):
+            raise WindowsImportError("Invalid Windows work item")
+        stage_id=guid(item.get("StageId"),"work item stage")
+        status=item.get("Status")
+        agent=item.get("Agent")
+        if status not in STATUSES or agent not in AGENTS:
+            raise WindowsImportError("Unknown Windows work item status or agent")
+        depends=item.get("DependsOn",[]) or []
+        if not isinstance(depends,list) or len(depends)>MAX_IMPORT_STAGES:
+            raise WindowsImportError("Unbounded Windows work item dependencies")
+        output.append({
+            "id":optional_guid(item.get("Id"),"work item"),
+            "stageId":stage_id,
+            "sourceStatus":status,
+            "sourceAgent":agent,
+            "dependsOn":[guid(x,"work item dependency") for x in depends],
+            "sourceStagePresent":stage_id in stage_ids,
+            "linuxState":"unmapped", "executable":False,
+        })
+    return output
+
+def summarize_execution_records(records):
+    """Retain bounded event identity/type/attribution, hash metadata, never logs."""
+    output=[]
+    for record in records:
+        if not isinstance(record,dict):
+            raise WindowsImportError("Invalid Windows execution record")
+        kind=record.get("Kind")
+        if not isinstance(kind,str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]{0,69}",kind):
+            raise WindowsImportError("Invalid Windows execution event type")
+        metadata=record.get("Metadata","")
+        if not isinstance(metadata,str):
+            raise WindowsImportError("Windows execution metadata must be text")
+        evidence=record.get("Evidence","unknown")
+        if evidence not in ("observed","imported","inferred","unknown"):
+            raise WindowsImportError("Unsupported Windows execution evidence label")
+        source=record.get("Source","")
+        if not isinstance(source,str) or len(source)>128:
+            raise WindowsImportError("Invalid Windows execution source")
+        output.append({
+            "id":optional_guid(record.get("Id"),"execution record"),
+            "stageId":optional_guid(record.get("StageId"),"execution stage"),
+            "runId":optional_guid(record.get("RunId"),"execution run"),
+            "kind":kind, "evidence":evidence,
+            "sourceKind":"aiws.local" if source=="aiws.local" else "other",
+            "at":date_label(record.get("At"),"execution event"),
+            "metadataSha256":hashlib.sha256(metadata.encode("utf-8")).hexdigest() if metadata else None,
+            "payloadImported":False,
+        })
+    return output
+
 def summarize_unified(unified):
     if unified is None:
         unified={}
@@ -67,10 +157,21 @@ def summarize_unified(unified):
         status=item.get("Status")
         if agent not in AGENTS or status not in STATUSES:
             raise WindowsImportError("Unrecognized Windows AgentRunRecord enum")
+        adapter=item.get("AdapterId","")
+        if not isinstance(adapter,str) or len(adapter)>128:
+            raise WindowsImportError("Invalid Windows Agent adapter")
+        evidence=item.get("Evidence","local-intent")
+        if evidence not in ("local-intent","observed","imported","inferred","unknown"):
+            raise WindowsImportError("Invalid Windows Agent evidence")
         run_summaries.append({
             "id":guid(item.get("Id"),"agent run"),
             "agent":agent,"status":status,
             "stageId":guid(item.get("StageId"),"run stage"),
+            "adapterIdSha256":hashlib.sha256(adapter.encode("utf-8")).hexdigest() if adapter else None,
+            "evidence":evidence,
+            "startedAt":date_label(item.get("StartedAt"),"Agent start"),
+            "completedAt":date_label(item.get("CompletedAt"),"Agent completion"),
+            "linuxState":"history-only", "executable":False,
         })
     return {"planRevisionSha256":hashes,"artifactRefs":refs,"agentRuns":run_summaries}
 
@@ -145,9 +246,18 @@ def convert_windows_task(data):
     for key in graph_map:
         visit(key,set())
     metadata["stages"]=[{
-        k:s[k] for k in ("key","windowsStatus","windowsAgent",
+        **{k:s[k] for k in ("key","windowsStatus","windowsAgent",
                         "windowsRequiresApproval","windowsApprovalGranted",
-                        "resultSha256","instructionsSha256")
+                        "resultSha256","instructionsSha256")},
+        "linuxState":"unmapped", "executable":False,
+    } for s in converted]
+    metadata["planRevisions"]=summarize_plans(unified.get("Plans",[]) or [])
+    metadata["workItems"]=summarize_workitems(unified.get("WorkItems",[]) or [],ids)
+    metadata["executionRecords"]=summarize_execution_records(executions)
+    metadata["workflowStages"]=[{
+        "stageId":s["key"],"sourceStatus":s["windowsStatus"],
+        "sourceAgent":s["windowsAgent"],"dependsOn":s["dependsOn"],
+        "linuxState":"unmapped","executable":False,
     } for s in converted]
     metadata["sourceSha256"]=digest(data)
     return {"taskId":task_id,"title":title,"goal":goal,"stages":converted,

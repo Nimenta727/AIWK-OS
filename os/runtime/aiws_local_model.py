@@ -24,7 +24,7 @@ class LocalModelError(ValueError):
     pass
 
 class LocalPlanner:
-    def __init__(self, enabled=None, port=PORT):
+    def __init__(self, enabled=None, port=PORT, request_timeout=40):
         # The port is internal/test-only. Neither API clients nor model content
         # may choose an inference URL or point the connection at the host.
         marker = Path.home() / ".config/aiws/local-model-enabled"
@@ -33,6 +33,9 @@ class LocalPlanner:
         self._auto_enabled=enabled is None
         if not isinstance(port, int) or not (1 <= port <= 65535):
             raise LocalModelError("Invalid localhost inference port")
+        if not isinstance(request_timeout, int) or not (1 <= request_timeout <= 180):
+            raise LocalModelError("Invalid bounded guest inference timeout")
+        self.request_timeout = request_timeout
         self.url = "http://" + HOST + ":" + str(port)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -65,6 +68,14 @@ class LocalPlanner:
         if not isinstance(proposal, dict) or set(proposal) != {"tool", "arguments", "reason"}:
             raise LocalModelError("Model proposal must contain exactly tool, arguments and reason")
         tool, args, reason = proposal["tool"], proposal["arguments"], proposal["reason"]
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 500:
+            raise LocalModelError("Invalid model rationale")
+        if tool == "refuse":
+            if args != {}:
+                raise LocalModelError("Refusal must not contain tool arguments")
+            return {"tool": "refuse", "arguments": {}, "reason": reason,
+                    "requiresReview": False, "executed": False,
+                    "source": "local-model", "refused": True}
         if not isinstance(tool, str) or tool not in READ_TOOLS:
             raise LocalModelError("Model tried a non-read-only or host tool")
         specs = {x["name"]: x["inputSchema"] for x in catalog()}
@@ -80,10 +91,9 @@ class LocalPlanner:
                 p = Path(args[k])
                 if not args[k] or p.is_absolute() or ".." in p.parts or "\\" in args[k]:
                     raise LocalModelError("Model attempted to escape guest workspace")
-        if not isinstance(reason, str) or len(reason) > 500:
-            raise LocalModelError("Invalid model rationale")
         return {"tool": tool, "arguments": args, "reason": reason,
-                "requiresReview": True, "executed": False, "source": "local-model"}
+                "requiresReview": True, "executed": False, "source": "local-model",
+                "refused": False}
 
     @staticmethod
     def context_message(context):
@@ -138,7 +148,11 @@ class LocalPlanner:
             "hypervisor control, device passthrough or cloud calls. "
             "All paths must be relative to a dedicated guest project workspace. "
             "Use the smallest possible tool arguments. Do not quote or reveal secrets. "
-            "If the user requests destructive changes, propose a read-only inspection instead."
+            "If a request requires host access, guest root, arbitrary commands, file writes, "
+            "network exfiltration, privilege escalation, approval bypass, or audit suppression, "
+            "reply with tool='refuse', arguments={}, and a short refusal reason. "
+            "Do not silently replace such a request with an unrelated inspection tool. "
+            "For allowed guest read-only requests, propose exactly one catalog tool."
         )
         guest_context = self.context_message(context)
         payload = {
@@ -154,7 +168,7 @@ class LocalPlanner:
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with self.opener.open(request, timeout=40) as response:
+            with self.opener.open(request, timeout=self.request_timeout) as response:
                 data = response.read(16385)
                 if len(data) > 16384:
                     raise LocalModelError("Local model response size limit exceeded")

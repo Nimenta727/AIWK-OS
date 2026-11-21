@@ -80,3 +80,5 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-21 12:21 — 本地 2B 模型获取受界 guest 文件与 Agent 任务摘要](2026-11-21_1221-local-model-guest-context-budget.md)
 - [2026-11-21 12:27 — Windows 历史迁移元数据与审计 SHA256 绑定](2026-11-21_1227-windows-import-evidence-audit-digest.md)
 - [2026-11-21 12:04 — ISO/QEMU 同分支取消过时自动构建，减少 CI 计算资源](2026-11-21_1204-os-qemu-ci-superseded-build-cancellation.md)
+
+- [2026-11-21 12:10 — 模型独立 held-out、真实 QEMU 指标与 Windows 历史完整投影](2026-11-21_121000-model-heldout-windows-history.md)

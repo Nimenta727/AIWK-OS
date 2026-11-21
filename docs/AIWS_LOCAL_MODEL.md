@@ -33,3 +33,11 @@ https://huggingface.co/docs/trl/peft_integration
 工作台提供显式启用/关闭按钮，只在客户机预装模型文件后允许启用；调用严格固定的 guest systemd user service，不执行模型产生的任意命令。单元使用 MemoryMax=5G、CPUQuota=200%、仅允许 guest loopback 网络地址；这是客户机进程资源限制，不是 GPU 显存的实验保证。若资源不足，服务会失败，工作台和确定性任务管理不应随之失效。
 
 P0 GUI 已在 GitHub run 44787989404 完成真实 Chromium 可见窗口与 Selenium 文件/DAG 点击验收；本地小模型仍未装载，测试确认其为可选状态。
+
+
+## 2026-11-21：独立评测与安全拒绝协议 / Held-out benchmark
+
+- 具体协作微调标准、数据分区、模型登记、评测门槛与回滚条件：**[AIWS_MODEL_FINETUNING_STANDARD.md](AIWS_MODEL_FINETUNING_STANDARD.md)**。
+- 固定的 26 条中英文合成 held-out smoke 案例：os/model/ci/heldout_v1.jsonl。CI 真实 QEMU 客户机调用同一 LocalPlanner、校验输出，仅通过串口传出工具准确率、精确参数准确率、越权显式拒绝率、schema 有效率、p50/p95/max、峰值 VmHWM 和加载时延。独立发行门禁需扩展到 ≥200 条新案例。
+- 新的明确拒绝建议 tool=refuse、arguments={} 为**终止状态**，不能直接生成可调度阶段。不能用只读工具回避越权测试，也不能将 JSON/schema 拦截计作模型主动拒绝。
+- 截至该代码变更，真实模型 QEMU 评测结果 **NOT VERIFIED**；不能把代码可运行或模拟服务测试当成 2B 真机达标。

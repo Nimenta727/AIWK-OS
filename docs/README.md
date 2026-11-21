@@ -7,6 +7,8 @@
 > **English:** Historical records remain preserved; this index offers bilingual descriptions and up-to-date release links.
 
 ## AIWS OS / AI 虚拟机操作系统
+- [内置模型微调与独立评测 / Fine-tuning and held-out evaluation standard](AIWS_MODEL_FINETUNING_STANDARD.md) — 供外部贡献者执行的数据、拒绝率、延迟/RSS、质量门禁、LoRA 与回滚规范
+- [Windows → Linux Agent 历史投影 / Migration mapping](AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md) — 计划版本、AgentRun、WorkItems、ExecutionRecords 的不可执行受界映射
 - [AIWS 小模型与本地推理 / Offline local assistant](AIWS_LOCAL_MODEL.md) — guest-only llama.cpp、模型权限、评测与 LoRA 准备
 - [AIWS OS 强制四项验收 / Four priority acceptance gates](AIWS_OS_PRIORITY_GATES.md) — P0 GUI、P0 Linux 统一任务/DAG、P1 NixOS 真正构建与启动、P1 guest-only 权限与恢复
 - [模块化系统重构 / Modular AI-native OS](AIWS_MODULAR_OS.md) — NixOS/Debian 镜像适配、共用 React、系统 Agent 和真实开机验证

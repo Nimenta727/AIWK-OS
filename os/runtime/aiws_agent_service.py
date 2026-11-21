@@ -91,6 +91,8 @@ class AgentCore:
             if not isinstance(a["instruction"],str) or not 1<=len(a["instruction"])<=1000:
                 raise AgentError("Invalid bounded instruction")
             proposal=LocalPlanner.validate(a["proposal"])
+            if proposal["tool"] == "refuse":
+                raise AgentError("Refusals cannot become executable Agent stages")
             stage={"key":"inspect","label":proposal["reason"][:160],
                    "tool":proposal["tool"],"arguments":proposal["arguments"],"dependsOn":[]}
             task=self.tasks.create("Local proposal: "+proposal["tool"],proposal["reason"],[stage])

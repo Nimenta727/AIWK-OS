@@ -204,6 +204,9 @@ class Controller:
     def model_plan(self, instruction):
         """Persist but do not execute a validated, read-only local model plan."""
         proposal = self.local_suggest(instruction)
+        if proposal["tool"] == "refuse":
+            # Explicit refusals are terminal decisions, never DAG tool nodes.
+            return {"refused": True, "proposal": proposal, "executed": False}
         if self.agent is not None:
             # Production: independent systemd user Agent revalidates the model
             # output, owns durable state and records prompt/proposal hashes.

@@ -66,3 +66,9 @@ Build with Debian 13 as above; validate with `python3 -m unittest discover -s os
 The earlier bootstrap description is retained for history. Current Debian guest defaults to a dedicated AIWS Shell and an independent systemd user aiws-agent.service over a same-UID private UNIX socket. File edits and kernel candidate mutations must use the same durable, reviewed DAG. An interactive guest-root-only A/B manager is packaged for guest EFI installations, but the standard Live ISO has no persistent EFI slot. Guest Qwen3.5-2B weights can optionally be included in a hash-pinned, licensed model-inclusive image. Normal smoke ISO remains model-free.
 
 Both real firmware A/B recovery and actual in-guest Qwen 2B inference require CI acceptance, which has not been established by the code changes themselves.
+
+
+## 2026-11-21 contributor gates / 当期微调及迁移验收入口
+
+- [2B 微调与独立评测规范](../docs/AIWS_MODEL_FINETUNING_STANDARD.md)：中英 held-out 测试、明确拒绝率、guest RSS/时延、复现证据和 LoRA 回滚。实际 QEMU 模型评测必须通过 ci 后才可宣称完成。
+- [Windows→Linux Agent 历史投影](../docs/AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md)：计划修订、WorkItem、AgentRun 和执行事件仅作受界证据；导入阶段不可执行，不复用 Windows 审批。

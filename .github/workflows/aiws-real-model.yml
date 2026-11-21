@@ -126,6 +126,10 @@ jobs:
             sleep 2
           done
           tail -n 140 "$serial" || true
+          if grep -q 'AIWS_GUEST_MODEL_BENCHMARK ' "$serial"; then
+            grep 'AIWS_GUEST_MODEL_BENCHMARK ' "$serial" | tail -n 1 | sed 's/^.*AIWS_GUEST_MODEL_BENCHMARK //' > out/aiws-guest-model-benchmark.json
+            python3 -m json.tool out/aiws-guest-model-benchmark.json >/dev/null
+          fi
           if [[ "$passed" != 1 ]]; then
             echo "Real QEMU guest 2B inference acceptance did not pass"
             exit 1
@@ -144,5 +148,13 @@ jobs:
         with:
           name: aiws-real-2b-cpu-inference-metrics
           path: out/aiws-real-model-metrics.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Upload held-out guest benchmark receipt (no prompts or model output)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-2b-heldout-guest-benchmark
+          path: out/aiws-guest-model-benchmark.json
           if-no-files-found: warn
           retention-days: 30

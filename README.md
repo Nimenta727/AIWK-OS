@@ -40,6 +40,8 @@ AIWS 是自己的 **WPF / .NET 10 Windows 桌面 EXE**，通过 WebView2 承载�
 
 工程说明：[AIWS OS 模块化重构](docs/AIWS_MODULAR_OS.md)、[OS 工程](os/README.md)、[镜像与 QEMU 启动验证](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/aiws-os-image-boot.yml)。
 
+**2026-11-21 Linux Agent 进展说明：** 已加入 Windows 计划修订/WorkItem/AgentRun/执行事件的受界只读迁移投影；旧阶段始终 UNMAPPED、不可执行。内置模型新增明确拒绝（refuse）协议、26 例独立中英双语评测集，以及真实 QEMU 的工具准确率、拒绝率、RSS、p50/p95 延迟采样链路。**本次代码提交并不代表 2B 模型已通过真实 QEMU 评测。** [模型微调规范](docs/AIWS_MODEL_FINETUNING_STANDARD.md) · [Windows→Linux 映射](docs/AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md)。
+
 ### 安装 / Installation
 
 1. 打开 [GitHub Releases](https://github.com/Nimenta727/Windows-AI-Workstation/releases)，选择最新的 **预发布版** ZIP。若预发布流程尚未完成，请使用 [Windows Actions 构建产物](https://github.com/Nimenta727/Windows-AI-Workstation/actions/workflows/native-desktop.yml)。

@@ -78,6 +78,10 @@ if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF || -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
   if [[ "${AIWS_OS_MODEL_GUEST_CI_TEST:-0}" == "1" ]]; then
     install -m 0444 "$repo/os/model/ci/guest_inference_smoke.py" \
       "$out/config/includes.chroot/usr/local/lib/aiws/aiws_model_guest_smoke.py"
+    install -m 0444 "$repo/os/model/ci/guest_benchmark.py" \
+      "$out/config/includes.chroot/usr/local/lib/aiws/guest_benchmark.py"
+    install -m 0444 "$repo/os/model/ci/heldout_v1.jsonl" \
+      "$out/config/includes.chroot/usr/local/lib/aiws/aiws_model_heldout.jsonl"
     mkdir -p "$out/config/includes.chroot/etc/aiws"
     printf 'AIWS_MODEL_CI_ONLY=1\n' \
       > "$out/config/includes.chroot/etc/aiws/guest-model-acceptance"
