@@ -48,6 +48,10 @@ jobs:
           set -Eeuo pipefail
           cp os/model/ci/inference_smoke.py out/model-real/inference_smoke.py
           docker build -t aiws-real-qwen-ci -f os/model/ci/Dockerfile out/model-real
+          # Verify a non-root user can actually traverse and read the bundled
+          # test script and GGUF before claiming an inference failure.
+          docker run --rm --network none --entrypoint /usr/bin/stat aiws-real-qwen-ci \
+            -c '%U %a %n' /opt /opt/aiws /opt/aiws/inference_smoke.py /opt/aiws/model.gguf
           docker run --rm --network none --cpus 2 --memory 5g --pids-limit 128 \
             --security-opt no-new-privileges --cap-drop ALL --read-only \
             --tmpfs /tmp:rw,nosuid,nodev,size=64m \
