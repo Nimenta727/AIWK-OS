@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 15:20 — 修复安装预检 Python 语法错误与 CI 阻断](2026-11-21_1520-installer-ci-syntax-fix.md)
 - [2026-11-21 15:05 — M1 安装预检签名检测与防误判加固](2026-11-21_1505-installer-signature-hardening.md)
 - [2026-11-21 14:50 — Alpha 0.1 安装安全预检与 Shell 2.0 首批功能](2026-11-21_1450-alpha-install-preflight-shell.md)
 - [2026-11-21 14:20 — README、文档和代码结构统一整理](2026-11-21_1420-readme-docs-codebase-structure.md)
