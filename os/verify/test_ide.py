@@ -126,8 +126,13 @@ class BuildScriptTests(unittest.TestCase):
         self.assertEqual(subprocess.run(["bash", "-n", str(IDE / "build-aiws-code.sh")]).returncode, 0)
         for needle in ('id -u', 'rev-parse HEAD', 'AIWS_CODE_VSCODE_COMMIT', 'already exists', 'nothing was deleted', 'git -C src apply --check',
                        'apply_product_overrides.py', 'scan_endpoints.py', 'LICENSE.txt', 'ThirdPartyNotices.txt', 'AIWS-NOTICE.md',
-                       'frozen-lockfile', 'vscode-reh-web-linux-x64-min-ci', 'sha256sum', 'NOT yet executed'):
+                       'frozen-lockfile', 'vscode-reh-web-linux-x64-min', 'sha256sum', 'NOT yet executed'):
             self.assertIn(needle, self.src, needle)
+        # The "-ci" gulp task only PACKAGES (it needs an earlier compile step) and fails with a missing nls.keys.json;
+        # the account/AI extensions are dropped from the OUTPUT because the gulp graph needs their sources.
+        self.assertNotIn('min-ci', self.src.split('# 4b)')[0].split('gulp ')[-1])
+        self.assertIn('"$out/extensions/copilot"', self.src)
+        self.assertNotRegex(self.src.split('# 4)')[1].split('( cd src')[0], r'rm -rf[^\n]*src/extensions')
         for bad in ("curl", "| sh", "| bash", "rm -rf /", "eval "):
             self.assertNotIn(bad, self.src)
         self.assertIn("never ship upstream logos", self.src.lower().replace("we never ship upstream logos", "never ship upstream logos"))
@@ -149,7 +154,10 @@ class BrandingTests(unittest.TestCase):
         for forbidden in ("microsoft", "visual studio", "vscode", "vs code"):
             self.assertNotIn(forbidden, svg.lower().replace("not derived from any microsoft or third-party logo", ""))
         self.assertIn("Original AIWS artwork", svg)
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow is not installed; the SVG checks above still ran")
         self.assertEqual(Image.open(IDE / "branding/icon-512.png").size, (512, 512))
         self.assertEqual(Image.open(IDE / "branding/icon-192.png").size, (192, 192))
         self.assertEqual(Image.open(IDE / "branding/icon-256.png").size, (256, 256))

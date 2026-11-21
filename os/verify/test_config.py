@@ -73,6 +73,12 @@ class AiwsOsContract(unittest.TestCase):
         self.assertNotIn("--kiosk", browser)
         self.assertIn("xclip -selection clipboard", smoke)
         self.assertIn("windowactivate --sync", smoke)
+        # Found by booting the full image: "-loops 1" lets a desktop component's TARGETS query consume the only loop,
+        # so the clipboard owner must stay alive until the value is read back.
+        commands = "\n".join(x for x in smoke.splitlines() if not x.strip().startswith("#"))
+        self.assertNotIn("-loops 1", commands)
+        # Without it Chromium asks gnome-keyring for a new keyring and a password dialog covers the workbench on boot.
+        self.assertIn("--password-store=basic", browser)
         self.assertIn("El Torito boot img", firmware)
         self.assertIn("AIWS_FIRMWARE_ISO_PASS", firmware)
         executable = "\n".join(x for x in firmware.splitlines()

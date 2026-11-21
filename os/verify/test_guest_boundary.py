@@ -55,8 +55,6 @@ class BoundaryTests(unittest.TestCase):
         root=Path(__file__).resolve().parents[2]
         marker=root/"os/debian/config/includes.chroot/etc/aiws/guest-managed"
         self.assertEqual(marker.read_text().strip(),MARKER_CONTENT)
-        nix=(root/"os/platforms/nixos/aiws.nix").read_text()
-        self.assertIn('aiws/guest-managed',nix)
         host=(root/"os/host/run-qemu-offline.sh").read_text()
         for forbidden in ("-virtfs","-fsdev","-device vfio-","-device usb-host","hostfwd=","-nic user"):
             self.assertNotIn(forbidden,host)

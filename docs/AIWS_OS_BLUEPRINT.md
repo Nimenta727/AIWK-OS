@@ -4,7 +4,7 @@
 
 ## 1. Product identity / 产品定位
 
-This is a **standalone Linux guest operating system**, not a Windows launcher. Windows AIWS remains a compatibility host. The target architecture is:
+This is a **standalone Linux operating system** for programmers (the earlier Windows workstation was retired; see history/). The target architecture is:
 
 ```text
 Host (Windows Hyper-V or hardened Linux KVM/libvirt)
@@ -56,7 +56,7 @@ Performance is an evidence problem: measure cold boot, memory pressure, VM exits
 | --- | --- | --- |
 | P0 current | Debian Live ISO recipe, GUI/tools, guest config, offline launch/tests | Static tests only; actual ISO build and boot pending |
 | P1 | Reproducible ISO/VM disk, signed/checksummed artifacts, boot smoke on KVM + Hyper-V | boot/graphics/input/IME/recovery evidence |
-| P2 | Port core Agent controller to Linux system daemon; embed React workbench into trusted desktop shell | same task data and API schema, no WPF dependency |
+| P2 | Port core Agent controller to Linux system daemon; embed React workbench into trusted desktop shell | same task data and API schema |
 | P3 | Versioned guest-only privileged execution broker + journal/audit + rollback | permission and interruption tests, root/session separation |
 | P4 | Pinned custom Debian kernel packages, trace/cgroup integration, safe fallback | kernel ABI/upgrade/boot tests and measurements |
 | P5 | Host side boundary validation, segmented online networking, mediated file import/export | VM isolation tests and expert review |
@@ -64,6 +64,6 @@ Performance is an evidence problem: measure cold boot, memory pressure, VM exits
 
 ## 6. Licensing / 许可清单
 
-This repository's `LICENSE` file is now Apache-2.0 (changed 2026-11-21; it was MIT before). The migration still owes: confirmation of every contributor, preservation of the prior MIT terms for code that was already distributed under MIT and of adapted MIT-provenance UI (`third_party/t3code/NOTICE.md`), a root NOTICE file, and an SPDX inventory. The Linux kernel remains GPL-2.0-only; Debian userland mixes GPL, LGPL, MPL, Apache, MIT and other licenses; Debian `main` packaging does not eliminate redistribution obligations. We currently bundle **package names** and download from Debian build-time mirrors, not copied proprietary application binaries. Do not claim the generated ISO may be redistributed until the full dependency license/source audit and SBOM are done.
+This repository's `LICENSE` file is now Apache-2.0 (changed 2026-11-21; it was MIT before). Resolved 2026-11-21: all commits come from the owner's account and no LICENSE file existed before, so no prior MIT grant needs preserving; a root `NOTICE` exists; adapted MIT-provenance UI keeps its MIT text in `third_party/t3code/NOTICE.md`. Still open: an SPDX inventory and contributor terms if outside contributions are accepted. The Linux kernel remains GPL-2.0-only; Debian userland mixes GPL, LGPL, MPL, Apache, MIT and other licenses; Debian `main` packaging does not eliminate redistribution obligations. We currently bundle **package names** and download from Debian build-time mirrors, not copied proprietary application binaries. Do not claim the generated ISO may be redistributed until the full dependency license/source audit and SBOM are done.
 
 References: [Debian Live Manual](https://live-team.pages.debian.net/live-manual/html/live-manual.en.html), [Debian live-build](https://packages.debian.org/trixie/live-build), [QEMU guest isolation](https://www.qemu.org/docs/master/system/security.html).

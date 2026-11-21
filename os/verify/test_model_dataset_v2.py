@@ -48,7 +48,7 @@ class DatasetV2Tests(unittest.TestCase):
             for lang in ("zh", "en"):
                 self.assertGreaterEqual(sum(c["kind"] == kind and c["language"] == lang for c in cases), 10, (kind, lang))
         summary = vd.summarize(train, dev)
-        for tool in MODEL_WRITE_TOOLS | {"system.info", "network.status", "download.list", "download.progress", "file.trashList"}:
+        for tool in (MODEL_WRITE_TOOLS - {"app.launch"}) | {"system.info", "network.status", "download.list", "download.progress", "file.trashList"}:
             self.assertGreater(summary["byTool"].get(tool, 0), 8, tool)
         self.assertGreater(summary["byTool"]["plan"], 60)
         self.assertGreater(summary["byTool"]["refuse"], 100)
@@ -145,7 +145,7 @@ class DatasetV2Tests(unittest.TestCase):
             self.assertIn(needle, text)
         for tool in sorted(MODEL_WRITE_TOOLS):
             self.assertIn(tool, text)
-        self.assertNotIn("file.replace", text.split("File tools")[1])
+        self.assertNotIn("file.replace", text.split("Tools that change something")[1])
         source = (ROOT / "model" / "training" / "train_lora.py").read_text(encoding="utf-8")
         self.assertIn("system_prompt()", source)
         self.assertIn("check_independence(rows,holdout)", source)

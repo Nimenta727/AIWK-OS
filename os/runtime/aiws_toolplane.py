@@ -13,11 +13,10 @@ import subprocess
 import re
 import tempfile
 import uuid
-from aiws_crossplatform import inspect_project, scaffold_project
 from aiws_guest_boundary import protect_guest_workspace
-from aiws_codeintel import symbols as code_symbols, references as code_references, dependencies as code_dependencies, platform_apis as code_platform_apis
 import time
 from urllib.parse import urlsplit
+import aiws_exttools
 
 MAX_TEXT = 128 * 1024
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "target", "dist", "build", ".aiws-trash"}
@@ -40,27 +39,25 @@ TOOL_SPECS = [
     ("file.trash", "Move a file or directory to the reversible workspace trash; never deletes permanently", {"path": "string", "expectedSha256": "string"}),
     ("file.restore", "Restore a trashed item to its original path if still free", {"trashId": "string"}),
     ("file.replace", "Atomically replace a file with SHA-256 precondition; guest workspace write", {"path": "string", "text": "string", "expectedSha256": "string"}),
+    ("tools.list", "List the integrated applications and command-line tools of this workstation and whether each is installed (read-only)", {}),
+    ("doc.text", "Extract plain text from a workspace document: PDF (pdftotext), DOCX/ODT/EPUB (pandoc), HTML, or any small text file; bounded output", {"path": "string"}),
+    ("app.launch", "Start a registered desktop program (terminal, browser, editor ...). Needs the user's explicit approval; fixed command, no arguments", {"id": "string"}),
     ("code.search", "Search literal text in source files with bounded output", {"query": "string", "path": "string"}),
     ("git.inspect", "Read git status or diff (not commit/push)", {"view": "string"}),
     ("runtime.detect", "Discover installed language and build executables", {}),
     ("runtime.test", "Execute a fixed language test command in the guest workspace; opt-in", {"language": "string"}),
     ("browser.local_text", "Extract text from an HTML document in the workspace", {"path": "string"}),
     ("browser.snapshot", "Headless Chromium DOM-text snapshot; disabled until exact origins are configured", {"url": "string"}),
-    ("platform.inspect", "Recognize Windows/macOS/Swift project sources without building", {"path": "string"}),
-    ("project.scaffold", "Create Windows WPF or macOS SwiftUI source template (opt-in; never overwrite)", {"name": "string", "template": "string"}),
-    ("code.symbols", "Read-only C#/Swift source symbol index; syntax-level candidates", {"path": "string", "query": "string"}),
-    ("code.references", "Find symbol definitions and unresolved cross-file identifier occurrences", {"symbol": "string", "path": "string"}),
-    ("code.dependencies", "Inspect MSBuild/NuGet, SwiftPM and XcodeGen declared dependencies without build", {"path": "string"}),
-    ("code.platformApis", "Find WPF/WinUI/interop and SwiftUI/AppKit/UIKit API usage evidence", {"path": "string"}),
 ]
 
 def catalog():
     tools = []
-    for name, description, fields in TOOL_SPECS:
+    for name, description, fields in TOOL_SPECS + aiws_exttools.specs():
         properties = {key: {"type": value} for key, value in fields.items()}
-        required = (["query"] if name == "code.search" else
-                    ["symbol"] if name == "code.references" else
-                    list(fields) if name in {"download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test", "project.scaffold"} else [])
+        required = (aiws_exttools.required(name) if name in aiws_exttools.EXT else
+                    ["id"] if name == "app.launch" else
+                    ["query"] if name == "code.search" else
+                    list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -68,7 +65,6 @@ def catalog():
 # Executables `runtime.detect` reports (path or null). Languages first, then build, debug, VCS and editors.
 DETECT_TOOLS = (
     "python3", "pipx", "node", "npm", "tsc", "go", "rustc", "cargo", "javac", "java", "mvn", "ruby", "php", "lua5.4",
-    "dotnet", "swift", "sourcekit-lsp", "xcodegen",
     "cc", "gcc", "g++", "clang", "clangd", "cmake", "make", "ninja", "meson",
     "gdb", "valgrind", "shellcheck", "sqlite3", "psql",
     "git", "gh", "rg", "jq", "tmux", "nvim", "vim", "aiws-code", "chromium", "chromedriver",
@@ -76,11 +72,13 @@ DETECT_TOOLS = (
 
 # Single source of truth for tool classes. Every other module imports these.
 READ_TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.stat", "file.trashList", "code.search", "git.inspect",
-    "runtime.detect", "browser.local_text", "platform.inspect", "code.symbols",
-    "code.references", "code.dependencies", "code.platformApis",
+    "workspace.tree", "file.read", "file.stat", "tools.list", "doc.text", "file.trashList", "code.search", "git.inspect",
+    "runtime.detect", "browser.local_text",
     "system.info", "network.status", "download.list", "download.progress",
-})
+}) | aiws_exttools.names()
+# Desktop launches are write-class: they always become pending DAG stages that need the user's approval, and they are
+# EXECUTED by the workbench's desktop launcher (aiws_launcher.py), because only it can reach the display.
+APP_LAUNCH_TOOLS = frozenset({"app.launch"})
 FILE_WRITE_TOOLS = frozenset({"file.replace", "file.mkdir", "file.copy", "file.move",
                               "file.trash", "file.restore"})
 
@@ -583,6 +581,47 @@ def _command(root, argv, timeout=20):
             "stdout": result.stdout[:24000], "stderr": result.stderr[:12000],
             "truncated": len(result.stdout) > 24000 or len(result.stderr) > 12000}
 
+DOC_MAX_BYTES = 32 * 1024 * 1024
+DOC_TEXT_LIMIT = 64 * 1024
+PANDOC_SUFFIXES = {".docx": "docx", ".odt": "odt", ".epub": "epub", ".rtf": "rtf"}
+
+def _doc_text(root, a):
+    """Text of a workspace document. Only fixed argv lists; output bounded; the file never leaves the workspace."""
+    path = _path(root, a["path"])
+    if not path.is_file():
+        raise ValueError("Not a regular file")
+    size = path.stat().st_size
+    if size > DOC_MAX_BYTES:
+        raise ValueError("Document is larger than 32 MiB")
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        exe, argv, source = shutil.which("pdftotext"), None, "pdftotext"
+        if not exe:
+            raise FileNotFoundError("poppler-utils (pdftotext) is not installed")
+        argv = [exe, "-q", "-layout", "-l", "60", str(path), "-"]
+    elif suffix in PANDOC_SUFFIXES:
+        exe, source = shutil.which("pandoc"), "pandoc"
+        if not exe:
+            raise FileNotFoundError("pandoc is not installed")
+        argv = [exe, "--sandbox", "-f", PANDOC_SUFFIXES[suffix], "-t", "plain", "--wrap=none", str(path)]
+    elif suffix in (".html", ".htm"):
+        text, source = _extract(_text_file(path)), "html"
+        return {"path": a["path"], "source": source, "text": text, "truncated": False, "bytes": size}
+    else:
+        text = _text_file(path)
+        return {"path": a["path"], "source": "text", "text": text[:DOC_TEXT_LIMIT],
+                "truncated": len(text) > DOC_TEXT_LIMIT, "bytes": size}
+    result = subprocess.run(argv, cwd=root, env=_safe_env(), capture_output=True, text=True, errors="replace",
+                            timeout=30, check=False)
+    if result.returncode != 0:
+        raise ValueError("The converter could not read this document")
+    return {"path": a["path"], "source": source, "text": result.stdout[:DOC_TEXT_LIMIT],
+            "truncated": len(result.stdout) > DOC_TEXT_LIMIT, "bytes": size}
+
+def _tools_list(root, a):
+    import aiws_apps
+    return {"apps": aiws_apps.listing(), "runtime": {name: shutil.which(name) for name in DETECT_TOOLS}}
+
 def _git(root, a):
     if a.get("view", "status") not in ("status", "diff"):
         raise ValueError("Only git status and diff are available")
@@ -704,6 +743,14 @@ def invoke(name, arguments):
                "file.move": _move, "file.trash": _trash, "file.restore": _restore}.get(name)
     if handler is not None:
         return handler(root, arguments)
+    if name in aiws_exttools.EXT:
+        return aiws_exttools.run(name, arguments, root, _path, _safe_env())
+    if name == "app.launch":
+        raise PermissionError("app.launch is executed by the desktop launcher after approval, not by the tool plane")
+    if name == "tools.list":
+        return _tools_list(root, arguments)
+    if name == "doc.text":
+        return _doc_text(root, arguments)
     if name == "code.search":
         return _search(root, arguments)
     if name == "git.inspect":
@@ -716,18 +763,6 @@ def invoke(name, arguments):
         return {"path": arguments["path"], "text": _extract(_text_file(_path(root, arguments["path"])))}
     if name == "browser.snapshot":
         return _browser(root, arguments)
-    if name == "platform.inspect":
-        return inspect_project(root, arguments.get("path", "."), _path)
-    if name == "project.scaffold":
-        return scaffold_project(root, arguments)
-    if name == "code.symbols":
-        return code_symbols(root, arguments, _path)
-    if name == "code.references":
-        return code_references(root, arguments, _path)
-    if name == "code.dependencies":
-        return code_dependencies(root, arguments, _path)
-    if name == "code.platformApis":
-        return code_platform_apis(root, arguments, _path)
     raise AssertionError("Unreachable tool dispatch")
 
 def audit(name, arguments, ok):

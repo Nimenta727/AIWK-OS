@@ -1,6 +1,6 @@
 # Linux guest runtime / 客户机运行时
 
-此目录是 **Linux 客户机** 的 Python 服务实现，不是 Windows WPF 的替代构建入口。
+此目录是 **Linux 客户机** 的 Python 服务实现。
 
 | 模块 | 职责 |
 | --- | --- |
@@ -13,7 +13,6 @@
 | `aiws_guest_ops.py` | 受限的客户机服务/内核候选操作 |
 | `aiws_local_model.py` | 可选 GGUF/llama.cpp 建议、读/写分级、多步计划及拒绝协议 |
 | `aiws_model_router.py` | 规则路由（本地 / 外部官方 CLI / 询问用户）、拒绝不升级、交接文件；不联网、不启动进程 |
-| `aiws_windows_compat.py` | Windows 历史证据导入，不继承审批 |
 | `aiws_guest_boundary.py` | 客户机路径/运行环境约束；不构成宿主隔离 |
 
 **权限顺序：** Workbench → Agent → Broker → 持久化 running DAG 阶段 → 工具。对外 MCP 仅暴露只读操作。Broker 与 Agent 仍是同 UID，恶意同 UID 进程可能绕过：详见 [威胁模型](../../docs/AIWS_PERMISSION_BROKER.md)。

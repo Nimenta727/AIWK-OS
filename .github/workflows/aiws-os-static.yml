@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'os/**'
+      - 'workbench/**'
       - 'docs/AIWS_OS_BLUEPRINT.md'
       - 'docs/AIWS_OS_ALPHA_PLAN.md'
       - '.github/workflows/aiws-os-static.yml'
@@ -30,5 +31,13 @@ jobs:
           bash -n os/host/run-qemu-offline.sh
           bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-system-status
           bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-admin-session
+      - name: Install test-only Python packages
+        run: python3 -m pip install --quiet pillow
+      - name: Frontend tests (pure logic)
+        working-directory: workbench
+        run: |
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          npm test
       - name: Static OS security contracts
         run: python3 -m unittest discover -s os/verify -p 'test_*.py' -v

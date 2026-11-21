@@ -40,7 +40,7 @@ GuestTaskStore persists goals, plan stages, dependency DAG, explicit approvals, 
 
 The normal Linux guest controller uses an OS advisory singleton lock. At restart, queued/running stages are marked interrupted; write operations lose prior approval and need fresh confirmation. Failed and completed stages are not silently rerun. The local hash chain is verified before new mutations; missing/deleted/reordered log entries can block scheduling. Tool arguments are SHA-represented in task-created audit events rather than duplicated as plaintext.
 
-Limits: it is a single-guest-user, serial task executor, not full Windows multi-Agent DAG parity. SQLite audit cannot defend against guest root; preexisting arbitrary file contents in task arguments/results still need encryption/data lifecycle controls. A privileged guest service broker does not yet exist.
+Limits: it is a single-guest-user, serial task executor, not a multi-agent scheduler. SQLite audit cannot defend against guest root; preexisting arbitrary file contents in task arguments/results still need encryption/data lifecycle controls. A privileged guest service broker does not yet exist.
 
 ## 3. Offline 1–3B model
 
@@ -65,7 +65,7 @@ These are tool interfaces, not a guarantee of a verified quantized model. Loadin
 ## 5. Four release gates
 
 1. GUI: Debian guest-only AIWS Shell/Chromium kiosk, file and DAG interactions are already QEMU verified; extended kernel candidate approval click test must separately pass. Firmware-boot and long-term user experience remain untested.
-2. Agent parity: unify persistent Linux DAG and approved tools; Windows advanced orchestration/protocol parity, idempotency under real crash and multi-agent scheduling remain to do.
+2. Agent parity: unify persistent Linux DAG and approved tools; advanced orchestration, idempotency under real crash and multi-agent scheduling remain to do.
 3. NixOS: declarative expression evaluated, ISO not yet built/booted.
 4. Isolation/recovery: guest marker, VM detection, forbidden mounts, unprivileged user, capability allowlists, current staging integrity; real permission broker, signed kernel A/B, formal security test remain.
 

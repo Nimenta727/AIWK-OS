@@ -27,7 +27,7 @@ MAX_STEPS = 8
 # WRITE: always become pending DAG stages that need an explicit user approval.
 # file.replace is deliberately not proposable: a small model must not author file contents.
 READ_TOOLS = frozenset(PLANE_READ_TOOLS)
-MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore"})
+MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "app.launch"})
 FINGERPRINTED = frozenset({"file.copy", "file.move", "file.trash"})
 TRASH_ID = re.compile(r"^[a-f0-9]{32}$")
 # Token thrift (step O5): small outputs by default, a larger budget only when the request looks multi-step,
@@ -61,6 +61,10 @@ def load_model_config(path=None):
         config["resultCacheSeconds"] = seconds
     return config
 
+def _launchable_ids():
+    import aiws_apps
+    return sorted(r[0] for r in aiws_apps.REGISTRY if r[1] == "gui" and r[6] is not None)
+
 def system_prompt():
     """The one system prompt used for inference AND for building training examples."""
     return (
@@ -70,7 +74,11 @@ def system_prompt():
         "keys steps (a list of at most 8 objects, each with tool, arguments, reason) and reason. "
         "You are NOT an executor; every proposal is reviewed by the user. "
         "Read-only tools: " + ", ".join(sorted(READ_TOOLS)) + ". "
-        "File tools (the user must approve each): " + ", ".join(sorted(MODEL_WRITE_TOOLS)) + ". "
+        "Tools that change something (the user must approve each): " + ", ".join(sorted(MODEL_WRITE_TOOLS)) + ". "
+        "app.launch takes only id, one of: " + ", ".join(_launchable_ids()) + "; refuse any other program and any command line. "
+        "ext.* tools are read-only: ext.rg is a regex search (code.search is plain text), "
+        "ext.jq reads JSON, ext.gitlog reads history, ext.sqlite runs one SELECT; refuse requests to modify through them. "
+        "Use doc.text for PDF, DOCX, ODT and EPUB files and file.read for plain text. "
         "Never include expectedSha256; the system computes it. Never write file contents. "
         "download.list and download.progress only READ existing download information; "
         "you cannot start, pause, resume or fetch a download, and you cannot access the internet. "
@@ -180,10 +188,30 @@ class LocalPlanner:
                     raise LocalModelError("Model attempted to escape guest workspace")
         if "trashId" in args and not TRASH_ID.fullmatch(args["trashId"]):
             raise LocalModelError("Invalid trash id")
+        LocalPlanner._check_external(tool, args)
+
         return {"tool": tool, "arguments": args, "reason": reason,
                 "requiresReview": True, "requiresApproval": write, "executed": False,
                 "source": "local-model", "refused": False,
                 "grade": "write" if write else "read"}
+
+    @staticmethod
+    def _check_external(tool, args):
+        """Semantic limits for the integrated-tool proposals (the tools re-check everything again when they run)."""
+        if tool == "app.launch":
+            import aiws_apps
+            try:
+                aiws_apps.require_launchable(args["id"])        # only registered desktop programs; never a command line
+            except ValueError as exc:
+                raise LocalModelError("Model proposed a program that cannot be launched") from exc
+        elif tool == "ext.jq" and args["filter"].startswith("-"):
+            raise LocalModelError("A jq filter cannot start with '-'")
+        elif tool == "ext.gitlog" and "count" in args and not (args["count"].isdigit() and 1 <= int(args["count"]) <= 50):
+            raise LocalModelError("git log count must be 1-50")
+        elif tool == "ext.sqlite":
+            query = args["query"].strip().rstrip(";").strip()
+            if ";" in query or not re.match(r"(?is)^(select|with)\b", query):
+                raise LocalModelError("Only one SELECT statement may be proposed")
 
     @staticmethod
     def validate_any(proposal):

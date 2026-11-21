@@ -18,7 +18,7 @@ from aiws_local_model import LocalPlanner, system_prompt
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("--dataset",default=str(here/"synthetic_intents_v2.jsonl"))
+    parser.add_argument("--dataset",default=str(here/"synthetic_intents_v3.jsonl"))
     parser.add_argument("--train-in-guest",action="store_true")
     parser.add_argument("--ack-large-guest-memory-cost",action="store_true")
     parser.add_argument("--epochs",type=int,default=1)
@@ -26,7 +26,8 @@ def main():
     if not args.train_in_guest:
         # Static CI dry run only; never read a user-specified host dataset.
         if Path(args.dataset).resolve() not in {(here/"synthetic_intents.jsonl").resolve(),
-                                                (here/"synthetic_intents_v2.jsonl").resolve()}:
+                                                (here/"synthetic_intents_v2.jsonl").resolve(),
+                                                (here/"synthetic_intents_v3.jsonl").resolve()}:
             parser.error("Non-guest dry runs may only validate bundled synthetic examples")
         rows,holdout=load_validate(args.dataset)
         check_independence(rows,holdout)

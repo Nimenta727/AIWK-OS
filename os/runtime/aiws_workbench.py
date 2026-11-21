@@ -16,7 +16,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
-from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS
+from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS, APP_LAUNCH_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
@@ -26,6 +26,9 @@ from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
 from aiws_events import EventStore, EventError, SAFE_NAME, make_event
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
+import aiws_apps
+import aiws_launcher
+from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
 from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
@@ -143,6 +146,14 @@ class Controller:
         subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
         return {"started": True, "running": False}
+
+    def apps_launch(self, ident):
+        if ident == "aiws-code":
+            return self.ide_open()                                  # the editor keeps its own installed/running logic
+        try:
+            return aiws_apps.launch(ident, self.workspace)
+        except FileNotFoundError as exc:
+            raise SupervisorError(str(exc))
 
     # ---- builder (official CLI under a user mandate) ----
     @staticmethod
@@ -448,11 +459,6 @@ class Controller:
                 return
         threading.Thread(target=work, daemon=True, name="aiws-autorun").start()
 
-    def import_windows(self, payload):
-        if not isinstance(payload,dict) or set(payload)!={"task"}:
-            raise ValueError("Expected Windows exported WorkTask object in task field")
-        return self.tasks.import_windows(payload["task"])
-
     def create_plan(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"title", "goal", "stages"}:
             raise TaskError("Expected title, goal and stages")
@@ -476,6 +482,10 @@ class Controller:
                 # Every system/kernel stage goes through the approved durable DAG.
                 result = self.guest_ops.execute(
                     tool, args, approved=action["approvalGranted"])
+            elif tool in APP_LAUNCH_TOOLS:
+                # Stand-alone workbench (no separate Agent): this process HAS the display and `dispatch` already
+                # required the user's persisted approval.
+                result = aiws_apps.launch(aiws_apps.require_launchable(args["id"]), self.workspace)
             else:
                 result = invoke(tool, args)
             encoded = json.dumps(result, ensure_ascii=False)
@@ -509,9 +519,40 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy",
                          "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                          "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+                         "frame-src 'self' http://127.0.0.1:* http://localhost:*; "
                          "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
         self.end_headers()
         self.wfile.write(data)
+
+    RAW_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+                 ".svg": "image/svg+xml", ".pdf": "application/pdf", ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8"}
+    RAW_MAX = 20 * 1024 * 1024
+
+    def reply_raw(self, relative):
+        """Serve ONE workspace file for the viewer. Allowlisted types only; documents that can run script are sandboxed
+        into an opaque origin (no access to this service's API) with no network."""
+        try:
+            path = workspace_path(_workspace(), relative)
+            media = self.RAW_TYPES.get(path.suffix.lower())
+            if media is None or not path.is_file() or path.stat().st_size > self.RAW_MAX:
+                return self.reply(415, {"error": "Not a previewable file type or too large"})
+            body = path.read_bytes()
+        except (ValueError, OSError, PermissionError) as exc:
+            return self.reply(403, {"error": str(exc)[:240]})
+        scripted = media.startswith("text/html") or media.startswith("image/svg")
+        csp = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; "
+               "font-src data:; frame-ancestors 'self'" if scripted else
+               "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'")
+        self.send_response(200)
+        self.send_header("Content-Type", media)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "SAMEORIGIN")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", csp)
+        self.end_headers()
+        self.wfile.write(body)
 
     def check_host(self):
         return self.headers.get("Host") == HOST + ":" + str(self.server.server_port)
@@ -562,6 +603,21 @@ class Handler(BaseHTTPRequestHandler):
                 if app.file_tools is None:
                     audit("file.read", {"path": paths[0]}, True)
                 return self.reply(200, result)
+            except (ValueError, OSError, PermissionError) as exc:
+                return self.reply(403, {"error": str(exc)[:240]})
+        if path == "/api/v1/workspace/doc":
+            from urllib.parse import parse_qs
+            docs = parse_qs(urlsplit(self.path).query).get("path", [])
+            if len(docs) != 1 or not docs[0] or len(docs[0]) > 512:
+                return self.reply(400, {"error": "One bounded guest-workspace path required"})
+            try:
+                result = (app.file_tools.invoke("doc.text", {"path": docs[0]})
+                          if app.file_tools is not None else invoke("doc.text", {"path": docs[0]}))
+                if app.file_tools is None:
+                    audit("doc.text", {"path": docs[0]}, True)
+                return self.reply(200, result)
+            except AgentUnavailable as exc:
+                return self.reply(503, {"error": str(exc)[:240]})
             except (ValueError, OSError, PermissionError) as exc:
                 return self.reply(403, {"error": str(exc)[:240]})
         if path == "/api/v1/audit/verify":
@@ -621,6 +677,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
         if path == "/api/v1/ide":
             return self.reply(200, app.ide_status())
+        if path == "/api/v1/apps":
+            return self.reply(200, {"apps": aiws_apps.listing()})
+        if path == "/api/v1/workspace/raw":
+            from urllib.parse import parse_qs
+            raws = parse_qs(urlsplit(self.path).query).get("path", [])
+            if len(raws) != 1 or not raws[0] or len(raws[0]) > 512:
+                return self.reply(400, {"error": "One bounded guest-workspace path required"})
+            return self.reply_raw(raws[0])
         if path == "/api/v1/builder":
             return self.reply(200, app.builder_overview())
         if path == "/api/v1/route/config":
@@ -641,8 +705,6 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/v1/jobs/"):
             job = app.job(path.removeprefix("/api/v1/jobs/"))
             return self.reply(200, job) if job else self.reply(404, {"error": "Unknown job"})
-        if path == "/os-bridge.js":
-            return self.reply(200, b"window.__AIWS_OS_WORKBENCH__ = true;\n", "text/javascript")
         if path == "/":
             try:
                 source = (app.ui / "index.html").read_text(encoding="utf-8")
@@ -650,7 +712,6 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Missing head")
             except (OSError, ValueError):
                 return self.reply(503, {"error": "React workbench assets missing"})
-            source = source.replace("</head>", '<script src="/os-bridge.js"></script></head>', 1)
             return self.reply(200, source.encode("utf-8"), "text/html; charset=utf-8")
         if not path.startswith("/assets/"):
             return self.reply(404, {"error": "Not found"})
@@ -671,7 +732,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/tasks/import/windows", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -703,12 +764,14 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.submit(payload["tool"], payload["arguments"])
             elif path == "/api/v1/tasks":
                 result = app.create_plan(payload)
-            elif path == "/api/v1/tasks/import/windows":
-                result = app.import_windows(payload)
             elif path in ("/api/v1/model/enable", "/api/v1/model/disable"):
                 if payload:
                     raise ValueError("Model toggle accepts no body fields")
                 result = app.configure_model(path.endswith("/enable"))
+            elif path == "/api/v1/apps/launch":
+                if set(payload) != {"id"}:
+                    raise ValueError("Expected the application id only")
+                result = app.apps_launch(payload["id"])
             elif path == "/api/v1/ide/open":
                 if payload:
                     raise ValueError("No arguments allowed")
@@ -797,6 +860,11 @@ def main():
                           "toolCount": len(READ_ONLY)}))
         return
     server = make_server(workspace, ui, args.port, singleton=True)
+    try:                                              # the desktop launcher for approved `app.launch` stages
+        state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        aiws_launcher.start_in_thread(aiws_launcher.LauncherPolicy(state / "aiws" / "tasks.sqlite3", workspace.resolve(strict=True)))
+    except (OSError, PermissionError) as exc:
+        print("AIWS desktop launcher unavailable: " + type(exc).__name__, flush=True)
     print("AIWS guest workbench http://" + HOST + ":" + str(server.server_port), flush=True)
     try:
         server.serve_forever(poll_interval=0.2)

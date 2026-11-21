@@ -15,7 +15,8 @@ from aiws_guest_ops import GuestOperations, TOOLS as SYSTEM_TOOLS, READ_TOOLS
 from aiws_local_model import LocalPlanner, stages_from_proposal
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_permission_broker import BrokerClient, BrokerDenied
-from aiws_toolplane import invoke, audit, catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS
+from aiws_toolplane import invoke, audit, catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, APP_LAUNCH_TOOLS
+from aiws_launcher import LauncherClient
 
 class AgentError(ValueError):
     pass
@@ -28,8 +29,9 @@ def socket_path():
     return expected/"aiws-agent"/"agent.sock"
 
 class AgentCore:
-    def __init__(self,workspace,state,singleton=True,broker=None):
+    def __init__(self,workspace,state,singleton=True,broker=None,launcher=None):
         self.broker=broker if broker is not None else BrokerClient()
+        self.launcher=launcher if launcher is not None else LauncherClient()
         self.workspace=Path(workspace).resolve(strict=True)
         self.tasks=GuestTaskStore(Path(state)/"aiws",singleton=singleton)
         self.ops=GuestOperations(self.workspace,Path(state)/"aiws/kernel-candidates")
@@ -47,8 +49,12 @@ class AgentCore:
             # Policy is bound to the exact persisted, running DAG state.
             # A missing Broker is a failed execution, never a permissive fallback.
             self.broker.authorize_stage(tid,key,tool,args)
-            result=(self.ops.execute(tool,args,approved=action["approvalGranted"])
-                    if tool in SYSTEM_TOOLS else invoke(tool,args))
+            if tool in APP_LAUNCH_TOOLS:
+                # Only the workbench can reach the display; it re-verifies this exact approved, running stage.
+                result=self.launcher.launch(tid,key,args["id"])
+            else:
+                result=(self.ops.execute(tool,args,approved=action["approvalGranted"])
+                        if tool in SYSTEM_TOOLS else invoke(tool,args))
             serial=json.dumps(result,ensure_ascii=False)
             if len(serial)>65536:
                 result={"truncated":True,"preview":serial[:32000]}
@@ -83,9 +89,6 @@ class AgentCore:
         if op=="task.audit":
             fields(a,{"id"})
             return self.tasks.audit(a["id"])[-128:]
-        if op=="task.import_windows":
-            fields(a,{"task"})
-            return self.tasks.import_windows(a["task"])
         if op=="task.create":
             fields(a,{"title","goal","stages"})
             return self.tasks.create(a["title"],a["goal"],a["stages"])

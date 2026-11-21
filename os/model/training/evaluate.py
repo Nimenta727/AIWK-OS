@@ -16,7 +16,7 @@ def _shape(p):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("--dataset",default=str(Path(__file__).with_name("synthetic_intents_v2.jsonl")))
+    parser.add_argument("--dataset",default=str(Path(__file__).with_name("synthetic_intents_v3.jsonl")))
     parser.add_argument("--live",action="store_true")
     parser.add_argument("--report",default="aiws-model-eval.json")
     args=parser.parse_args()

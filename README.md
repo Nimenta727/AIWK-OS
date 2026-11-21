@@ -47,6 +47,7 @@
 - **语言与运行时**：Python（含 pip/venv/pipx）、Node.js + TypeScript、Go、Rust、Java（OpenJDK 21 + Maven）、Ruby、PHP、Lua、C/C++（gcc/g++/clang/clangd/cmake/meson/ninja）；清单见 `os/debian/config/package-lists/`，包名已对照真实 Debian 索引校验。
 - **常用开源工具**：git / gh / git-delta、ripgrep / fd / jq、tmux / neovim、gdb / valgrind、shellcheck / shfmt、SQLite / PostgreSQL 客户端、编程字体等。
 - **AIWS Code**：基于 [Code - OSS](https://github.com/microsoft/vscode)（MIT）源码的重新品牌化构建，保留上游版权与第三方声明，**不使用** Microsoft 的名称、图标、市场和服务；扩展来自 Open VSX。见 [os/ide/NOTICE.md](os/ide/NOTICE.md)。
+- **一切围绕工作台**：「工具」侧栏集中列出内置与外部工具——文档阅读器（Markdown / CSV / JSON / 图片 / PDF / DOCX / 沙箱 HTML）、内置预览浏览器（本机开发服务与工作区页面）、终端、Chromium、文件管理器、AIWS Code，以及 git / gh / rg / jq / sqlite / pandoc 等命令行工具。读取类工具（`tools.list`、`doc.text` 等）AI 可通过受审计的工具接口自动调用；桌面程序只在你点击时启动。
 - **工作台界面参照 VS Code 布局**：活动栏、侧边栏（真实文件树）、标签页、底部面板、状态栏、命令面板（`Ctrl+Shift+P`），深色/浅色主题。观察台是第一个、固定的标签页。
 
 > 有意没有包含的：.NET SDK、pnpm、black、ruff 不在 Debian 主仓库（可用 pipx/npm 自行安装）；Docker 因权限模型另行评估。说明见 [软件包清单](os/debian/config/package-lists/aiws-devtools.list.chroot) 开头的注释。
@@ -55,10 +56,10 @@
 
 | 部分 | 状态 |
 | --- | --- |
-| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 382 项、前端 61 项） |
+| 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 438 项、前端 70 项） |
 | 前端（VS Code 风格外壳） | **已在真实浏览器里点过**（深/浅主题、标签、命令面板、文件查看） |
-| Debian 13 镜像构建、BIOS/UEFI 引导 | CI 工作流已有；**以对应提交的 Actions 结论为准** |
-| AIWS Code 的真实构建与浏览器内运行 | **配方、补丁、扫描器已验证；完整构建尚未在本仓库环境里执行** |
+| Debian 13 完整镜像（含工具链、AIWS Code、模型权重） | ✅ [v0.2.0-preview.1 测试版](https://github.com/Nimenta727/AIWK-OS/releases/tag/v0.2.0-preview.1)：构建通过、从 ISO 读回校验模型权重、QEMU 启动冒烟（含界面点击）通过 |
+| AIWS Code 的真实构建 | ✅ 构建成功并打进镜像（许可文件已校验）；在镜像里的完整可用性**待验证** |
 | 真实客户机里的模型质量、官方 CLI 实跑、完整镜像体积 | **未验证**（有检查清单，等待真实运行） |
 | 内核强制隔离、通用安装器、Secure Boot、物理机启动 | **未完成**；当前 Permission Broker 是应用层策略，不是内核隔离 |
 
@@ -66,46 +67,50 @@
 
 ## 快速开始
 
-### 构建 Linux 镜像（实验）
+### 试用测试版 ISO（推荐在虚拟机里）
 
-在隔离的 Debian 13 (trixie) 构建环境执行（需要 live-build/chroot 权限与软件包下载）：
+1. 到 [Releases](https://github.com/Nimenta727/AIWK-OS/releases) 下载标有 **Pre-release** 的 `aiws-os-*-amd64.iso`（如被拆成 `.01 .02 …` 分卷，按 `REASSEMBLE.txt` 用 `cat` 合并），并用 `SHA256SUMS` 校验。
+2. 在 QEMU / VirtualBox / VMware 里新建一台 **x86-64、≥6 GB 内存、≥2 核** 的虚拟机，把 ISO 当光盘启动；**不要写入重要磁盘**（没有经验证的安装器）。
+   QEMU 示例（离线、无宿主共享）：`./os/host/run-qemu-offline.sh aiws-os-*.iso`
+3. 自动以用户 `user` 登录（Live 默认密码 `live`），桌面上会打开工作台：首页是观察台；`Ctrl+Shift+P` 打开命令面板。
+4. 想用本地模型：在「本地 AI 助手」页点“申请启用模型”（默认关闭）；想用云端：先在终端里用官方 CLI 登录（本系统不保存密钥），再在观察台里授权一次构建。
+
+**该测试版需要你帮忙验证的**见 [发行说明](docs/RELEASE_NOTES_OS_PREVIEW.md) 的“请你验证”清单。
+
+### 自己构建镜像
+
+在隔离的 Debian 13 (trixie) 构建环境（需要 root 与网络）：
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
-sudo ./os/debian/build.sh                       # AIWS_OS_PROFILE=smoke 为不含开发工具链的小镜像
+sudo apt-get install -y live-build debootstrap xorriso squashfs-tools zstd
+(cd workbench && npm install && npm run build)
+sudo ./os/debian/build.sh            # AIWS_OS_PROFILE=smoke 为不含开发工具链的小镜像
 ```
 
-可选：先按 [os/ide/README.md](os/ide/README.md) 构建 AIWS Code，再用 `AIWS_CODE_TARBALL` / `AIWS_CODE_SHA256` 嵌入镜像。
-在具备 KVM 的 Linux 宿主上可用 `./os/host/run-qemu-offline.sh out/aiws-os/live-image-amd64.hybrid.iso` 离线试运行（无网络、无宿主共享）。
-**不要把 ISO 写入重要磁盘**——目前没有经验证的安装器。
+可选：先按 [os/ide/README.md](os/ide/README.md) 构建 AIWS Code，用 `AIWS_CODE_TARBALL` / `AIWS_CODE_SHA256` 嵌入；嵌入模型权重见 `os/debian/build.sh` 里的 `AIWS_OS_BUNDLED_MODEL_GGUF` 一组变量。
+官方发行镜像由工作流 [`release-preview.yml`](.github/workflows/release-preview.yml) 构建，只在构建、校验和、QEMU 启动冒烟全部通过后才发布 pre-release。
 
 ### 只看工作台界面（不需要整个系统）
 
 ```bash
-cd desktop/AIWorkstation.Frontend && npm install && npm test && npm run build
-python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监听 127.0.0.1
+cd workbench && npm install && npm test && npm run build
+python3 os/runtime/aiws_workbench.py --help      # 客户机本地服务，仅监听 127.0.0.1
 ```
-
-### Windows 工作台（次要目标）
-
-仓库同时维护一个 Windows 原生 AI 工作台（WPF / .NET 10 + WebView2，共用同一套 React 前端），用于任务/DAG/证据的桌面端。它**不**共用 Linux 的权限。获取与构建见 [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) 与 `scripts/Build-NativeDesktop.ps1`。
 
 ## 仓库地图
 
 | 目录 | 内容 |
 | --- | --- |
+| `workbench/` | React 工作台前端（VS Code 风格外壳 + 观察台 + 阅读器 + 预览浏览器） |
 | `os/runtime/` | 客户机 Python 服务：Workbench、Agent、Broker、任务 DAG、模型网关/路由、观察台、构建监督（模块清单 `MODULES`） |
 | `os/debian/` | live-build 配方、软件包清单、systemd 单元、桌面 Shell |
 | `os/ide/` | AIWS Code：构建配方、补丁、品牌资源、许可说明 |
 | `os/builder/` | 官方 CLI 构建通道的隔离与自检 |
-| `os/model/` | 本地模型运行器、评测与训练规范 |
+| `os/model/` | 本地模型运行器、数据集 v1–v3 生成与评测 |
 | `os/verify/` | 静态契约与行为测试 |
-| `desktop/AIWorkstation.Frontend/` | React 前端（Linux 模式在 `src/os`） |
-| `desktop/AIWorkstation.{Desktop,Core}/` | Windows 原生宿主 |
-| `aiws/` `app.py` `web/` `tests/` | 旧版 Python 控制平面，仅作兼容/回归 |
+| `docs/` | 当前文档；`docs/history/` 旧资料；`docs/routine/` 每次修改的记录 |
 
-细节见 [代码结构](docs/CODEBASE_MAP.md)。
+旧的 Windows 工作台、旧 Python 控制平面和 NixOS 配方已移入 Git 历史（见 [docs/history](docs/history/README.md)）。细节见 [代码结构](docs/CODEBASE_MAP.md)。
 
 ## 开发入口
 
@@ -114,7 +119,7 @@ python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监�
 | 理解系统路线与已定决策 | [AI 原生路线](docs/AIWS_NATIVE_AI_PLAN.md) · [观察台计划](docs/AIWS_OBSERVATORY_PLAN.md) · [模型路由](docs/AIWS_MODEL_ROUTER.md) |
 | 安全边界与威胁模型 | [SECURITY](docs/SECURITY.md) · [Permission Broker](docs/AIWS_PERMISSION_BROKER.md) |
 | 固件启动、Shell、隔离的验收标准 | [OS 生产级门槛](docs/AIWS_OS_PRODUCTION_GATES.md) |
-| 发行流程与检查表 | [发行说明（OS 预览）](docs/RELEASE_NOTES_OS_PREVIEW.md) · [检查清单](docs/RELEASE_CHECKLIST.md) · [CHANGELOG](CHANGELOG.md) |
+| 发行流程与检查表 | [发行说明（OS 预览）](docs/RELEASE_NOTES_OS_PREVIEW.md) · [CHANGELOG](CHANGELOG.md) |
 | 第三方组件与许可 | [第三方清单](docs/THIRD_PARTY.md) |
 | 每次修改、验证与下一步 | [Routine 日志](docs/routine/README.md) |
 
@@ -135,7 +140,7 @@ python3 os/runtime/aiws_workbench.py --help      # guest 本地服务，仅监�
 - **Built for developers**: common language toolchains and open-source tools are preinstalled, and **AIWS Code** — a rebranded build of the MIT-licensed Code - OSS (no Microsoft names, logos, marketplace or services; upstream credits kept) — opens on demand. The workbench UI follows the VS Code layout (activity bar, side bar, tabs, panel, status bar, command palette; dark/light themes).
 - **Token- and resource-frugal by design**: the local model unloads when idle, and usage numbers are only what the provider reports.
 
-**Status: engineering preview.** Code and unit/contract tests exist (Python 382, frontend 61) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
+**Status: engineering preview.** Code and unit/contract tests exist (Python 438, frontend 70) and the UI was exercised in a real browser. The AIWS Code build, real-guest model quality, real CLI runs, image size, firmware/physical boot and kernel-enforced isolation are **not verified yet** — see the table above. The Permission Broker is an application-level policy, not OS-level confinement.
 
 Repository code is licensed under Apache-2.0 (see `LICENSE`); third-party components keep their own licenses ([docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)).
 Start at [Documentation](docs/README.md), [Codebase map](docs/CODEBASE_MAP.md), [OS build](os/README.md) and [Routine log](docs/routine/README.md).

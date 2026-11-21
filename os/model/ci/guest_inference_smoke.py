@@ -15,6 +15,7 @@ from guest_benchmark import benchmark, load_cases
 UNIT = "aiws-local-model.service"
 BENCH = Path("/usr/local/lib/aiws/aiws_model_heldout.jsonl")
 BENCH_V2 = Path("/usr/local/lib/aiws/aiws_model_heldout_v2.jsonl")   # release-candidate set; report only
+BENCH_V3 = Path("/usr/local/lib/aiws/aiws_model_heldout_v3.jsonl")   # v2 + integrated tools; report only
 
 def model_memory(pid):
     data = {"rssMiB": None, "peakRssMiB": None}
@@ -77,6 +78,12 @@ def main():
             v2 = benchmark(planner, cases2, sha2, lambda: model_memory(pid), release=True)
             v2.update({"realGuestModel": True, "modelSha256": metadata.get("sha256"), "gating": False})
             print("AIWS_GUEST_MODEL_BENCHMARK_V2 " + json.dumps(v2, sort_keys=True, ensure_ascii=True), flush=True)
+        if BENCH_V3.is_file():
+            # Report-only: the 372-case locked set adds app.launch, doc.text, tools.list and ext.* (and their refusals).
+            cases3, sha3 = load_cases(BENCH_V3, require_release=True)
+            v3 = benchmark(planner, cases3, sha3, lambda: model_memory(pid), release=True)
+            v3.update({"realGuestModel": True, "modelSha256": metadata.get("sha256"), "gating": False})
+            print("AIWS_GUEST_MODEL_BENCHMARK_V3 " + json.dumps(v3, sort_keys=True, ensure_ascii=True), flush=True)
         if not metrics["smokePassed"]:
             raise RuntimeError("Held-out QEMU inference quality/resource gate failed; inspect benchmark receipt")
         print("AIWS_GUEST_MODEL_INFERENCE_PASS " + json.dumps({

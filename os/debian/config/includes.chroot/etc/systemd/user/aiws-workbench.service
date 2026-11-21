@@ -9,6 +9,8 @@ Restart=on-failure
 RestartSec=3
 NoNewPrivileges=yes
 PrivateTmp=yes
+# PrivateTmp hides the X11 socket; bind it back ("-" = ignore if absent) so approved desktop launches can open windows.
+BindPaths=-/tmp/.X11-unix
 UMask=0077
 [Install]
 WantedBy=default.target

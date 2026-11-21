@@ -1,6 +1,6 @@
 # AIWS OS Alpha 0.1 — engineering execution gates
 
-**Status:** authorized roadmap, **not completed features**. Source of truth for staged M1–M4 acceptance. Existing Linux guest and Windows workstation remain separate.
+**Status:** authorized roadmap, **not completed features**. Source of truth for staged M1–M4 acceptance.
 
 | Milestone | Scope | Hard acceptance |
 | --- | --- | --- |

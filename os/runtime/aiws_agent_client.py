@@ -50,8 +50,6 @@ class TaskProxy:
         return self.agent.request("task.audit",{"id":identifier})
     def create(self,title,goal,stages):
         return self.agent.request("task.create",{"title":title,"goal":goal,"stages":stages})
-    def import_windows(self,worktask):
-        return self.agent.request("task.import_windows",{"task":worktask})
     def approve(self,identifier,key):
         return self.agent.request("task.approve",{"id":identifier,"key":key})
     def dispatch(self,identifier,key):

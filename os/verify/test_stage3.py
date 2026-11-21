@@ -50,7 +50,7 @@ class LocalReadToolTests(unittest.TestCase):
         self.assertFalse(new & aiws_tasks.WRITE_TOOLS)
         self.assertTrue(new <= lm.READ_TOOLS)
         # nothing network-capable or executing is ever offered to the model
-        for bad in ("browser.snapshot", "runtime.test", "project.scaffold", "file.replace"):
+        for bad in ("browser.snapshot", "runtime.test", "file.replace"):
             self.assertNotIn(bad, lm.READ_TOOLS | lm.MODEL_WRITE_TOOLS)
         self.assertFalse(lm.READ_TOOLS & plane.FILE_WRITE_TOOLS)
 

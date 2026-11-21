@@ -6,6 +6,9 @@ aiws_workbench.py
 aiws_agent_service.py
 aiws_agent_client.py
 aiws_mcp.py
+aiws_apps.py
+aiws_launcher.py
+aiws_exttools.py
 
 # Tool plane, task graph and permission
 aiws_toolplane.py
@@ -13,9 +16,6 @@ aiws_tasks.py
 aiws_permission_broker.py
 aiws_guest_boundary.py
 aiws_guest_ops.py
-aiws_codeintel.py
-aiws_crossplatform.py
-aiws_windows_compat.py
 aiws_boot_slots.py
 
 # Local model and router

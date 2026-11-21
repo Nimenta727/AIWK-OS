@@ -51,7 +51,7 @@ if ! curl --fail --silent --noproxy '*' --max-time 3 http://127.0.0.1:17640/api/
     emit "AIWS_BOOT_SMOKE_FAIL: workbench-not-using-independent-agent"
     exit 1
 fi
-if ! /usr/local/bin/aiws-toolctl --list | grep -q '"code.symbols"'; then
+if ! /usr/local/bin/aiws-toolctl --list | grep -q '"workspace.tree"'; then
     emit "AIWS_BOOT_SMOKE_FAIL: mcp-unavailable"
     exit 1
 fi
@@ -70,15 +70,31 @@ if [ "$visible" -ne 1 ]; then
 fi
 # Verify real X11 focus routing and a synthetic Unicode desktop clipboard.
 # Selenium separately tests React clicking and text input in the guest browser.
-if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
-    /bin/sh -c '
-      window="$(xdotool search --onlyvisible --class Chromium | tail -n 1)"
-      test -n "$window"
-      xdotool windowactivate --sync "$window"
-      test "$(xdotool getactivewindow)" = "$window"
-      printf "AIWS-输入-clipboard" | xclip -selection clipboard -loops 1
-      test "$(xclip -selection clipboard -o)" = "AIWS-输入-clipboard"
-    '; then
+# Both depend on the window manager and the clipboard owner having settled, which takes noticeably longer on a
+# software-emulated CPU, so the check is retried for up to ~60 s. It must still succeed: no retry is a pass by itself.
+focus_ok=0
+for i in $(seq 1 30); do
+    if runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
+        /bin/sh -c '
+          pkill -x xclip 2>/dev/null
+          window="$(xdotool search --onlyvisible --class Chromium | tail -n 1)" || exit 1
+          test -n "$window" || exit 1
+          xdotool windowactivate --sync "$window" || exit 1
+          test "$(xdotool getactivewindow)" = "$window" || exit 1
+          # Keep owning the selection until we have read it back: with "-loops 1" a desktop component that first asks
+          # for TARGETS uses up the single loop and the owner exits before the real read (seen on the full desktop).
+          printf "AIWS-输入-clipboard" | xclip -selection clipboard || exit 1
+          sleep 1
+          got="$(xclip -selection clipboard -o 2>/dev/null)"
+          pkill -x xclip 2>/dev/null
+          test "$got" = "AIWS-输入-clipboard"
+        ' >/dev/null 2>&1; then
+        focus_ok=1
+        break
+    fi
+    sleep 2
+done
+if [ "$focus_ok" -ne 1 ]; then
     emit "AIWS_BOOT_SMOKE_FAIL: shell-x11-focus-or-clipboard"
     exit 1
 fi

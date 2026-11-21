@@ -19,7 +19,8 @@ import time
 from aiws_guest_boundary import require_guest_runtime
 from aiws_guest_ops import READ_TOOLS as GUEST_READ, TOOLS as GUEST_TOOLS, validate as validate_guest
 from aiws_tasks import WRITE_TOOLS, TOOLS as STAGE_TOOLS
-from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS
+from aiws_toolplane import catalog as tool_catalog, READ_TOOLS as PLANE_READ_TOOLS, APP_LAUNCH_TOOLS
+import aiws_apps
 
 DIRECT_READ = PLANE_READ_TOOLS | GUEST_READ
 MAX_TASK_WRITES = 8
@@ -50,6 +51,11 @@ def valid_tool(tool, args):
         if not spec or (set(args) - set(spec["properties"])) or any(
                 k not in args for k in spec["required"]):
             raise BrokerDenied("Tool arguments do not match allowlist schema")
+        if tool in APP_LAUNCH_TOOLS:
+            try:
+                aiws_apps.require_launchable(args.get("id"))
+            except ValueError as exc:
+                raise BrokerDenied(str(exc)) from exc
 
 class BrokerPolicy:
     def __init__(self, task_db, ledger_db):
