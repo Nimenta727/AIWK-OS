@@ -245,7 +245,9 @@ class WorkbenchTests(unittest.TestCase):
                 break
             time.sleep(.01)
         self.assertEqual(result["stages"][0]["state"],"failed",result)
-        self.assertIn("guest image marker",result["stages"][0]["error"].lower())
+        # Fail-closed either way: no VM marker, or (e.g. root CI container) refusal to run as root.
+        self.assertRegex(result["stages"][0]["error"].lower(),
+                         "guest image marker|must never run as root")
 
     def test_local_model_proposal_becomes_pending_audited_task(self):
         csrf=self.request("GET","/api/v1/session")[1]["csrf"]
