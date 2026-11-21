@@ -20,10 +20,15 @@ Linux OS 使用与 Windows 桌面版共用的 React 源码，但不运行 Window
 
 **安全声明：** Broker 是独立的非 root 用户态策略进程，核对持久化 DAG、工具参数和审批；它与 Agent 仍是同 UID，**不是不可绕过的 Linux 内核强制访问控制**。客户机 root 不等于宿主 root；客户机不能自动获得宿主虚拟化控制 API、共享文件或宿主凭据。
 
+## Alpha 0.1 开发中
+
+已增加 [M1 只读安装预检](installer/README.md)，但**尚不能安装系统或恢复磁盘**。Shell 已增加原生启动器、通知组件和可选 Fcitx5 中文输入支持；这些是代码集成，真实 GUI/IME 验收仍需完成。完整里程碑见 [Alpha 计划](../docs/AIWS_OS_ALPHA_PLAN.md)。
+
 ## 目录职责
 
 | 目录 | 内容 |
 | --- | --- |
+| [installer](installer/README.md) | 只读安装预检与未来安装/恢复门槛 |
 | [runtime](runtime/README.md) | Agent、Broker、MCP、DAG、模型建议、工具 |
 | [debian](debian/README.md) | Debian 13 live-build、桌面会话、systemd 服务 |
 | [model](model/README.md) | GGUF/llama.cpp、离线模型评测和 LoRA 配方 |

@@ -4,6 +4,7 @@ on:
     paths:
       - 'os/**'
       - 'docs/AIWS_OS_BLUEPRINT.md'
+      - 'docs/AIWS_OS_ALPHA_PLAN.md'
       - '.github/workflows/aiws-os-static.yml'
   pull_request:
     paths:
@@ -20,6 +21,7 @@ jobs:
       - name: Shell syntax
         run: |
           bash -n os/debian/build.sh
+          python3 -m py_compile os/installer/aiws_install_preflight.py
           bash -n os/kernel/ci/firmware-iso-boot.sh
           sh -n os/debian/config/includes.chroot/usr/local/bin/aiws-session
           sh -n os/debian/config/includes.chroot/usr/local/bin/aiws-boot-smoke

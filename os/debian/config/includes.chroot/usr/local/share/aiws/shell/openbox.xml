@@ -5,6 +5,9 @@
   <desktops><number>2</number></desktops>
   <keyboard>
     <keybind key="W-Return"><action name="Execute"><command>xfce4-terminal</command></action></keybind>
+    <keybind key="W-space"><action name="Execute"><command>xfce4-appfinder</command></action></keybind>
+    <keybind key="W-b"><action name="Execute"><command>firefox-esr</command></action></keybind>
+    <keybind key="W-i"><action name="Execute"><command>geany</command></action></keybind>
     <keybind key="W-e"><action name="Execute"><command>thunar</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>

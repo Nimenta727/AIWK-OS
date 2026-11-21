@@ -50,3 +50,9 @@ nftables
 openbox
 xdotool
 xclip
+
+# Shell 2.0: native launcher, notifications and Chinese IME
+xfce4-appfinder
+xfce4-notifyd
+fcitx5
+fcitx5-chinese-addons

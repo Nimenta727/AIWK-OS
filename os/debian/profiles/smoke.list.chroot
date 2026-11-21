@@ -26,3 +26,9 @@ xfce4-panel
 thunar
 xclip
 fonts-noto-cjk
+
+# Shell 2.0 integration smoke
+xfce4-appfinder
+xfce4-notifyd
+fcitx5
+fcitx5-chinese-addons

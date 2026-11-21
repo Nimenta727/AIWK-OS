@@ -6,6 +6,12 @@ export XDG_CURRENT_DESKTOP=AIWS:XFCE
 export DESKTOP_SESSION=aiws
 export XDG_SESSION_DESKTOP=aiws
 mkdir -p "$HOME/.local/share/aiws"
+# Input method is optional at runtime; never prevent the desktop from booting.
+export GTK_IM_MODULE=fcitx
+export QT_IM_MODULE=fcitx
+export XMODIFIERS=@im=fcitx
+if command -v fcitx5 >/dev/null 2>&1; then fcitx5 -d >/dev/null 2>&1 || true; fi
+if command -v xfce4-notifyd >/dev/null 2>&1; then xfce4-notifyd >/dev/null 2>&1 & fi
 openbox --config-file /usr/local/share/aiws/shell/openbox.xml &
 wm=$!
 xfce4-panel --disable-wm-check &

@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | 产品和安装 | [Root README](../README.md) | Windows 工作台与 Linux OS 的区别、使用方式和限制 |
 | 代码结构 | [CODEBASE_MAP](CODEBASE_MAP.md) | 目录职责、入口、数据流、可修改边界 |
+| Alpha 0.1 开发门槛 | [ALPHA_PLAN](AIWS_OS_ALPHA_PLAN.md) | M1 安装恢复、M2 Shell、M3 强制隔离、M4 自主 Agent 的分阶段验收 |
 | Linux 系统构建 | [OS README](../os/README.md) | Debian 构建、QEMU、NixOS 与验证命令 |
 | Windows 版本发布 | [Release checklist](RELEASE_CHECKLIST.md) | 自动与人工验收、发行包要求 |
 | 安全与权限 | [SECURITY](SECURITY.md) · [Permission Broker](AIWS_PERMISSION_BROKER.md) | 信任边界、应用层授权、未完成的强制隔离 |

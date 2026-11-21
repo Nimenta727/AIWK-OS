@@ -13,6 +13,18 @@ class AiwsOsContract(unittest.TestCase):
         self.assertTrue(builder.stat().st_mode & stat.S_IXUSR,
                         "Image builder must retain Git mode 100755 for CI execution")
 
+    def test_shell_2_native_launcher_and_input_contract(self):
+        full = (CONFIG / "package-lists/aiws-desktop.list.chroot").read_text()
+        smoke = (ROOT / "os/debian/profiles/smoke.list.chroot").read_text()
+        for package in ("xfce4-appfinder", "xfce4-notifyd", "fcitx5", "fcitx5-chinese-addons"):
+            self.assertIn(package, full.split())
+            self.assertIn(package, smoke.split())
+        shell = (CONFIG / "includes.chroot/usr/local/bin/aiws-session").read_text()
+        self.assertIn("XMODIFIERS=@im=fcitx", shell)
+        xml = (CONFIG / "includes.chroot/usr/local/share/aiws/shell/openbox.xml").read_text()
+        for shortcut in ("W-space", "W-Return", "W-e", "W-b", "W-i", "A-Tab"):
+            self.assertIn(shortcut, xml)
+
     def test_live_package_list_supplies_desktop_and_languages(self):
         packages = set((CONFIG / "package-lists/aiws-desktop.list.chroot").read_text().split())
         for package in ("xfce4", "lightdm", "firefox-esr", "geany", "python3",

@@ -4,6 +4,7 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 14:50 — Alpha 0.1 安装安全预检与 Shell 2.0 首批功能](2026-11-21_1450-alpha-install-preflight-shell.md)
 - [2026-11-21 14:20 — README、文档和代码结构统一整理](2026-11-21_1420-readme-docs-codebase-structure.md)
 - [2026-11-21 13:45 — MCP 只读回归与镜像构建脚本执行位修复](2026-11-21_1345-mcp-regression-build-executable.md)
 - [2026-11-21 13:30 — 独立权限 Broker 和 Agent/MCP 审批闭环](2026-11-21_1330-broker-pdp-policy-agent.md)
