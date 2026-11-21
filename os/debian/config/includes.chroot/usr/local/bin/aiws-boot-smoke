@@ -67,5 +67,12 @@ if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
     emit "AIWS_BOOT_SMOKE_FAIL: workbench-gui-clicks-or-dag"
     exit 1
 fi
+if [ -f /etc/aiws/guest-model-acceptance ]; then
+    if ! runuser -u user -- env DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 \
+        python3 /usr/local/lib/aiws/aiws_model_guest_smoke.py; then
+        emit "AIWS_BOOT_SMOKE_FAIL: real-offline-model-inference"
+        exit 1
+    fi
+fi
 emit "AIWS_BOOT_SMOKE_PASS: lightdm=active shell=aiws chromium=visible workbench=active tools=mcp gui=clicked"
 exit 0

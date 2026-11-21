@@ -13,7 +13,7 @@ permissions:
 jobs:
   pinned-qwen-2b-cpu:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@v4
       - name: Install reproducible CPU-only build dependencies
@@ -53,6 +53,74 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=64m \
             aiws-real-qwen-ci | tee out/aiws-real-model-metrics.json
           python3 -c 'import json; d=json.load(open("out/aiws-real-model-metrics.json")); assert d["realModel"] and d["cpu_only"] and d["network"] == "disabled"'
+      - name: Build real-model-inclusive AIWS guest ISO from verified artifacts
+        timeout-minutes: 36
+        run: |
+          set -Eeuo pipefail
+          cd desktop/AIWorkstation.Frontend
+          npm install --no-audit --no-fund
+          npm run build
+          cd "$GITHUB_WORKSPACE"
+          export AIWS_OS_MODEL_GGUF_SHA256=a8b50de00b780c0f3c16f07cb041a1ecd678b6e22fd8cde91e57fe4b5031523b
+          export AIWS_OS_LLAMA_SERVER_SHA256="$(sha256sum out/model-real/llama-server | cut -d' ' -f1)"
+          docker run --rm --privileged -v "$PWD":/repo -w /repo \
+            -e AIWS_OS_MODEL_GGUF_SHA256 \
+            -e AIWS_OS_LLAMA_SERVER_SHA256 \
+            -e AIWS_OS_MODEL_LICENSE_REVIEWED=1 \
+            -e AIWS_OS_MODEL_GUEST_CI_TEST=1 \
+            -e AIWS_OS_PROFILE=smoke \
+            -e AIWS_OS_OUTPUT=/repo/out/aiws-os-model \
+            -e AIWS_OS_BUNDLED_MODEL_GGUF=/repo/out/model-real/model.gguf \
+            -e AIWS_OS_BUNDLED_LLAMA_SERVER=/repo/out/model-real/llama-server \
+            debian:trixie bash -lc '
+              set -eu
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools
+              ./os/debian/build.sh
+            '
+          (cd out/aiws-os-model && sha256sum -c live-image-amd64.hybrid.iso.sha256)
+      - name: Real offline model inference inside QEMU guest boot
+        timeout-minutes: 44
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso
+          iso="$PWD/out/aiws-os-model/live-image-amd64.hybrid.iso"
+          serial="$PWD/out/aiws-guest-model-serial.log"
+          mkdir -p "$RUNNER_TEMP/model-live"
+          xorriso -osirrox on -indev "$iso" -extract /live "$RUNNER_TEMP/model-live"
+          kernel="$(find "$RUNNER_TEMP/model-live" -maxdepth 1 -type f -name 'vmlinuz*' | head -n 1)"
+          initrd="$(find "$RUNNER_TEMP/model-live" -maxdepth 1 -type f -name 'initrd*' | head -n 1)"
+          test -s "$kernel" && test -s "$initrd"
+          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 5120 \
+            -cdrom "$iso" -kernel "$kernel" -initrd "$initrd" \
+            -append 'boot=live components console=tty0 console=ttyS0,115200n8 loglevel=6' \
+            -nic none -display none -vga std -serial "file:$serial" -no-reboot &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          passed=0
+          for _ in $(seq 1 1150); do
+            if [[ -s "$serial" ]] && grep -q 'AIWS_GUEST_MODEL_INFERENCE_PASS' "$serial" &&
+                 grep -q 'AIWS_BOOT_SMOKE_PASS' "$serial"; then
+              passed=1
+              break
+            fi
+            if [[ -s "$serial" ]] && grep -q 'AIWS_BOOT_SMOKE_FAIL' "$serial"; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          tail -n 140 "$serial" || true
+          if [[ "$passed" != 1 ]]; then
+            echo "Real QEMU guest 2B inference acceptance did not pass"
+            exit 1
+          fi
+      - name: Upload actual guest-inference serial evidence (no weights)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-real-2b-qemu-guest-evidence
+          path: out/aiws-guest-model-serial.log
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload metrics only (never redistribute model weights)
         if: always()
         uses: actions/upload-artifact@v4
