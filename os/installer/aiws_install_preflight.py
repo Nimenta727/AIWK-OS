@@ -6,7 +6,6 @@ interactive disk selection and rollback implementation is available.
 """
 import argparse
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -32,9 +31,9 @@ def inspect_devices(lsblk):
             continue
         # A disk already holding partitions or mountpoints must never be
         # presented as a candidate by this read-only preflight.
-        if item.get("children") or item.get("mountpoint") or item.get("mountpoints"):
+        if item.get("children") or item.get("mountpoint") or item.get("mountpoints") or item.get("fstype") or item.get("pttype")\n                or item.get("ptuuid") or item.get("uuid"):
             continue
-        result.append({"device": name, "sizeBytes": size,
+        # Even a disk with no visible signatures may contain important data.\n        result.append({"device": name, "sizeBytes": size,
                        "model": str(item.get("model") or "")[:80]})
     return result
 
@@ -47,7 +46,7 @@ def inspect_environment():
               "diskWritesPerformed": False,
               "firmware": "UEFI" if firmware else "BIOS",
               "virtualMachineDetected": virtualization.returncode == 0,
-              "candidateBlankDisks": [], "blockers": []}
+              "candidateUnpartitionedDisks": [], "blockers": []}
     if not report["virtualMachineDetected"]:
         report["blockers"].append("VM-only prototype: physical installation disabled")
     if not firmware:
@@ -57,7 +56,7 @@ def inspect_environment():
             ["lsblk", "--json", "--bytes", "--output",
              "PATH,TYPE,SIZE,RM,MOUNTPOINT,MODEL"],
             check=True, capture_output=True, text=True, timeout=10)
-        report["candidateBlankDisks"] = inspect_devices(json.loads(raw.stdout))
+        report["candidateUnpartitionedDisks"] = inspect_devices(json.loads(raw.stdout))
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         report["blockers"].append("Cannot safely enumerate disks: " + type(exc).__name__)
     report["blockers"].append(
@@ -77,7 +76,7 @@ def main(argv=None):
     print(json.dumps(report, indent=2, ensure_ascii=False) if args.json else
           "AIWS OS installation preflight (READ ONLY)\n" +
           "\n".join(report["blockers"]) +
-          "\nCandidate blank VM disks: " + str(len(report["candidateBlankDisks"])))
+          "\nUnpartitioned VM disk candidates (NOT safe to erase): " + str(len(report["candidateUnpartitionedDisks"])))
     return 0
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ python3 os/installer/aiws_install_preflight.py --json
 python3 os/installer/aiws_install_preflight.py --install  # 必然拒绝，退出码 3
 ```
 
-预检只读取虚拟化状态、UEFI 目录和 lsblk JSON；只列出未挂载、无子分区、非可移除、至少 32 GiB 的候选磁盘。它**不**将候选盘视为已经授权安装，也不保证设备空白或无重要数据。物理机安装明确禁止。
+预检只读取虚拟化状态、UEFI 目录和 lsblk JSON；只列出未挂载、无子分区、未检测到文件系统或分区表签名、非可移除、至少 32 GiB 的候选磁盘。它**不**将候选盘视为已经授权安装；即使未检测到签名，也**不保证设备空白或无重要数据**。物理机安装明确禁止。
 
 ## M1 完成前的强制验收
 

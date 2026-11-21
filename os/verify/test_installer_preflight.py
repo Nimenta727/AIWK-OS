@@ -24,7 +24,7 @@ class InstallerPreflightContract(unittest.TestCase):
     def test_mounted_or_partitioned_or_removable_or_small_rejected(self):
         base = {"path": "/dev/vda", "type": "disk", "size": 40 * 1024**3,
                 "rm": False, "mountpoint": None}
-        for override in ({"children": [{"type": "part"}]},
+        for override in ({"children": [{"type": "part"}]},\n                         {"mountpoints": ["/home"]}, {"fstype": "ext4"},\n                         {"pttype": "gpt"}, {"ptuuid": "existing"},\n                         {"uuid": "existing"},
                          {"mountpoint": "/"}, {"rm": True},
                          {"size": 1024}, {"path": "/dev/mapper/system"},
                          {"type": "part"}, {"size": True}):
@@ -37,7 +37,7 @@ class InstallerPreflightContract(unittest.TestCase):
             with self.assertRaises(ValueError):
                 installer.inspect_devices(value)
 
-    def test_install_flag_always_refused(self):
+    def test_probe_is_read_only_and_requests_all_signature_fields(self):\n        source = MODULE.read_text()\n        for field in ("MOUNTPOINTS", "FSTYPE", "PTTYPE", "PTUUID", "UUID"):\n            self.assertIn(field, source)\n        self.assertNotIn("candidateBlankDisks", source)\n\n    def test_install_flag_always_refused(self):
         with redirect_stderr(io.StringIO()):
             self.assertEqual(installer.main(["--install"]), 3)
 
