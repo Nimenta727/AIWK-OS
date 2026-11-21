@@ -147,3 +147,14 @@ Read the [documentation index](docs/README.md), [security guide](docs/SECURITY.m
 
 
 AIWS OS 2026-11-21 integration: a separate guest systemd Agent now owns the durable DAG for file/code inspection, approved file edits, allowlisted services and staged kernel candidates. Experimental guest-admin-only EFI A/B version management and real QEMU firmware fault-injection acceptance are under test. Optional, license-reviewed and SHA-256-pinned Qwen3.5-2B weights can be bundled in a guest ISO, with a separate real-QEMU inference gate. Do not claim successful real kernel recovery or deployed guest AI weights until their jobs actually pass. See docs/AIWS_GUEST_AGENT_SYSTEM_KERNEL.md.
+
+### AIWS OS native firmware and desktop Shell acceptance (2026-11-21)
+
+The experimental Debian profile now uses an Openbox/XFCE native desktop
+taskbar and a normal Chromium application window instead of exclusive
+kiosk. CI now includes direct **BIOS and OVMF UEFI ISO firmware** boot
+jobs in addition to the original -kernel diagnostics. A guest input
+focus/Unicode clipboard check extends the existing real GUI/DAG tests.
+These are new acceptance mechanisms, not a claim of successful CI runs,
+bare-metal installation, mandatory sandboxing or stable OS release.
+See [production engineering gates](docs/AIWS_OS_PRODUCTION_GATES.md).

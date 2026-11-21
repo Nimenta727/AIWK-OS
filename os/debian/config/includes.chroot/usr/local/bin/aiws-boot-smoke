@@ -16,7 +16,7 @@ for i in $(seq 1 65); do
     fi
     sleep 2
 done
-if [ "$desktop" -ne 1 ]; then
+if [ "$desktop" -ne 1 ] || ! pgrep -x xfce4-panel >/dev/null; then
     emit "AIWS_BOOT_SMOKE_FAIL: display-manager-or-aiws-shell-not-running"
     exit 1
 fi
@@ -59,7 +59,21 @@ for i in $(seq 1 45); do
     sleep 2
 done
 if [ "$visible" -ne 1 ]; then
-    emit "AIWS_BOOT_SMOKE_FAIL: chromium-kiosk-not-visible"
+    emit "AIWS_BOOT_SMOKE_FAIL: chromium-shell-app-not-visible"
+    exit 1
+fi
+# Verify real X11 focus routing and a synthetic Unicode desktop clipboard.
+# Selenium separately tests React clicking and text input in the guest browser.
+if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
+    /bin/sh -c '
+      window="$(xdotool search --onlyvisible --class Chromium | tail -n 1)"
+      test -n "$window"
+      xdotool windowactivate --sync "$window"
+      test "$(xdotool getactivewindow)" = "$window"
+      printf "AIWS-输入-clipboard" | xclip -selection clipboard -loops 1
+      test "$(xclip -selection clipboard -o)" = "AIWS-输入-clipboard"
+    '; then
+    emit "AIWS_BOOT_SMOKE_FAIL: shell-x11-focus-or-clipboard"
     exit 1
 fi
 if ! runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
@@ -81,5 +95,5 @@ if [ -f /etc/aiws/guest-model-acceptance ]; then
         exit 1
     fi
 fi
-emit "AIWS_BOOT_SMOKE_PASS: lightdm=active shell=aiws chromium=visible workbench=active tools=mcp gui=clicked"
+emit "AIWS_BOOT_SMOKE_PASS: lightdm=active shell=native-panel chromium=app-window x11=focused clipboard=utf8 workbench=active tools=mcp gui=clicked"
 exit 0

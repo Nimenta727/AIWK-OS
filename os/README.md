@@ -72,3 +72,15 @@ Both real firmware A/B recovery and actual in-guest Qwen 2B inference require CI
 
 - [2B 微调与独立评测规范](../docs/AIWS_MODEL_FINETUNING_STANDARD.md)：中英 held-out 测试、明确拒绝率、guest RSS/时延、复现证据和 LoRA 回滚。实际 QEMU 模型评测必须通过 ci 后才可宣称完成。
 - [Windows→Linux Agent 历史投影](../docs/AIWS_WINDOWS_TO_LINUX_AGENT_MAPPING.md)：计划修订、WorkItem、AgentRun 和执行事件仅作受界证据；导入阶段不可执行，不复用 Windows 审批。
+
+## Firmware ISO and interactive Shell acceptance
+
+The standard Debian smoke ISO now assembles Openbox + XFCE native panel,
+a maximized normal Chromium application window rather than kiosk,
+Super+Enter/ Super+E shortcuts, and X11 focus + UTF-8 clipboard probes.
+The image CI adds **actual El Torito BIOS/OVMF UEFI ISO boot** jobs
+(without -kernel/-initrd) while preserving the diagnostic direct-kernel
+tests and separate ESP A/B fixture. Passing these CI tests is not proof
+of physical boot, CJK IME completeness, installer, secure update, or
+non-bypassable worker sandbox. See the
+[OS production gates](../docs/AIWS_OS_PRODUCTION_GATES.md).

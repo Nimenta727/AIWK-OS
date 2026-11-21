@@ -42,5 +42,23 @@ class AiwsOsContract(unittest.TestCase):
         self.assertIn("not yet compiled", fragment)
         self.assertIn("CONFIG_SECURITY_LANDLOCK=y", fragment)
 
+    def test_firmware_iso_and_native_shell_contract(self):
+        shell = (CONFIG / "includes.chroot/usr/local/bin/aiws-session").read_text()
+        browser = (CONFIG / "includes.chroot/usr/local/bin/aiws-open-workbench").read_text()
+        smoke = (CONFIG / "includes.chroot/usr/local/bin/aiws-boot-smoke").read_text()
+        firmware = (ROOT / "os/kernel/ci/firmware-iso-boot.sh").read_text()
+        workflow = (ROOT / ".github/workflows/aiws-os-image-boot.yml").read_text()
+        self.assertIn("xfce4-panel --disable-wm-check", shell)
+        self.assertIn("openbox --config-file", shell)
+        self.assertIn("--app=http://127.0.0.1:17640/", browser)
+        self.assertNotIn("--kiosk", browser)
+        self.assertIn("xclip -selection clipboard", smoke)
+        self.assertIn("windowactivate --sync", smoke)
+        self.assertIn("El Torito boot img", firmware)
+        self.assertIn("AIWS_FIRMWARE_ISO_PASS", firmware)
+        for forbidden in (" -kernel ", " -initrd ", "-virtfs", "-nic user"):
+            self.assertNotIn(forbidden, firmware)
+        self.assertIn("firmware: [bios, uefi]", workflow)
+
 if __name__ == "__main__":
     unittest.main()

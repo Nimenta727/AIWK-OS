@@ -66,6 +66,43 @@ jobs:
           compression-level: 0
           retention-days: 3
 
+  firmware-iso-boot:
+    # Real ISO boot menus and loader, not direct -kernel diagnostics.
+    needs: debian-image
+    strategy:
+      fail-fast: false
+      matrix:
+        firmware: [bios, uefi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 34
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: aiws-os-debian-live-smoke-iso
+          path: out/aiws-os-smoke
+      - name: Install BIOS/OVMF firmware, emulator and ISO inspection
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf xorriso
+      - name: Firmware boot entire ISO with guest Shell and DAG acceptance
+        timeout-minutes: 29
+        run: |
+          bash os/kernel/ci/firmware-iso-boot.sh \
+            "$PWD/out/aiws-os-smoke/live-image-amd64.hybrid.iso" \
+            "$PWD/out/aiws-firmware-${{ matrix.firmware }}" "${{ matrix.firmware }}"
+      - name: Upload firmware and guest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiws-os-iso-firmware-${{ matrix.firmware }}
+          path: |
+            out/aiws-firmware-${{ matrix.firmware }}/el-torito.txt
+            out/aiws-firmware-${{ matrix.firmware }}/system-area.txt
+            out/aiws-firmware-${{ matrix.firmware }}/boot-serial.log
+          if-no-files-found: warn
+          retention-days: 14
+
   uefi-kernel-ab:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ab-boot]')
     needs: debian-image

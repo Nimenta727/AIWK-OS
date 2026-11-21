@@ -1,18 +1,24 @@
 #!/bin/sh
-# AIWS is the sole visible GUI; Openbox supplies minimal X11 window management.
-# Guest-only disposable VM profile. Never run on host or as root.
+# Guest-only Openbox + native XFCE taskbar + AIWS application window.
 set -eu
 if [ "$(id -u)" -eq 0 ]; then echo 'No root graphical AIWS session' >&2; exit 1; fi
-export XDG_CURRENT_DESKTOP=AIWS
+export XDG_CURRENT_DESKTOP=AIWS:XFCE
 export DESKTOP_SESSION=aiws
 export XDG_SESSION_DESKTOP=aiws
 mkdir -p "$HOME/.local/share/aiws"
-openbox &
+openbox --config-file /usr/local/share/aiws/shell/openbox.xml &
 wm=$!
-trap 'kill "$wm" 2>/dev/null || true' EXIT INT TERM
-sleep 1
-while kill -0 "$wm" 2>/dev/null; do
-    /usr/local/bin/aiws-open-workbench || true
-    sleep 2
+xfce4-panel --disable-wm-check &
+panel=$!
+trap 'kill "$panel" "$wm" 2>/dev/null || true' EXIT INT TERM
+sleep 2
+if ! kill -0 "$wm" 2>/dev/null || ! kill -0 "$panel" 2>/dev/null; then
+  echo 'AIWS native panel or window manager unavailable' >&2
+  exit 1
+fi
+while kill -0 "$wm" 2>/dev/null && kill -0 "$panel" 2>/dev/null; do
+  /usr/local/bin/aiws-open-workbench || true
+  sleep 2
 done
+echo 'AIWS Shell lost window manager or desktop panel' >&2
 exit 1

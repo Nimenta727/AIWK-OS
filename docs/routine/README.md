@@ -4,6 +4,8 @@
 
 Each repository modification requires a timestamped log with changed files, verification, limitations and next steps. Earlier entries are retained intact.
 
+- [2026-11-21 13:10 — 原生 BIOS/UEFI ISO 启动与桌面 Shell](2026-11-21_1310-firmware-iso-native-shell.md)
+
 - [2026-11-20 21:30 — 独立 AIWS OS 客户机工程 / Independent guest OS bootstrap](2026-11-20_2130-aiws-os-guest-bootstrap.md)
 
 - [2026-11-20 22:26 — C#/Swift 跨平台代码智能索引 / Code intelligence MVP](2026-11-20_2226-code-intelligence-static-index.md)

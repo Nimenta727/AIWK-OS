@@ -20,3 +20,9 @@ openbox
 xdotool
 chromium-driver
 python3-selenium
+
+# Native interactive Shell and UTF-8 clipboard acceptance
+xfce4-panel
+thunar
+xclip
+fonts-noto-cjk

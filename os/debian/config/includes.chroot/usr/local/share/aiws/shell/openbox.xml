@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Guest-local shortcuts; no commands from untrusted web text. -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <focus><focusNew>yes</focusNew><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
+  <desktops><number>2</number></desktops>
+  <keyboard>
+    <keybind key="W-Return"><action name="Execute"><command>xfce4-terminal</command></action></keybind>
+    <keybind key="W-e"><action name="Execute"><command>thunar</command></action></keybind>
+    <keybind key="A-Tab"><action name="NextWindow"/></keybind>
+    <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>
+  </keyboard>
+</openbox_config>

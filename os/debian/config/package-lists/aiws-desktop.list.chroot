@@ -45,3 +45,8 @@ apparmor
 apparmor-utils
 sudo
 nftables
+
+# Native AIWS Shell taskbar and keyboard/clipboard support
+openbox
+xdotool
+xclip
