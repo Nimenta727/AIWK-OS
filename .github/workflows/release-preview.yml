@@ -165,6 +165,8 @@ jobs:
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools zstd
               ./os/debian/build.sh
             '
+          # The container built as root: hand the output back to the runner user before later steps write next to it.
+          sudo chown -R "$(id -u):$(id -g)" out
           ls -la out/aiws-os/*.iso out/aiws-os/*.packages 2>/dev/null || ls -la out/aiws-os
           (cd out/aiws-os && sha256sum -c live-image-amd64.hybrid.iso.sha256)
       - name: Prove the ISO really contains the model weights, llama-server and AIWS Code
@@ -192,7 +194,7 @@ jobs:
           set -Eeuo pipefail
           sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso
           iso="$PWD/out/aiws-os/live-image-amd64.hybrid.iso"
-          serial="$PWD/out/boot-serial.log"
+          serial="$RUNNER_TEMP/boot-serial.log"
           accel=tcg; [[ -w /dev/kvm ]] && accel=kvm
           echo "QEMU acceleration: $accel"
           mkdir -p "$RUNNER_TEMP/live"
@@ -283,6 +285,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: boot-serial-log
-          path: out/boot-serial.log
+          path: ${{ runner.temp }}/boot-serial.log
           if-no-files-found: ignore
           retention-days: 14
