@@ -120,3 +120,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-22 12:00 — 全界面双语、官方插件调研、云端连接方案](2026-11-22_1200-bilingual-and-cloud-connection-research.md)
 - [2026-11-22 15:00 — 云端模型改为直接接 DeepSeek API（自带智能体循环）](2026-11-22_1500-deepseek-native-runner.md)
 - [2026-11-22 17:00 — 受限的编译/测试/运行工具（build_run）](2026-11-22_1700-restricted-build-tool.md)
+- [2026-11-22 20:00 — 模型工具箱补齐、Swift、项目预览、AIWS Code 嵌入工作台](2026-11-22_2000-dev-toolbox-preview-ide.md)

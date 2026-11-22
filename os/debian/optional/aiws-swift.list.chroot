@@ -1,0 +1,4 @@
+# OPTIONAL: the Swift toolchain from Debian 13 'main' (swiftlang 6.0.3-2, verified against the real trixie index).
+# It is about 2 GB INSTALLED, so it is not part of the default image. Include it with:  AIWS_WITH_SWIFT=1 sudo ./os/debian/build.sh
+# What it gives: swiftc / SwiftPM for the standard library and Foundation on Linux. It cannot build SwiftUI/UIKit/AppKit apps (Apple-only SDKs).
+swiftlang

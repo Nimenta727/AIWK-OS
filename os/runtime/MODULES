@@ -8,6 +8,7 @@ aiws_agent_client.py
 aiws_mcp.py
 aiws_apps.py
 aiws_changes.py
+aiws_preview.py
 aiws_capabilities.py
 aiws_system.py
 aiws_launcher.py
@@ -42,5 +43,6 @@ aiws_cli_adapters.py
 aiws_deepseek.py
 aiws_cloud_agent.py
 aiws_build_tool.py
+aiws_git_tool.py
 aiws_secrets.py
 aiws_egress_proxy.py

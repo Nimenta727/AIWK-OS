@@ -11,6 +11,8 @@ const INTERNAL=['plan.propose','plan.update','agent.spawn'];
 const EDIT=['file.replace','file.mkdir','file.copy','file.move'];
 const DELETE=['file.trash','file.restore'];
 const EXEC=['build.run'];
+const DEPS=['deps.install'];
+const GIT=['git.commit'];
 type KeyStatus={configured:boolean;source:string|null;last4:string|null;problem:string|null};
 const EFFORT_LABEL=(tr:Tr)=>({low:tr('低（快、省）','low (fast, cheap)'),high:tr('高（默认）','high (default)'),max:tr('最高（慢、贵）','max (slow, costly)')} as Record<string,string>);
 
@@ -39,7 +41,7 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
  const {builder,reload}=data;
  const act=useAction(reload);
  const [f,setF]=useState({provider:'deepseek',projectDir:'',prompt:'',inputK:'400',outputK:'100',minutes:'30',turns:'40',tools:'Read,Edit,Write,Bash(npm test)',del:true,install:true,push:true,
-  model:'deepseek-flash',thinking:true,effort:'high',planApproval:true,edit:true,remove:false,askWrite:false,build:true,askBuild:true});
+  model:'deepseek-flash',thinking:true,effort:'high',planApproval:true,edit:true,remove:false,askWrite:false,build:true,askBuild:true,deps:true,git:true,askCommit:true});
  const set=(k:string,v:string|boolean)=>setF(x=>({...x,[k]:v}));
  const native=f.provider==='deepseek';
  const execOk=!!builder?.status.execAllowed;
@@ -48,10 +50,10 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
   try{
    let body:Record<string,unknown>;
    if(native){
-    const tools=[...READ,...INTERNAL,...(f.edit?EDIT:[]),...(f.remove?DELETE:[]),...(f.build&&execOk?EXEC:[])];
+    const tools=[...READ,...INTERNAL,...(f.edit?EDIT:[]),...(f.remove?DELETE:[]),...(f.build&&execOk?EXEC:[]),...(f.deps&&execOk?DEPS:[]),...(f.git?GIT:[])];
     body={provider:'deepseek',projectDir:f.projectDir.trim(),allowedTools:tools,model:f.model,thinking:f.thinking,effort:f.effort,planApproval:f.planApproval,maxTurns:Number(f.turns),
      wallClockMinutes:Number(f.minutes),tokenBudget:{input:Number(f.inputK)*1000,output:Number(f.outputK)*1000},
-     needApprovalFor:['network','shell','outside-project',...(f.remove?['delete']:[]),...(f.askWrite?['write']:[]),...(f.build&&execOk&&f.askBuild?['build']:[])]};
+     needApprovalFor:['network','shell','outside-project',...(f.remove?['delete']:[]),...(f.askWrite?['write']:[]),...(f.build&&execOk&&f.askBuild?['build']:[]),...(f.git&&f.askCommit?['commit']:[])]};
    }else{
     const approvals=['network','shell','outside-project',...(f.del?['delete']:[]),...(f.install?['install-dependency']:[]),...(f.push?['git-push']:[])];
     body={provider:f.provider,projectDir:f.projectDir.trim(),allowedTools:f.tools.split(',').map(x=>x.trim()).filter(Boolean),permissionMode:'default',maxTurns:Number(f.turns),
@@ -89,8 +91,11 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
       <Check label={tr('创建/修改/复制/移动文件','Create / edit / copy / move files')} checked={f.edit} onChange={v=>set('edit',v)}/>
       <Check label={tr('删除（进回收站，每次都要你批准）','Delete (to trash, always needs your approval)')} checked={f.remove} onChange={v=>set('remove',v)}/>
       <Check label={tr('每次写入文件前先问我','Ask me before every file write')} checked={f.askWrite} disabled={!f.edit} onChange={v=>set('askWrite',v)}/>
-      <Check label={tr('允许编译、检查、测试、运行代码（C、C++、Go、Python、Rust、C#、Java、JavaScript）','Allow compiling, checking, testing and running code (C, C++, Go, Python, Rust, C#, Java, JavaScript)')} checked={f.build&&execOk} disabled={!execOk} onChange={v=>set('build',v)}/>
+      <Check label={tr('允许编译、检查、测试、运行代码（C、C++、Go、Python、Rust、C#、Java、JavaScript、Swift）','Allow compiling, checking, testing and running code (C, C++, Go, Python, Rust, C#, Java, JavaScript, Swift)')} checked={f.build&&execOk} disabled={!execOk} onChange={v=>set('build',v)}/>
       <Check label={tr('每次编译/运行前先问我（会显示完整命令）','Ask me before every build/run (the exact command is shown)')} checked={f.askBuild} disabled={!execOk||!f.build} onChange={v=>set('askBuild',v)}/>
+      <Check label={tr('允许下载依赖（只经白名单代理访问官方源；每次都要你批准，无法关闭）','Allow downloading dependencies (official registries through the allowlisting proxy only; always needs your approval)')} checked={f.deps&&execOk} disabled={!execOk} onChange={v=>set('deps',v)}/>
+      <Check label={tr('允许在本地提交（git commit；没有 push）','Allow local commits (git commit; there is no push)')} checked={f.git} onChange={v=>set('git',v)}/>
+      <Check label={tr('每次提交前先问我','Ask me before every commit')} checked={f.askCommit} disabled={!f.git} onChange={v=>set('askCommit',v)}/>
       <Check label={tr('动手前先给我看计划，等我批准','Show me a plan first and wait for my approval')} checked={f.planApproval} onChange={v=>set('planApproval',v)}/>
       {!execOk&&<Notice tone="warn">{tr('编译和运行代码目前不可用：模型写的程序会以你自己的权限运行，所以只在构建通道使用专用低权限用户（isolation.mode="user"）时才开放。','Building and running code is unavailable for now: programs written by the model would run with your own privileges, so it is only offered when the builder uses its dedicated low-privilege user (isolation.mode="user").')}</Notice>}
       <p className="muted">{tr('没有 shell，也没有任意命令：编译只用每种语言的固定命令，离线进行（依赖需事先备好），结果在隔离的临时目录里。文件工具被限制在项目文件夹内。','There is no shell and no free-form command: builds use one fixed command per language, offline (dependencies must already be present), in an isolated scratch folder. File tools are confined to the project folder.')}</p></fieldset>

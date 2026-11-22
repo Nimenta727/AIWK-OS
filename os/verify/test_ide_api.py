@@ -104,5 +104,49 @@ class IdeApiTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/api/v1/ide/open", {"folder": "/etc"}, self.hdr)[0], 400)
         self.assertFalse(self.out.exists())
 
+
+class IdeSessionTests(IdeApiTests):
+    """The tab embedded in the workbench: server-only start and a CSRF-protected session URL."""
+    TOKEN = "0123456789abcdef0123456789abcdef"
+    def setUp(self):
+        super().setUp(); self.rt = Path(self.temp.name) / "run"; self.rt.mkdir(mode=0o700)
+        self.rt_env = patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(self.rt)}); self.rt_env.start(); self.listener = None
+        (self.root / "proj").mkdir()
+    def tearDown(self):
+        self.rt_env.stop()
+        if self.listener: self.listener.close()
+        super().tearDown()
+    def token(self, text=None, mode=0o600):
+        f = self.rt / "aiws-code.token"; f.write_text(self.TOKEN if text is None else text); f.chmod(mode); return f
+    def running(self):
+        self.listener = socket.socket(); self.listener.bind(("127.0.0.1", self.port)); self.listener.listen(4)
+    def test_start_runs_the_launcher_in_server_only_mode(self):
+        self.install(); s, b = self.req("POST", "/api/v1/ide/start", {}, self.hdr); self.assertEqual((s, b["started"]), (202, True)); time.sleep(0.5)
+        self.assertIn("ARGS:1", self.out.read_text()); self.assertNotIn("must-not-leak", self.out.read_text())
+        self.assertEqual(self.req("POST", "/api/v1/ide/start", {"folder": "x"}, self.hdr)[0], 400); self.assertEqual(self.req("POST", "/api/v1/ide/start", {})[0], 403)
+    def test_session_needs_install_running_and_a_safe_token(self):
+        self.token(); self.assertGreaterEqual(self.req("POST", "/api/v1/ide/session", {}, self.hdr)[0], 400)           # not installed
+        self.install(); self.assertGreaterEqual(self.req("POST", "/api/v1/ide/session", {}, self.hdr)[0], 400)         # not running
+    def test_session_url_has_token_and_a_confined_absolute_folder(self):
+        self.install(); self.running(); self.token()
+        s, b = self.req("POST", "/api/v1/ide/session", {"path": "proj"}, self.hdr); self.assertEqual(s, 202, b)
+        self.assertTrue(b["url"].startswith("http://127.0.0.1:%d/?tkn=%s&folder=" % (self.port, self.TOKEN))); self.assertEqual(b["folder"], str((self.root / "proj").resolve())); self.assertIn("%", b["url"].replace("%2F", "")) if " " in b["folder"] else None
+        s, b = self.req("POST", "/api/v1/ide/session", {}, self.hdr); self.assertEqual(b["folder"], str(self.root.resolve()))
+    def test_folder_must_stay_inside_the_workspace(self):
+        self.install(); self.running(); self.token()
+        for bad in ("..", "../x", "/etc", ".git", "proj/../../x", 5):
+            s, b = self.req("POST", "/api/v1/ide/session", {"path": bad}, self.hdr); self.assertGreaterEqual(s, 400, bad); self.assertNotIn("url", b)
+        self.assertEqual(self.req("POST", "/api/v1/ide/session", {"path": "proj", "extra": 1}, self.hdr)[0], 400)
+        self.assertEqual(self.req("POST", "/api/v1/ide/session", {"path": "proj"})[0], 403)
+    def test_unsafe_token_files_are_refused_and_never_echoed(self):
+        self.install(); self.running()
+        for text, mode in ((None, 0o644), ("not hex!", 0o600), ("abc", 0o600), ("0" * 300, 0o600), ("", 0o600)):
+            self.token(text, mode); s, b = self.req("POST", "/api/v1/ide/session", {}, self.hdr); self.assertGreaterEqual(s, 400, (text, mode)); self.assertNotIn(self.TOKEN, json.dumps(b))
+        (self.rt / "aiws-code.token").unlink(); self.assertGreaterEqual(self.req("POST", "/api/v1/ide/session", {}, self.hdr)[0], 400)
+        real = self.rt / "real"; real.write_text(self.TOKEN); real.chmod(0o600); (self.rt / "aiws-code.token").symlink_to(real)
+        self.assertGreaterEqual(self.req("POST", "/api/v1/ide/session", {}, self.hdr)[0], 400)                     # a symlink is refused
+    def test_the_token_is_not_in_the_get_status(self):
+        self.install(); self.running(); self.token(); s, b = self.req("GET", "/api/v1/ide"); self.assertNotIn(self.TOKEN, json.dumps(b))
+
 if __name__ == "__main__":
     unittest.main()

@@ -136,6 +136,11 @@ chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-broker" \
   "$out/config/includes.chroot/usr/local/bin/aiws-open-workbench" \
   "$out/config/includes.chroot/usr/local/bin/aiws-boot-smoke"
 echo "Building AIWS OS Live ISO using Debian package repositories..."
+# Optional Swift toolchain (about 2 GB installed): AIWS_WITH_SWIFT=1. The packages come from Debian 13 main like everything else.
+if [[ "${AIWS_WITH_SWIFT:-0}" == "1" ]]; then
+  cp -- "$repo/os/debian/optional/aiws-swift.list.chroot" "$out/config/package-lists/aiws-swift.list.chroot"
+  echo "Swift toolchain (swiftlang) will be included: the image will be about 2 GB larger when installed."
+fi
 # System file manifest (the LAST staging step, so it covers everything above): the guest re-checks it at every boot
 # (aiws-verify-system.service) because the live system's writable overlay would otherwise hide a modified file.
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/docs"

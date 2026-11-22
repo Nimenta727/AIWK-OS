@@ -3,6 +3,7 @@ import '../ui/base.css';
 import '../ui/kit.css';
 import '../ui/layout.css';
 import './app.css';
+import './viewer.css';
 import '../os/OsWorkbench.css';
 import {ActivityBar,BottomPanel,Palette,Sash,SideBar,StatusBar,Tabs} from '../ui/Layout';
 import type {Command,Tab} from '../ui/Layout';
@@ -13,6 +14,8 @@ import AgentTree from './AgentTree';
 import ChangesPage from './Changes';
 import SystemPage from './System';
 import Build from './Build';
+import ProjectPreview from './ProjectPreview';
+import IdeView from './IdeView';
 import FileViewer from '../os/FileViewer';
 import BrowserView from '../os/BrowserView';
 import GuestFiles from '../os/GuestFiles';
@@ -34,7 +37,7 @@ const VIEWS:View[]=[
  {id:'home',zh:'总览',en:'Overview',icon:'pulse'},{id:'plans',zh:'计划审核',en:'Plan review',icon:'checklist'},{id:'agents',zh:'云端智能体',en:'Cloud agents',icon:'type-hierarchy'},
  {id:'changes',zh:'变更审查',en:'Review changes',icon:'diff'},{id:'build',zh:'构建',en:'Build',icon:'rocket'},{id:'files',zh:'AI 文件管理',en:'AI files',icon:'files'},
  {id:'tasks',zh:'持久任务与 DAG',en:'Persistent tasks',icon:'list-tree'},{id:'model',zh:'本地 AI 助手',en:'Local AI',icon:'hubot'},
- {id:'system',zh:'系统',en:'System',icon:'settings-gear'},{id:'advanced',zh:'系统服务与内核',en:'Services & kernel',icon:'server-process'},{id:'browser',zh:'内置浏览器',en:'Preview browser',icon:'globe'}];
+ {id:'ide',zh:'代码编辑器',en:'Code editor',icon:'code'},{id:'system',zh:'系统',en:'System',icon:'settings-gear'},{id:'advanced',zh:'系统服务与内核',en:'Services & kernel',icon:'server-process'},{id:'browser',zh:'内置浏览器',en:'Preview browser',icon:'globe'}];
 const ACTIVITIES=[{id:'home',zh:'总览',en:'Overview',icon:'pulse'},{id:'plans',zh:'计划',en:'Plans',icon:'checklist'},{id:'agents',zh:'智能体',en:'Agents',icon:'type-hierarchy'},
  {id:'changes',zh:'变更',en:'Changes',icon:'diff'},{id:'explorer',zh:'文件',en:'Files',icon:'files'},{id:'system',zh:'系统',en:'System',icon:'settings-gear'}];
 const isView=(id:string|null)=>VIEWS.some(v=>v.id===id);
@@ -66,6 +69,7 @@ export default function App(){
  const [expanded,setExpanded]=useState<Set<string>>(new Set());
  const [apps,setApps]=useState<AppRow[]>([]);
  const [note,setNote]=useState('');
+ const [nav,setNav]=useState<{url:string;nonce:number}|null>(null);
  const [cmd,setCmd]=useState<{text:string;nonce:number}|null>(null);
  const data=useObservatoryData();
  const s=data.summary;
@@ -152,10 +156,10 @@ export default function App(){
    {note&&<p className="muted pad">{note}</p>}</SideBar>;
   return <SideBar title={tr('总览','Overview')}>
    <Row icon="pulse" label={tr('总览','Overview')} onClick={()=>open('home')}/><Row icon="rocket" label={tr('构建','Build')} onClick={()=>open('build')}/><Row icon="hubot" label={tr('本地 AI 助手','Local AI')} onClick={()=>open('model')}/>
-   <Row icon="files" label={tr('AI 文件管理','AI files')} onClick={()=>open('files')}/><Row icon="globe" label={tr('内置浏览器','Preview browser')} onClick={()=>open('browser')}/></SideBar>;
+   <Row icon="files" label={tr('AI 文件管理','AI files')} onClick={()=>open('files')}/><Row icon="globe" label={tr('预览浏览器','Preview browser')} onClick={()=>open('browser')}/><Row icon="code" label={tr('代码编辑器（AIWS Code）','Code editor (AIWS Code)')} onClick={()=>open('ide')}/></SideBar>;
  };
  const pageOf=(id:string|null)=>{
-  if(id&&id.startsWith('file:'))return <FileViewer path={id.slice(5)} english={english}/>;
+  if(id&&id.startsWith('file:'))return <div className="legacy fill"><FileViewer path={id.slice(5)} english={english}/></div>;
   switch(id){
    case 'home':return <Home english={english} tr={tr} data={data} onCommand={runCommand} onOpen={(v,f)=>open(v,f)}/>;
    case 'plans':return <Plans english={english} tr={tr} focus={focus.plans||null} onStop={stopRun} activeRun={s?.status.builder.runId||null} reload={data.reload}/>;
@@ -166,7 +170,8 @@ export default function App(){
    case 'files':return <div className="legacy"><GuestFiles csrf={csrf} english={english} command={cmd} onPlanCreated={()=>open('plans')}/></div>;
    case 'tasks':case 'model':return <div className="legacy"><GuestTaskStudio csrf={csrf} english={english} capabilities={caps as never} focus={id==='model'?'model':'tasks'}/></div>;
    case 'advanced':return <div className="legacy"><GuestSystemConsole csrf={csrf} english={english} onPlanCreated={()=>open('plans')}/></div>;
-   case 'browser':return <BrowserView english={english} openExternal={()=>void launch('chromium')} canOpenExternal={apps.some(a=>a.id==='chromium'&&a.launchable)}/>;
+   case 'browser':return <div className="legacy fill"><ProjectPreview tr={tr} folders={folders} onUrl={u=>setNav({url:u,nonce:Date.now()})}/><BrowserView english={english} navigateTo={nav} openExternal={()=>void launch('chromium')} canOpenExternal={apps.some(a=>a.id==='chromium'&&a.launchable)}/></div>;
+   case 'ide':return <IdeView tr={tr} folders={folders}/>;
    default:return null;
   }
  };

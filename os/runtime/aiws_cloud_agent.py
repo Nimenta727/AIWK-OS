@@ -21,16 +21,18 @@ import sys
 import time
 
 import aiws_build_tool as build_tool
+import aiws_git_tool as git_tool
 from aiws_deepseek import Client, DeepSeekError, MODELS, history_message
 from aiws_events import redact
 
 READ_TOOLS = ("workspace.tree", "file.read", "file.stat", "code.search", "doc.text", "git.inspect", "ext.rg", "ext.jq", "ext.gitlog", "tools.list")
 WRITE_TOOLS = ("file.replace", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore")
 INTERNAL_TOOLS = ("plan.propose", "plan.update", "agent.spawn")
-EXEC_TOOLS = ("build.run",)          # runs programs: only offered when the supervisor says the builder is isolated
-NATIVE_TOOLS = READ_TOOLS + WRITE_TOOLS + INTERNAL_TOOLS + EXEC_TOOLS
-GATE_CATEGORY = {"file.trash": "delete", "file.restore": "delete", "file.replace": "write", "file.mkdir": "write", "file.copy": "write", "file.move": "write", "build.run": "build"}
-CTX_KIND = {"build.run": "command", "file.read": "file", "file.stat": "file", "doc.text": "file", "file.replace": "file", "file.copy": "file", "file.move": "file", "file.trash": "file",
+EXEC_TOOLS = ("build.run", "deps.install")   # run programs / package managers: only offered when the supervisor says the builder is isolated
+GIT_TOOLS = ("git.commit",)                    # local commits only; runs git hardened, never model-written code
+NATIVE_TOOLS = READ_TOOLS + WRITE_TOOLS + INTERNAL_TOOLS + EXEC_TOOLS + GIT_TOOLS
+GATE_CATEGORY = {"file.trash": "delete", "file.restore": "delete", "file.replace": "write", "file.mkdir": "write", "file.copy": "write", "file.move": "write", "build.run": "build", "deps.install": "network", "git.commit": "commit"}
+CTX_KIND = {"build.run": "command", "deps.install": "command", "git.commit": "command", "file.read": "file", "file.stat": "file", "doc.text": "file", "file.replace": "file", "file.copy": "file", "file.move": "file", "file.trash": "file",
             "code.search": "search", "ext.rg": "search", "workspace.tree": "search"}
 MAX_TOOL_OUTPUT = 12000
 MAX_CHILDREN = 8
@@ -52,6 +54,10 @@ Rules:
 """
 
 
+GIT_RULE = """- git_commit stages (all changes, or only the paths you list) and commits locally. There is no push, pull or reset. Commit when a coherent piece of work is done and checked, with a clear message.
+"""
+DEPS_RULE = """- deps_install downloads the dependencies named in the project's manifest (go.mod, Cargo.toml, package.json, requirements.txt, pom.xml, a .csproj) into a cache; build_run itself is offline, so call deps_install first when a build fails because a dependency is missing. The user must approve every download.
+"""
 BUILD_RULE = """- build_run compiles, checks, tests or runs code with a fixed command per language (c, cpp, go, python, rust, csharp, java, javascript; actions check, build, test, run; target = a source file or project folder). There is no shell and no network: dependencies must already be present. After you change code, check it with build_run and fix what the compiler or tests report. The user may be asked to approve each call.
 """
 
@@ -94,6 +100,11 @@ INTERNAL_SCHEMAS = {
     "build.run": ("Compile, check, test or run code in the project using a FIXED command for the language (no shell, offline). Returns the exit code and the bounded output.",
                   {"type": "object", "required": ["language", "action"], "properties": {"language": {"type": "string", "enum": list(build_tool.LANGUAGES)},
                    "action": {"type": "string", "enum": list(build_tool.ACTIONS)}, "target": {"type": "string", "description": "a source file or a project folder, relative to the project; omit for the project itself"}}}),
+    "deps.install": ("Download the dependencies named in the project's manifest (go.mod, Cargo.toml, package.json, requirements.txt, pom.xml, .csproj) into the cache. The only step with network access, through an allowlisting proxy; install scripts are not run.",
+                     {"type": "object", "required": ["language"], "properties": {"language": {"type": "string", "enum": ["go", "rust", "javascript", "python", "java", "csharp"]},
+                      "target": {"type": "string", "description": "the project folder that holds the manifest, relative to the project; omit for the project itself"}}}),
+    "git.commit": ("Stage and commit the project's changes locally (no push, no history rewriting). The project folder must be the root of its git repository.",
+                   {"type": "object", "required": ["message"], "properties": {"message": STR, "paths": {"type": "array", "items": STR, "description": "files or folders to stage; omit to stage everything"}}}),
     "plan.update": ("Report the state of a plan step (1-based).", {"type": "object", "required": ["step", "state"], "properties": {"step": {"type": "integer"}, "state": {"type": "string", "enum": ["running", "completed", "failed"]}}}),
     "agent.spawn": ("Run a focused sub-agent with its own context and return its final answer. Use for research or review.",
                     {"type": "object", "required": ["task"], "properties": {"task": STR, "label": STR, "model": {"type": "string", "enum": list(MODELS)},
@@ -141,8 +152,8 @@ class Agent:
         self.tools = sorted(t for t in (tools if tools is not None else m["allowedTools"]) if t in NATIVE_TOOLS)
         if depth >= MAX_DEPTH and "agent.spawn" in self.tools:
             self.tools.remove("agent.spawn")
-        if not shared.exec_enabled and "build.run" in self.tools:
-            self.tools.remove("build.run")                     # never offered when running programs is not allowed for this run
+        if not shared.exec_enabled:
+            self.tools = [t for t in self.tools if t not in EXEC_TOOLS]      # never offered when running programs is not allowed for this run
         self.max_turns, self.turns, self.tool_calls = max_turns, 0, 0
         self.defs = tool_definitions(self.tools, shared.catalog)
         self.last_in = 0
@@ -155,7 +166,7 @@ class Agent:
 
     # ---- one conversation ----
     def run(self, task, language="en"):
-        messages = [{"role": "system", "content": SYSTEM + (BUILD_RULE if "build.run" in self.tools else "") + "\nReply in the user's language (" + ("Chinese" if language == "zh" else "English") + ")."},
+        messages = [{"role": "system", "content": SYSTEM + (BUILD_RULE if "build.run" in self.tools else "") + (DEPS_RULE if "deps.install" in self.tools else "") + (GIT_RULE if "git.commit" in self.tools else "") + "\nReply in the user's language (" + ("Chinese" if language == "zh" else "English") + ")."},
                     {"role": "user", "content": task}]
         nudged = False
         while True:
@@ -219,6 +230,10 @@ class Agent:
                 return self._spawn(args)
             if name == "build.run":
                 return self._build(args)
+            if name == "deps.install":
+                return self._deps(args)
+            if name == "git.commit":
+                return self._commit(args)
             return self._run_tool(name, args)
         except Stop:
             raise
@@ -252,18 +267,42 @@ class Agent:
             text = text[:MAX_TOOL_OUTPUT] + "\n[truncated %d characters]" % (len(text) - MAX_TOOL_OUTPUT)
         return text
 
+    def _approved_run(self, tool, category, command, go, language=None):
+        """Common path for tools that run a command: approval (if the mandate asks), events, bounded result text."""
+        if category in self.s.m["needApprovalFor"] and not self.s.gate(category, tool, command):
+            self.ev("tool", tool=tool, status="denied", detail=redact(command, 120))
+            return "error: the user did not approve this action"
+        self.ev("tool", tool=tool, status="pending", detail=redact(command, 120), ctx=[{"kind": "command", "ref": redact(command, 120)}])
+        res = go()
+        self.ev("tool", tool=tool, status="ok" if res["exitCode"] == 0 else "error")
+        return build_tool.describe(res, language)
+
     def _build(self, args):
         try:
             command, go = build_tool.run_request(args, self.s.project, self.s.scratch)
         except build_tool.BuildError as exc:
             return "error: " + str(exc)
-        if "build" in self.s.m["needApprovalFor"] and not self.s.gate("build", "build.run", command):
-            self.ev("tool", tool="build.run", status="denied", detail=redact(command, 120))
+        return self._approved_run("build.run", "build", command, go, args.get("language"))
+
+    def _deps(self, args):
+        try:
+            command, go = build_tool.deps_request(args, self.s.project, self.s.scratch)
+        except build_tool.BuildError as exc:
+            return "error: " + str(exc)
+        return self._approved_run("deps.install", "network", command, go, args.get("language"))   # "network" approval can never be switched off
+
+    def _commit(self, args):
+        try:
+            command, plan = git_tool.plan_commit(args, self.s.project)
+        except build_tool.BuildError as exc:
+            return "error: " + str(exc)
+        if "commit" in self.s.m["needApprovalFor"] and not self.s.gate("commit", "git.commit", command):
+            self.ev("tool", tool="git.commit", status="denied", detail=redact(command, 120))
             return "error: the user did not approve this action"
-        self.ev("tool", tool="build.run", status="pending", detail=redact(command, 120), ctx=[{"kind": "command", "ref": redact(command, 120)}])
-        res = go()
-        self.ev("tool", tool="build.run", status="ok" if res["exitCode"] == 0 else "error")
-        return build_tool.describe(res)
+        self.ev("tool", tool="git.commit", status="pending", detail=redact(command, 120), ctx=[{"kind": "command", "ref": redact(command, 120)}])
+        text = git_tool.commit(plan, self.s.project, self.s.scratch.get())
+        self.ev("tool", tool="git.commit", status="error" if text.startswith(("error", "exit code")) else "ok")
+        return text
 
     # ---- plans ----
     def _plan(self, a):

@@ -1,4 +1,4 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ExternalLink,RefreshCw} from 'lucide-react';
 import {resolveBrowserTarget} from '../model/apps.mjs';
 
@@ -6,7 +6,7 @@ type Target={kind:string;url?:string;path?:string};
 
 /** Preview browser. Embeds ONLY loopback dev servers and sandboxed workspace HTML. Any other web address is never rendered
  *  inside the workbench: it is offered to the system browser, so remote pages cannot run next to the guest API. */
-export default function BrowserView({english,openExternal,canOpenExternal}:{english:boolean;openExternal:()=>void;canOpenExternal:boolean}){
+export default function BrowserView({english,openExternal,canOpenExternal,navigateTo}:{english:boolean;openExternal:()=>void;canOpenExternal:boolean;navigateTo?:{url:string;nonce:number}|null}){
  const tr=(zh:string,en:string)=>english?en:zh;
  const [input,setInput]=useState('');
  const [target,setTarget]=useState<Target|null>(null);
@@ -22,6 +22,8 @@ export default function BrowserView({english,openExternal,canOpenExternal}:{engl
   if(push&&target&&target.kind!=='external')setHistory(h=>[...h.slice(-19),target]);
   setTarget(t);
  };
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ useEffect(()=>{if(navigateTo){setInput(navigateTo.url);go(navigateTo.url);}},[navigateTo?.nonce]);
  const back=()=>{const prev=history[history.length-1];if(!prev)return;setHistory(h=>h.slice(0,-1));setTarget(prev);setInput(prev.kind==='workspace'?prev.path||'':prev.url||'');};
  const reload=()=>{if(frame.current&&target?.url)frame.current.src=target.url;};
  return <div className="aiws-sh-file aiws-sh-fill">

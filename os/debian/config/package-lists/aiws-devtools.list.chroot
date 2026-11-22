@@ -76,3 +76,15 @@ fonts-hack
 # Document tools used by the workbench reader and the model's doc.text tool (read-only conversion, run without a shell)
 poppler-utils
 pandoc
+
+# Added for the cloud agent's build tool and for AIWS Code (names verified against the real trixie index).
+# C#: Debian main has no .NET SDK, but it has Mono's compiler and runtime (enough to compile and run console programs).
+mono-mcs
+mono-runtime
+# Language servers and analysers (AIWS Code can use them once an extension launches them)
+gopls
+rust-analyzer
+python3-pylsp
+clang-tidy
+cppcheck
+lldb

@@ -7,6 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import argparse
 import json
 import os
+import re
+import stat
 from pathlib import Path
 import secrets
 import shutil
@@ -35,6 +37,7 @@ import aiws_plans
 import aiws_sysverify
 import aiws_secrets
 import aiws_deepseek
+import aiws_preview
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -87,6 +90,7 @@ class Controller:
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
         self.plans = aiws_plans.PlanStore(state_home / "aiws" / "plans.json")
         self.results = aiws_plans.ResultStore(state_home / "aiws" / "results.json")
+        self.preview = aiws_preview.PreviewManager(self.workspace, self._preview_dir)
         self.supervisor = Supervisor(self.mandates, self.events, self.workspace, plans=self.plans, results=self.results)
         if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
             self._seed_demo()
@@ -143,8 +147,9 @@ class Controller:
         return {"installed": installed, "launcherPresent": Path(launcher).is_file(), "running": running,
                 "version": version if isinstance(version, str) and len(version) <= 32 else None, "port": port}
 
-    def ide_open(self):
-        """Start AIWS Code (fixed command, no user-supplied arguments). Already running: nothing is started."""
+    def ide_open(self, server_only=False):
+        """Start AIWS Code (fixed command, no user-supplied arguments). Already running: nothing is started.
+        server_only starts just the loopback server, for the tab embedded in the workbench; otherwise the launcher also opens its own window."""
         status = self.ide_status()
         if not status["installed"] or not status["launcherPresent"]:
             raise SupervisorError("AIWS Code is not installed in this image (see os/ide/README.md)")
@@ -156,7 +161,7 @@ class Controller:
         self._ide_last = now
         env = {k: os.environ[k] for k in self.IDE_ENV if k in os.environ}
         env["AIWS_WORKSPACE"] = str(self.workspace)
-        subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        subprocess.Popen([getattr(self, "ide_launcher", self.IDE_LAUNCHER)] + (["--server-only"] if server_only else []), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True, shell=False, env=env)
         return {"started": True, "running": False}
 
@@ -222,6 +227,38 @@ class Controller:
         except aiws_system.SystemError_ as exc:
             raise SupervisorError(str(exc))
 
+    @staticmethod
+    def _ide_token():
+        """The access token the launcher wrote. Read only if the file is private, ours, a regular file and small (same rules as the key file)."""
+        runtime = os.environ.get("XDG_RUNTIME_DIR") or str(Path.home() / ".local/share/aiws-code")
+        path = Path(runtime) / "aiws-code.token"
+        try:
+            st = os.lstat(path)
+            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077 or st.st_size > 256:
+                raise SupervisorError("The AIWS Code access token file is unsafe")
+            token = path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            raise SupervisorError("The AIWS Code access token is missing")
+        except OSError:
+            raise SupervisorError("The AIWS Code access token could not be read")
+        if not re.fullmatch(r"[0-9a-f]{16,128}", token):
+            raise SupervisorError("The AIWS Code access token is unsafe")
+        return token
+
+    def ide_session(self, rel):
+        """URL for the IDE tab: the loopback server, the access token and a folder chosen with the platform's path rules."""
+        status = self.ide_status()
+        if not status["installed"]:
+            raise SupervisorError("AIWS Code is not installed in this image (see os/ide/README.md)")
+        if not status["running"]:
+            raise SupervisorError("AIWS Code is not running")
+        try:
+            folder = aiws_changes.project_dir(self.workspace, rel or ".")
+        except aiws_changes.ChangesError as exc:
+            raise SupervisorError(str(exc))
+        from urllib.parse import quote
+        return {"url": "http://127.0.0.1:%d/?tkn=%s&folder=%s" % (status["port"], self._ide_token(), quote(str(folder), safe="/")), "port": status["port"], "folder": str(folder)}
+
     def apps_launch(self, ident):
         if ident == "aiws-code":
             return self.ide_open()                                  # the editor keeps its own installed/running logic
@@ -256,6 +293,28 @@ class Controller:
 
     def builder_start(self, mandate_id, prompt, language="zh"):
         return self.supervisor.start(mandate_id, prompt, language)
+
+    @staticmethod
+    def _preview_dir(root, rel):
+        try:
+            return aiws_changes.project_dir(root, rel)
+        except aiws_changes.ChangesError as exc:
+            raise aiws_preview.PreviewError(str(exc))
+
+    def preview_op(self, action, payload):
+        """Start / stop the static project preview. Same 2-second limiter as the other system-level actions."""
+        now = time.monotonic()
+        if now - getattr(self, "_preview_last", -10) < 1:
+            raise ValueError("Too many system operations; wait a moment")
+        self._preview_last = now
+        try:
+            if action == "stop" and not payload:
+                return self.preview.stop()
+            if action == "start" and set(payload) == {"path"} and isinstance(payload["path"], str):
+                return self.preview.start(payload["path"])
+        except aiws_preview.PreviewError as exc:
+            raise SupervisorError(str(exc))
+        raise ValueError("Unexpected fields for this system operation")
 
     def cloud_key(self, payload):
         """Save or clear the DeepSeek key. The key is only ever written to the private config file; it is never echoed back."""
@@ -807,6 +866,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"memory": app.memory.list()})
         if path == "/api/v1/cloud/key":
             return self.reply(200, aiws_secrets.status())
+        if path == "/api/v1/preview":
+            return self.reply(200, app.preview.status())
         if path in ("/api/v1/changes", "/api/v1/changes/diff"):
             from urllib.parse import parse_qs
             qs = parse_qs(urlsplit(self.path).query)
@@ -875,7 +936,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key", "/api/v1/preview", "/api/v1/preview/stop", "/api/v1/ide/start", "/api/v1/ide/session") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -919,8 +980,18 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.memory_op(payload)
             elif path == "/api/v1/cloud/key":
                 result = app.cloud_key(payload)
+            elif path in ("/api/v1/preview", "/api/v1/preview/stop"):
+                result = app.preview_op("stop" if path.endswith("/stop") else "start", payload)
             elif path.startswith("/api/v1/system/"):
                 result = app.system_op(path.rsplit("/", 1)[1], payload)
+            elif path == "/api/v1/ide/start":
+                if payload:
+                    raise ValueError("No arguments allowed")
+                result = app.ide_open(server_only=True)
+            elif path == "/api/v1/ide/session":
+                if set(payload) - {"path"} or not isinstance(payload.get("path", "."), str):
+                    raise ValueError("Unexpected fields for this system operation")
+                result = app.ide_session(payload.get("path", "."))
             elif path == "/api/v1/ide/open":
                 if payload:
                     raise ValueError("No arguments allowed")

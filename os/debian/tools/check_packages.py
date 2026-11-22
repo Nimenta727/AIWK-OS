@@ -13,7 +13,8 @@ import re
 import sys
 
 HERE = Path(__file__).resolve().parent
-LISTS = [HERE.parent / "config/package-lists/aiws-desktop.list.chroot", HERE.parent / "config/package-lists/aiws-devtools.list.chroot"]
+LISTS = [HERE.parent / "config/package-lists/aiws-desktop.list.chroot", HERE.parent / "config/package-lists/aiws-devtools.list.chroot",
+         HERE.parent / "optional/aiws-swift.list.chroot"]
 
 def read_list(path):
     return [l.split("#")[0].strip() for l in Path(path).read_text(encoding="utf-8").splitlines() if l.split("#")[0].strip()]

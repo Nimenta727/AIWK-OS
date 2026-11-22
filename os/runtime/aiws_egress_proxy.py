@@ -76,6 +76,17 @@ class Policy:
             raise PolicyError("Allowlist must be a regular file up to 16 KiB")
         return cls(path.read_text(encoding="utf-8").splitlines(), ports)
 
+    @classmethod
+    def load_with_extra(cls, path, extra_path=None, ports=(443,)):
+        """The base allowlist, plus an OPTIONAL second file the owner enables on purpose (e.g. package registries). A missing extra file
+        adds nothing; a malformed one stops the proxy rather than being half-applied."""
+        base = cls.load(path, ports)
+        if extra_path and Path(extra_path).exists():
+            extra = cls.load(extra_path, ports)
+            base.exact |= extra.exact
+            base.suffixes |= extra.suffixes
+        return base
+
     def allows(self, host, port):
         if port not in self.ports:
             return False
@@ -302,11 +313,12 @@ def main():
     parser.add_argument("--allow", default="/etc/aiws/egress-allow.conf")
     parser.add_argument("--port", type=int, default=3128)
     parser.add_argument("--log", default=None)
+    parser.add_argument("--allow-extra", default=None, help="optional second allowlist file (ignored when it does not exist)")
     args = parser.parse_args()
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         parser.error("The egress proxy must not run as root")
     try:
-        proxy = EgressProxy(Policy.load(args.allow), port=args.port, log_path=args.log)
+        proxy = EgressProxy(Policy.load_with_extra(args.allow, args.allow_extra), port=args.port, log_path=args.log)
     except PolicyError as exc:
         parser.error(str(exc))
     proxy.serve_forever()

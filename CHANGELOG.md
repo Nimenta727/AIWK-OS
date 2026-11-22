@@ -8,6 +8,7 @@
 
 ### 新增
 - **云端模型直接接 DeepSeek API**：自带智能体循环（含受限的编译/测试/运行工具，覆盖 C、C++、Go、Python、Rust、C#、Java、JavaScript）（独立进程，受监督器的预算/隔离/批准约束）、工具由我们执行所以批准是同步的、结构化计划审核、原生子智能体树；密钥只存私有文件、经管道传递。详见 [docs/AIWS_DEEPSEEK.md](docs/AIWS_DEEPSEEK.md)（**未对真实服务验证**）。
+- **模型工具箱补齐**：`build_run`（C、C++、Go、Python、Rust、C#、Java、JavaScript、Swift 的固定命令检查/编译/测试/运行）、`deps_install`（经批准的依赖下载）、`git_commit`（仅本地）；项目预览（只读静态服务器）；AIWS Code 作为标签页嵌入工作台。详见 [docs/AIWS_DEV_TOOLS.md](docs/AIWS_DEV_TOOLS.md)。
 - **观察台**（只读首页）：token、模型状态、调用状态、任务、审计结论、待批准；示例数据明确标注为合成回放。
 - **VS Code 风格工作台外壳**：活动栏、资源管理器（真实文件树）、标签页、底部面板、状态栏、命令面板、深色/浅色主题、快捷键。
 - **本地小模型框架**：懒启动/空闲卸载的模型网关、受约束输出 schema、规则 → 本地模型 → 官方 CLI 的路由；模型只提议，写操作必须审批；完全离线。

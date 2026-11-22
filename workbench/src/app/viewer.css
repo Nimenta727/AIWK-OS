@@ -1,0 +1,33 @@
+/* Viewers (file viewer, preview browser, IDE tab). These classes used to live in the old shell stylesheet; they now use the shared tokens. */
+.legacy.fill{height:100%;padding:0;display:flex;flex-direction:column;min-height:0}
+.aiws-sh-file{display:flex;flex-direction:column;min-height:0}
+.aiws-sh-fill{flex:1;height:100%}
+.aiws-sh-file>header,.aiws-sh-viewbar{display:flex;justify-content:space-between;gap:12px;padding:6px 16px;border-bottom:1px solid var(--border);color:var(--fg-muted);font-size:12px;flex:none}
+.aiws-sh-file>header strong,.aiws-sh-viewbar strong{color:var(--fg);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aiws-sh-frame{flex:1;width:100%;min-height:240px;border:0;background:#fff;color-scheme:normal}
+.aiws-sh-code{display:flex;flex:1;min-height:0;overflow:auto;font-family:var(--font-mono);font-size:var(--fs-mono);line-height:1.5}
+.aiws-sh-code ol{margin:0;padding:8px 10px 8px 14px;list-style:none;text-align:right;color:var(--fg-faint);border-right:1px solid var(--border);flex:none;user-select:none}
+.aiws-sh-code pre{margin:0;padding:8px 12px;flex:1;white-space:pre;user-select:text}
+.aiws-sh-image{padding:16px;overflow:auto;display:flex;justify-content:center;align-items:flex-start}
+.aiws-sh-image img{max-width:100%;height:auto;background:repeating-conic-gradient(color-mix(in srgb,var(--fg) 12%,transparent) 0 25%,transparent 0 50%) 50%/16px 16px}
+.aiws-sh-md{padding:12px 24px 48px;max-width:860px;line-height:1.65;user-select:text;overflow:auto}
+.aiws-sh-md h1,.aiws-sh-md h2,.aiws-sh-md h3{margin:1.2em 0 .5em}.aiws-sh-md p{margin:.6em 0}.aiws-sh-md a{color:var(--accent-fg)}.aiws-sh-md blockquote{margin:.8em 0;padding:2px 14px;border-left:3px solid var(--border-strong);color:var(--fg-muted)}
+.aiws-sh-md code{font-family:var(--font-mono);font-size:var(--fs-mono);background:var(--bg-widget);padding:1px 4px;border-radius:var(--r)}
+.aiws-sh-md-code,.aiws-sh-doc pre,.aiws-sh-doc-text{background:var(--bg-widget);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;overflow:auto;font-family:var(--font-mono);font-size:var(--fs-mono);white-space:pre-wrap;word-break:break-word}
+.aiws-sh-md-code code{background:none;padding:0}
+.aiws-sh-doc{margin:8px 16px}.aiws-sh-doc summary{cursor:var(--cur-action);color:var(--fg-muted)}
+.aiws-sh-table-wrap{overflow:auto;padding:8px 16px;max-height:100%}.aiws-sh-table{border-collapse:collapse;font-size:12px;user-select:text}
+.aiws-sh-table th,.aiws-sh-table td{border:1px solid var(--border);padding:3px 8px;text-align:left;white-space:nowrap}.aiws-sh-table th{background:var(--bg-widget);position:sticky;top:0}
+.aiws-sh-urlbar{display:flex;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);align-items:center;flex:none}
+.aiws-sh-urlbar input{flex:1;min-width:0;height:var(--h-input);padding:0 8px;background:var(--bg-input);color:var(--fg);border:1px solid var(--border-strong);border-radius:var(--r);cursor:var(--cur-text)}
+.aiws-sh-urlbar input:focus{border-color:var(--focus);outline:none}
+.aiws-sh-btn{display:inline-flex;align-items:center;gap:6px;height:var(--h-input);padding:0 11px;border-radius:var(--r);border:1px solid var(--border-strong);background:var(--bg-hover);color:var(--fg)}
+.aiws-sh-btn:hover:not(:disabled){background:var(--bg-select-inactive)}
+.aiws-sh-icon{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r);color:var(--fg-muted)}.aiws-sh-icon:hover:not(:disabled){background:var(--bg-hover);color:var(--fg-strong)}
+.aiws-sh-welcome{padding:28px 24px;max-width:680px}.aiws-sh-welcome h1{font-size:18px;margin-bottom:8px}.aiws-sh-welcome p{color:var(--fg-muted);line-height:1.6}
+.aiws-os-error{display:flex;gap:8px;padding:8px 12px;margin:8px 12px;border:1px solid var(--err);border-left-width:3px;border-radius:var(--r);background:var(--bg-widget)}
+.aiws-os-muted{color:var(--fg-muted)}
+.pv{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);flex:none;font-size:var(--fs-small)}
+.pv .muted{margin-left:auto}
+.ide{display:flex;flex-direction:column;height:100%;min-height:0}.ide-bar{display:flex;gap:8px;align-items:center;padding:4px 10px;border-bottom:1px solid var(--border);flex:none}
+.ide-bar .k-select{margin-left:auto;max-width:240px}.ide-frame{flex:1;width:100%;border:0;background:var(--bg-editor)}.ide-info{padding:16px}.ide-start{display:flex;justify-content:center}

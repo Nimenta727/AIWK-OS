@@ -48,6 +48,12 @@ const EXACT = [
   ['model, thinking, effort and planApproval are only for the deepseek provider', 'model、thinking、effort、planApproval 只适用于 deepseek'],
   ['model is not one of the supported DeepSeek models', '不是受支持的 DeepSeek 模型'], ['effort must be low, high or max', '推理强度只能是 low、high 或 max'],
   ['thinking and planApproval must be true or false', 'thinking 和 planApproval 必须是 true 或 false'],
+  // preview and path rules shared with the tool plane
+  ['The preview target must be a folder', '预览目标必须是文件夹'], ['Path outside workspace or protected metadata is not allowed', '路径超出工作区，或指向受保护的目录'],
+  ['Symlink paths are not supported', '不支持符号链接路径'], ['Workspace path escape', '路径逃出了工作区'], ['Invalid workspace path', '工作区路径无效'], ['Use slash-separated relative paths', '请使用以斜杠分隔的相对路径'],
+  // embedded IDE
+  ['AIWS Code is not running', 'AIWS Code 未运行'], ['The AIWS Code access token file is unsafe', 'AIWS Code 的访问令牌文件不安全'], ['The AIWS Code access token is missing', '缺少 AIWS Code 的访问令牌'],
+  ['The AIWS Code access token could not be read', '无法读取 AIWS Code 的访问令牌'], ['The AIWS Code access token is unsafe', 'AIWS Code 的访问令牌格式不安全'],
   // DeepSeek key and runner
   ['execWithoutIsolation must be true or false', 'execWithoutIsolation 必须是 true 或 false'],
   ['No DeepSeek API key is configured', '还没有配置 DeepSeek API 密钥'], ['Could not start the runner', '无法启动云端运行器'], ['Expected {key} or {clear: true}', '需要 {key} 或 {clear: true}'],
