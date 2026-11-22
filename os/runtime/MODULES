@@ -16,6 +16,7 @@ aiws_exttools.py
 # Tool plane, task graph and permission
 aiws_toolplane.py
 aiws_tasks.py
+aiws_plans.py
 aiws_permission_broker.py
 aiws_guest_boundary.py
 aiws_guest_ops.py
@@ -31,6 +32,7 @@ aiws_model_registry.py
 
 # Observatory, builder lane (official CLI under a mandate)
 aiws_events.py
+aiws_agent_tree.py
 aiws_observatory.py
 aiws_mandate.py
 aiws_supervisor.py

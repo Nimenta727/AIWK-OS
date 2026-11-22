@@ -30,6 +30,8 @@ import aiws_apps
 import aiws_system
 import aiws_capabilities
 import aiws_changes
+import aiws_agent_tree
+import aiws_plans
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -80,7 +82,8 @@ class Controller:
         self.capabilities = self._build_capabilities()
         self.events = EventStore(state_home / "aiws-observatory")
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
-        self.supervisor = Supervisor(self.mandates, self.events, self.workspace)
+        self.plans = aiws_plans.PlanStore(state_home / "aiws" / "plans.json")
+        self.supervisor = Supervisor(self.mandates, self.events, self.workspace, plans=self.plans)
         if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
             self._seed_demo()
 
@@ -729,6 +732,28 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(session) or after < 0:
                 return self.reply(400, {"error": "A valid session id is required"})
             return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
+        if path == "/api/v1/plans":
+            plans = list(app.plans.list())[:30]
+            try:
+                for row in (app.tasks.overview().get("recent") or [])[:8]:
+                    detail = app.tasks.get(row["id"])
+                    plans.append(aiws_plans.from_local(detail["task"], detail["stages"]))
+            except (TaskError, AgentUnavailable, AgentError):
+                pass
+            return self.reply(200, {"plans": plans})
+        if path == "/api/v1/observatory/tree":
+            from urllib.parse import parse_qs
+            session = (parse_qs(urlsplit(self.path).query).get("session") or [""])[0]
+            if not SAFE_NAME.match(session):
+                return self.reply(400, {"error": "A valid session id is required"})
+            events, after = [], 0
+            while len(events) < 5000:                      # bounded: the tree never needs more than this
+                page = app.events.events(session, after=after, limit=500)
+                if not page:
+                    break
+                events += page
+                after = page[-1]["seq"]
+            return self.reply(200, {"session": session, **aiws_agent_tree.build(events)})
         if path == "/api/v1/capabilities":
             from urllib.parse import parse_qs
             qs = parse_qs(urlsplit(self.path).query)

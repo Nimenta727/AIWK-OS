@@ -21,3 +21,6 @@ This product includes or builds upon third-party software that keeps its own lic
 
   * "Claude", "Claude Code", "Codex" and other product names belong to their owners. This product only starts the
     vendors' official command-line tools under the user's own account; it does not bundle them or store their credentials.
+
+The workbench UI uses the Codicons icon font (Copyright (c) Microsoft Corporation), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/), unmodified: https://github.com/microsoft/vscode-codicons

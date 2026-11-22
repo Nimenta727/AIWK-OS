@@ -43,6 +43,9 @@ class _Base:
         self.turns = 0          # assistant turns seen, for the supervisor's turn limit
 
     def _ev(self, kind, **fields):
+        cur = getattr(self, "_node", None)
+        if cur and "node" not in fields:
+            fields["node"] = cur                 # events produced inside a sub-agent belong to its node
         try:
             return [make_event(self.clock(), self.agent, self.session, kind, **fields)]
         except EventError:
@@ -85,6 +88,7 @@ class _Base:
         if self.ended:
             return []
         self.ended = True
+        self._node = None
         return self._ev("end", status="unknown", detail="stream closed without a result")
 
 class ClaudeStreamAdapter(_Base):
@@ -96,6 +100,11 @@ class ClaudeStreamAdapter(_Base):
         self.tool_names = {}
         self.usage_seen = {}
         self.counted = set()
+        self.plan_updates = []          # ("todo", todos) / ("text", plan): content for the plan panel, never put in events
+
+    def drain_plans(self):
+        out, self.plan_updates = self.plan_updates, []
+        return out
 
     def _usage_delta(self, message_id, usage):
         fields = {"in": "input_tokens", "out": "output_tokens",
@@ -115,10 +124,16 @@ class ClaudeStreamAdapter(_Base):
 
     def handle(self, data):
         kind = data.get("type")
+        parent = data.get("parent_tool_use_id")
+        self._node = safe_name(parent, "") if isinstance(parent, str) and parent else None
         if kind == "system":
             if data.get("subtype") == "init":
                 model = data.get("model")
+                if isinstance(model, str):
+                    self.root_model = redact(model, 60)
                 return self._ev("start", detail=redact(model, 60) if isinstance(model, str) else "claude session")
+            if data.get("subtype") in ("task_started", "task_notification"):
+                return self._task_event(data)
             return []
         if kind == "stream_event":
             return []
@@ -129,6 +144,36 @@ class ClaudeStreamAdapter(_Base):
         if kind == "result":
             return self._result(data)
         return self._unrecognized(str(kind))
+
+    CTX_BY_TOOL = {"Read": "file", "Edit": "file", "Write": "file", "MultiEdit": "file", "NotebookEdit": "file",
+                   "Grep": "search", "Glob": "search", "WebFetch": "url", "WebSearch": "search", "Bash": "command"}
+    SUBAGENT_TOOLS = ("Task", "Agent")
+
+    def _task_event(self, data):
+        """system/task_started and system/task_notification (field names unverified): progress of a sub-agent node."""
+        tid = data.get("tool_use_id") if isinstance(data.get("tool_use_id"), str) else None
+        if not tid:
+            return []
+        fields = {"node": safe_name(tid, "node")}
+        if data.get("subtype") == "task_started":
+            desc = data.get("description")
+            if isinstance(desc, str) and desc.strip():
+                fields["label"] = redact(desc, 100)
+            return self._ev("message", detail="sub-agent started", **fields)
+        status = data.get("status") if isinstance(data.get("status"), str) else ""
+        prog = {}
+        for src, dst in (("tool_uses", "tools"), ("duration_ms", "ms")):
+            if _int(data.get(src)) is not None:
+                prog[dst] = _int(data[src])
+        if len(prog) == 2:
+            fields["prog"] = prog
+        done = status in ("completed", "done", "success")
+        fields["status"] = "ok" if done else ("error" if status in ("failed", "error", "killed") else "pending")
+        total = _int(data.get("total_tokens"))
+        out = self._ev("message", detail="sub-agent " + (redact(status, 24) or "update"), **fields)
+        if total is not None:                     # a total only: scope=total on this node, in-token side unknown
+            out += self._ev("usage", node=fields["node"], tokens={"in": None, "out": total, "cacheRead": None, "cacheWrite": None, "source": "reported", "scope": "total"})
+        return out
 
     def _assistant(self, message):
         if not isinstance(message, dict):
@@ -143,7 +188,27 @@ class ClaudeStreamAdapter(_Base):
                 if isinstance(block.get("id"), str):
                     self.tool_names[block["id"][:80]] = name
                 hint = _describe(name, block.get("input"))
-                out += self._ev("tool", tool=name, status="pending", **({"detail": hint} if hint else {}))
+                extra = {}
+                inp = block.get("input") if isinstance(block.get("input"), dict) else {}
+                if name == "TodoWrite" and isinstance(inp.get("todos"), list):
+                    self.plan_updates.append(("todo", inp["todos"][:60]))
+                elif name == "ExitPlanMode" and isinstance(inp.get("plan"), str):
+                    self.plan_updates.append(("text", inp["plan"][:20000]))
+                if name in self.SUBAGENT_TOOLS and isinstance(block.get("id"), str):
+                    # this call spawns a child: it becomes a node whose parent is the node we are currently in
+                    extra = {"node": safe_name(block["id"], "node"), "parent": self._node or "root"}
+                    desc, kind_ = inp.get("description"), inp.get("subagent_type")
+                    if isinstance(desc, str) and desc.strip():
+                        extra["label"] = redact(desc, 84) + (" [" + redact(kind_, 14) + "]" if isinstance(kind_, str) and kind_.strip() else "")
+                    mdl = inp.get("model")                 # only an explicit model; the agent TYPE is not a model
+                    if isinstance(mdl, str) and mdl.strip():
+                        extra["model"] = redact(mdl, 60)
+                    ctx = [{"kind": "prompt", "ref": "%d chars" % len(inp["prompt"])}] if isinstance(inp.get("prompt"), str) else []
+                    if ctx:
+                        extra["ctx"] = ctx
+                elif self.CTX_BY_TOOL.get(name) and hint:
+                    extra = {"ctx": [{"kind": self.CTX_BY_TOOL[name], "ref": hint[:120]}]}
+                out += self._ev("tool", tool=name, status="pending", **({"detail": hint} if hint else {}), **extra)
             elif block.get("type") == "text" and isinstance(block.get("text"), str):
                 text_chars += len(block["text"])
         if text_chars:
@@ -170,8 +235,10 @@ class ClaudeStreamAdapter(_Base):
         blocks = message.get("content") if isinstance(message, dict) and isinstance(message.get("content"), list) else []
         for block in blocks:
             if isinstance(block, dict) and block.get("type") == "tool_result":
-                name = self.tool_names.get(str(block.get("tool_use_id"))[:80], "unknown")
-                out += self._ev("tool", tool=name, status="error" if block.get("is_error") is True else "ok")
+                tid = str(block.get("tool_use_id"))[:80]
+                name = self.tool_names.get(tid, "unknown")
+                extra = {"node": safe_name(tid, "node")} if name in self.SUBAGENT_TOOLS else {}
+                out += self._ev("tool", tool=name, status="error" if block.get("is_error") is True else "ok", **extra)
         return out
 
     def _result(self, data):

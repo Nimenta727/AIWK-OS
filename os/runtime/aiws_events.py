@@ -20,6 +20,7 @@ EVENT_KINDS = ("start", "message", "tool", "usage", "approval", "error", "end")
 STATUSES = ("ok", "error", "denied", "pending", "unknown")
 AGENTS = ("claude", "codex", "local", "router", "supervisor")
 TOKEN_FIELDS = ("in", "out", "cacheRead", "cacheWrite")
+CTX_KINDS = ("file", "url", "search", "command", "prompt")
 SCOPES = ("delta", "total", "turn")      # turn: reported per turn, cumulative-vs-increment NOT verified
 UNRECOGNIZED = "unrecognized"            # detail marker for provider events we do not understand
 MAX_EVENTS_PER_SESSION = 20000
@@ -52,7 +53,8 @@ def _token_count(value):
 
 def validate_event(event):
     """Strict validation; returns a normalised copy. Unknown keys are rejected."""
-    allowed = {"v", "ts", "agent", "session", "kind", "tool", "status", "tokens", "cost", "detail", "src"}
+    allowed = {"v", "ts", "agent", "session", "kind", "tool", "status", "tokens", "cost", "detail", "src",
+               "node", "parent", "model", "label", "ctx", "prog"}
     if not isinstance(event, dict) or set(event) - allowed:
         raise EventError("Unknown event fields")
     if event.get("v") != EVENT_VERSION:
@@ -99,6 +101,29 @@ def validate_event(event):
         if not isinstance(event["src"], str) or len(event["src"]) > 48 or CONTROL.search(event["src"]):
             raise EventError("Invalid src")
         out["src"] = event["src"]
+    for key in ("node", "parent"):                       # sub-agent tree: ids are provider call ids, never free text
+        if key in event:
+            if not isinstance(event[key], str) or not SAFE_NAME.match(event[key]):
+                raise EventError("Invalid " + key)
+            out[key] = event[key]
+    for key, limit in (("model", 60), ("label", 100)):
+        if key in event:
+            if not isinstance(event[key], str) or len(event[key]) > limit or CONTROL.search(event[key]):
+                raise EventError("Invalid " + key)
+            out[key] = event[key]
+    if "ctx" in event:                                    # context the node was given/used: short typed references
+        c = event["ctx"]
+        if (not isinstance(c, list) or len(c) > 8 or any(
+                not isinstance(x, dict) or set(x) != {"kind", "ref"} or x["kind"] not in CTX_KINDS
+                or not isinstance(x["ref"], str) or not 1 <= len(x["ref"]) <= 120 or CONTROL.search(x["ref"]) for x in c)):
+            raise EventError("Invalid ctx")
+        out["ctx"] = [{"kind": x["kind"], "ref": x["ref"]} for x in c]
+    if "prog" in event:
+        g = event["prog"]
+        if (not isinstance(g, dict) or set(g) != {"tools", "ms"} or any(
+                isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= 10 ** 9 for v in g.values())):
+            raise EventError("Invalid prog")
+        out["prog"] = {"tools": g["tools"], "ms": g["ms"]}
     return out
 
 def make_event(ts, agent, session, kind, **fields):

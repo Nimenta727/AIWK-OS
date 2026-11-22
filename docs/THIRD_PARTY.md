@@ -16,6 +16,7 @@
 | React、React DOM | 前端 | MIT | npm 依赖 |
 | Vite、TypeScript | 前端构建 | MIT / Apache-2.0 | npm 开发依赖 |
 | lucide-react | 图标 | ISC | npm 依赖 |
+| @vscode/codicons 0.0.46-24 | 工作台图标字体（Microsoft） | 图标：CC-BY-4.0；其代码：MIT | npm 依赖，随前端打包。CC-BY-4.0 要求署名：“Codicons © Microsoft Corporation, CC BY 4.0, https://github.com/microsoft/vscode-codicons”；未修改字体。版本已固定（不用 `latest`）。 |
 | xterm.js 及 fit 插件 | 终端界面 | MIT | npm 依赖 |
 | Playwright | 浏览器自动化测试 | Apache-2.0 | 仅开发/测试依赖，不进入镜像 |
 | poppler-utils（pdftotext）、pandoc | 文档阅读器与 `doc.text` 的转换 | GPL（poppler）/ GPL（pandoc）：通过 Debian 包安装、以独立进程调用，不链接进本项目代码 | 随 ISO 分发时须满足 GPL 的源码提供义务 |

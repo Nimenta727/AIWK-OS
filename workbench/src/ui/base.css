@@ -1,0 +1,32 @@
+@import "@vscode/codicons/dist/codicon.css";
+@import "./tokens.css";
+
+*,*::before,*::after{box-sizing:border-box}
+html,body,#root{height:100%;margin:0}
+body{background:var(--bg-editor);color:var(--fg);font:var(--fs)/var(--lh) var(--font-ui);-webkit-font-smoothing:antialiased;overflow:hidden;cursor:default;user-select:none}
+/* chrome is not selectable (like an editor); content areas opt in */
+.selectable,.selectable *,pre,code,input,textarea{user-select:text}
+h1,h2,h3,h4{margin:0;font-weight:600;color:var(--fg-strong)}
+p{margin:0}
+a{color:var(--accent-fg);text-decoration:none;cursor:var(--cur-action)}a:hover{text-decoration:underline}
+code,pre,kbd{font-family:var(--font-mono);font-size:var(--fs-mono)}
+kbd{border:1px solid var(--border-strong);border-bottom-width:2px;border-radius:var(--r);padding:0 5px;background:var(--bg-widget);color:var(--fg-muted)}
+::selection{background:var(--bg-select)}
+/* scrollbars like the editor: thin, appear on hover */
+*{scrollbar-width:thin;scrollbar-color:transparent transparent}
+*:hover{scrollbar-color:color-mix(in srgb,var(--fg) 30%,transparent) transparent}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:transparent;border:2px solid transparent;background-clip:content-box;border-radius:5px}
+*:hover::-webkit-scrollbar-thumb{background-color:color-mix(in srgb,var(--fg) 30%,transparent)}
+::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--fg) 50%,transparent)}
+/* focus: only for keyboard users */
+:focus{outline:none}
+:focus-visible{outline:1px solid var(--focus);outline-offset:-1px}
+/* every control: one cursor rule, one disabled rule */
+button,[role=button],[role=tab],[role=option],[role=menuitem],summary,select,label[for],input[type=checkbox],input[type=radio]{cursor:var(--cur-action)}
+button:disabled,[aria-disabled=true],select:disabled,input:disabled,textarea:disabled{cursor:var(--cur-disabled);opacity:.4}
+input[type=text],input[type=search],input[type=password],input:not([type]),textarea{cursor:var(--cur-text)}
+[aria-busy=true]{cursor:progress}
+.sash-x{cursor:var(--cur-resize-x)}.sash-y{cursor:var(--cur-resize-y)}
+[draggable=true]{cursor:var(--cur-drag)}[draggable=true]:active{cursor:var(--cur-dragging)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

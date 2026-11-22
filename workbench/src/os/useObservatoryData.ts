@@ -20,3 +20,5 @@ export default function useObservatoryData(intervalMs=5000){
  },[reload,intervalMs]);
  return {summary,builder,error,reload};
 }
+
+export type ObservatoryData=ReturnType<typeof useObservatoryData>&{reload:()=>Promise<void>};

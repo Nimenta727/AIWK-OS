@@ -1,0 +1,29 @@
+.k-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--h-input);padding:0 11px;border-radius:var(--r);border:1px solid transparent;white-space:nowrap;transition:background var(--dur)}
+.k-btn-primary{background:var(--accent);color:var(--fg-on-accent)}.k-btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.k-btn-secondary{background:var(--bg-hover);border-color:var(--border-strong);color:var(--fg)}.k-btn-secondary:hover:not(:disabled){background:var(--bg-select-inactive)}
+.k-btn-ghost{color:var(--accent-fg)}.k-btn-ghost:hover:not(:disabled){background:var(--bg-hover)}
+.k-btn:active:not(:disabled){filter:brightness(.92)}
+.k-ibtn{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:var(--r);color:var(--fg-muted)}
+.k-ibtn:hover:not(:disabled){background:var(--bg-hover);color:var(--fg-strong)}.k-ibtn.on{color:var(--fg-strong);background:var(--bg-select-inactive)}.k-ibtn:active:not(:disabled){background:var(--bg-select)}
+.k-badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--bg-badge);color:var(--fg-strong);font-size:11px;line-height:16px;text-align:center}
+.k-badge.ok{background:var(--ok);color:#fff}.k-badge.warn{background:var(--warn);color:#000}.k-badge.err{background:var(--err);color:#fff}.k-badge.info{background:var(--accent);color:#fff}
+.k-input{height:var(--h-input);padding:0 8px;background:var(--bg-input);color:var(--fg);border:1px solid var(--border-strong);border-radius:var(--r);min-width:0}
+.k-input:focus{border-color:var(--focus);outline:none}.k-input::placeholder{color:var(--fg-faint)}
+textarea.k-input{height:auto;padding:6px 8px;resize:vertical}
+.k-select{padding-right:4px}
+.k-check{display:inline-flex;gap:6px;align-items:center}.k-check input{accent-color:var(--accent);margin:0}
+.k-progress{height:4px;background:var(--border-strong);border-radius:2px;overflow:hidden}.k-progress i{display:block;height:100%;background:var(--accent)}
+.k-progress.ok i{background:var(--ok)}.k-progress.warn i{background:var(--warn)}.k-progress.err i{background:var(--err)}
+.k-section-head{display:flex;align-items:center;justify-content:space-between;height:22px;background:var(--bg-side);border-top:1px solid var(--border)}
+.k-section-head button{display:flex;align-items:center;gap:2px;flex:1;height:100%;padding:0 4px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg)}
+.k-section-head button em{font-style:normal;margin-left:6px;font-weight:400;color:var(--fg-muted)}
+.k-section-head>div{display:flex;padding-right:4px}
+.k-row{display:flex;align-items:center;gap:4px;height:var(--h-row);padding-right:8px;white-space:nowrap;overflow:hidden}
+.k-row:not(.static){cursor:var(--cur-action)}.k-row:not(.static):hover{background:var(--bg-hover)}.k-row.on{background:var(--bg-select);color:var(--fg-strong)}
+.k-row-gap{width:16px;flex:none}.k-row-label{overflow:hidden;text-overflow:ellipsis}.k-row-detail{color:var(--fg-muted);font-size:var(--fs-small);overflow:hidden;text-overflow:ellipsis}.k-row-right{margin-left:auto;color:var(--fg-muted);font-size:var(--fs-small)}
+.k-empty{display:grid;justify-items:center;gap:6px;padding:32px 16px;color:var(--fg-muted);text-align:center}.k-empty .codicon{font-size:28px}.k-empty h3{font-size:var(--fs);color:var(--fg)}
+.k-notice{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border-strong);border-left-width:3px;border-radius:var(--r);background:var(--bg-widget);font-size:var(--fs-small)}
+.k-notice.info{border-left-color:var(--info)}.k-notice.warn{border-left-color:var(--warn)}.k-notice.err{border-left-color:var(--err)}.k-notice.ok{border-left-color:var(--ok)}
+.codicon-modifier-spin{animation:k-spin 1.2s linear infinite}@keyframes k-spin{to{transform:rotate(360deg)}}
+
+.k-row.t-ok>.codicon:not(:first-child),.k-row.t-ok>.codicon-circle-filled{color:var(--ok)}.k-row.t-warn>.codicon-circle-filled{color:var(--warn)}.k-row.t-err>.codicon-circle-filled{color:var(--err)}.k-row.t-off>.codicon-circle-filled{color:var(--fg-faint)}

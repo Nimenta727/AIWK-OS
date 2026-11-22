@@ -65,7 +65,7 @@ export function isEditableTarget(target) {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(target && target.isContentEditable);
 }
 
-export const DEFAULT_PREFS = {theme: 'dark', sidebar: true, panel: false, activity: 'observatory'};
+export const DEFAULT_PREFS = {theme: 'dark', sidebar: true, panel: false, activity: 'home'};
 
 export function sanitizePrefs(value) {
   const out = {...DEFAULT_PREFS};
@@ -73,7 +73,7 @@ export function sanitizePrefs(value) {
     if (value.theme === 'dark' || value.theme === 'light') out.theme = value.theme;
     if (typeof value.sidebar === 'boolean') out.sidebar = value.sidebar;
     if (typeof value.panel === 'boolean') out.panel = value.panel;
-    if (['observatory', 'explorer', 'tools', 'tasks', 'ai', 'system'].includes(value.activity)) out.activity = value.activity;
+    if (['home', 'plans', 'agents', 'changes', 'explorer', 'system'].includes(value.activity)) out.activity = value.activity;
   }
   return out;
 }

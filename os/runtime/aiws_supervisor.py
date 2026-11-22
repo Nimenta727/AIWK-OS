@@ -25,6 +25,7 @@ import subprocess
 import threading
 import time
 
+import aiws_plans
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, MAX_LINE
 from aiws_events import EventError, make_event, redact
 from aiws_mandate import MandateError
@@ -262,9 +263,21 @@ class _Run:
         return self.sum_in, self.sum_out
 
 class Supervisor:
+    def _store_plans(self, run):
+        """Hand plans the adapter saw to the plan store. A plan problem must never disturb the run."""
+        drain = getattr(run.adapter, "drain_plans", None)
+        if not self.plans or not drain:
+            return
+        for kind, payload in drain():
+            try:
+                self.plans.upsert(aiws_plans.from_cloud(run.id, kind, payload))
+            except Exception:
+                pass
+
     def __init__(self, mandates, events, workspace, launcher=None, config=None, clock=time.time, approval_timeout=APPROVAL_TIMEOUT,
-                 isolation_factory=None):
+                 isolation_factory=None, plans=None):
         self.mandates, self.events, self.clock = mandates, events, clock
+        self.plans = plans                      # optional PlanStore: cloud plans announced by the CLI
         self.isolation_factory = isolation_factory or default_isolation_factory
         self.workspace = Path(workspace).resolve(strict=True)
         self.launcher = launcher or default_launcher()
@@ -481,7 +494,9 @@ class Supervisor:
             if line is None:
                 eof = True
             elif line:
-                for event in run.adapter.feed(line):
+                events_now = run.adapter.feed(line)
+                self._store_plans(run)
+                for event in events_now:
                     try:
                         stored = self.events.append(event)
                     except (EventError, OSError, ValueError):

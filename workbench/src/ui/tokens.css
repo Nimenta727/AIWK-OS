@@ -1,0 +1,36 @@
+/* AIWS design tokens. Values follow the VS Code "Dark Modern" / "Light Modern" palettes so the workbench feels like the
+   editor next to it. Every colour, size and cursor used anywhere in the UI comes from this file. */
+:root,[data-theme="dark"]{
+  color-scheme:dark;
+  --bg-editor:#1f1f1f; --bg-side:#181818; --bg-activity:#181818; --bg-title:#181818; --bg-status:#181818; --bg-panel:#181818;
+  --bg-tab:#181818; --bg-tab-active:#1f1f1f; --bg-input:#313131; --bg-widget:#202020; --bg-badge:#616161;
+  --bg-hover:#2a2d2e; --bg-select:#04395e; --bg-select-inactive:#37373d;
+  --fg:#cccccc; --fg-strong:#ffffff; --fg-muted:#9d9d9d; --fg-faint:#6e7681; --fg-on-accent:#ffffff;
+  --border:#2b2b2b; --border-strong:#3c3c3c;
+  --accent:#0078d4; --accent-hover:#026ec1; --accent-fg:#4daafc; --focus:#0078d4;
+  --ok:#2ea043; --warn:#cca700; --err:#f85149; --info:#3794ff;
+  --diff-add:rgba(46,160,67,.18); --diff-del:rgba(248,81,73,.18); --diff-hunk:#9d9d9d;
+  --shadow:0 0 8px 2px rgba(0,0,0,.36);
+}
+[data-theme="light"]{
+  color-scheme:light;
+  --bg-editor:#ffffff; --bg-side:#f8f8f8; --bg-activity:#f8f8f8; --bg-title:#f8f8f8; --bg-status:#f8f8f8; --bg-panel:#ffffff;
+  --bg-tab:#f8f8f8; --bg-tab-active:#ffffff; --bg-input:#ffffff; --bg-widget:#f8f8f8; --bg-badge:#c4c4c4;
+  --bg-hover:#f2f2f2; --bg-select:#e4e6f1; --bg-select-inactive:#e4e6f1;
+  --fg:#3b3b3b; --fg-strong:#000000; --fg-muted:#616161; --fg-faint:#8a8a8a; --fg-on-accent:#ffffff;
+  --border:#e5e5e5; --border-strong:#cecece;
+  --accent:#005fb8; --accent-hover:#0258a8; --accent-fg:#005fb8; --focus:#005fb8;
+  --ok:#1a7f37; --warn:#946b00; --err:#cf222e; --info:#0969da;
+  --diff-add:rgba(46,160,67,.16); --diff-del:rgba(207,34,46,.14); --diff-hunk:#616161;
+  --shadow:0 0 8px 2px rgba(0,0,0,.16);
+}
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-mono:"Cascadia Code","Cascadia Mono",Consolas,Menlo,"DejaVu Sans Mono","Noto Sans Mono CJK SC",monospace;
+  --fs:13px; --fs-small:12px; --fs-mono:12px; --lh:1.4;
+  --h-title:30px; --h-tab:35px; --h-row:22px; --h-status:22px; --h-input:26px; --w-activity:48px;
+  --r:3px; --r-lg:6px;
+  --dur:80ms;
+  /* cursors: same vocabulary as VS Code */
+  --cur-action:pointer; --cur-disabled:default; --cur-text:text; --cur-resize-x:ew-resize; --cur-resize-y:ns-resize; --cur-drag:grab; --cur-dragging:grabbing;
+}

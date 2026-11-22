@@ -1,5 +1,5 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import OsWorkbench from './os/OsWorkbench';
+import App from './app/App';
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><OsWorkbench/></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
