@@ -1,0 +1,500 @@
+{
+ "label": "9B",
+ "model": "Qwen3.5-9B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "loadSeconds": 3.1,
+ "routing": {
+  "n": 90,
+  "accuracy": 0.711,
+  "underRoute": 0.289,
+  "overRoute": 0.0,
+  "proRecall": 1.0,
+  "accuracyZh": 0.674,
+  "accuracyEn": 0.75,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 30,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 26,
+    "flash": 4,
+    "pro": 0
+   },
+   "pro": {
+    "local": 0,
+    "flash": 0,
+    "pro": 30
+   }
+  },
+  "medianSec": 9.49,
+  "maxSec": 11.18
+ },
+ "routingMisses": [
+  {
+   "text": "给 utils.py 里的 parse_date 函数加上空字符串的处理",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.79,
+   "promptTokens": 217
+  },
+  {
+   "text": "write a python script that renames all jpg files by date",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.88,
+   "promptTokens": 216
+  },
+  {
+   "text": "explain what this function does",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.01,
+   "promptTokens": 209
+  },
+  {
+   "text": "修复这个 off-by-one 错误：循环少处理了最后一个元素",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.27,
+   "promptTokens": 218
+  },
+  {
+   "text": "把 main.py 里的变量 x 重命名为 count",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.5,
+   "promptTokens": 215
+  },
+  {
+   "text": "运行测试并告诉我哪些失败了",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.69,
+   "promptTokens": 210
+  },
+  {
+   "text": "write a bash one-liner to count lines in all .py files",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.03,
+   "promptTokens": 218
+  },
+  {
+   "text": "给这个类加一个 __repr__ 方法",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.97,
+   "promptTokens": 214
+  },
+  {
+   "text": "convert this JSON file to YAML",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.72,
+   "promptTokens": 210
+  },
+  {
+   "text": "帮我写一个读取 CSV 并求平均值的函数",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.87,
+   "promptTokens": 215
+  },
+  {
+   "text": "这段正则是什么意思",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.95,
+   "promptTokens": 207
+  },
+  {
+   "text": "write a Dockerfile for a simple flask app",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.37,
+   "promptTokens": 213
+  },
+  {
+   "text": "把这个 for 循环改成列表推导式",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.72,
+   "promptTokens": 212
+  },
+  {
+   "text": "写一个 hello world 的 Go 程序并编译运行",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.38,
+   "promptTokens": 216
+  },
+  {
+   "text": "fix the typo in the error message in app.js",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.87,
+   "promptTokens": 214
+  },
+  {
+   "text": "给 README 加一个安装说明章节",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.72,
+   "promptTokens": 212
+  },
+  {
+   "text": "why does this line throw a KeyError, here is the traceback",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.75,
+   "promptTokens": 216
+  },
+  {
+   "text": "把这个函数里的重复代码提取成一个辅助函数",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.91,
+   "promptTokens": 213
+  },
+  {
+   "text": "generate a .gitignore for a rust project",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.68,
+   "promptTokens": 213
+  },
+  {
+   "text": "编译这个 C 程序并把报错贴给我",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 10.05,
+   "promptTokens": 213
+  },
+  {
+   "text": "写一个简单的二分查找",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.85,
+   "promptTokens": 208
+  },
+  {
+   "text": "summarize this file in three sentences",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 10.02,
+   "promptTokens": 212
+  },
+  {
+   "text": "这个 SQL 查询怎么加上按日期排序",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.91,
+   "promptTokens": 213
+  },
+  {
+   "text": "update the version number in package.json to 1.2.0",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 10.06,
+   "promptTokens": 218
+  },
+  {
+   "text": "把这个类的注释翻译成英文",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.06,
+   "promptTokens": 209
+  },
+  {
+   "text": "write a regex that matches ipv4 addresses",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.44,
+   "promptTokens": 212
+  }
+ ],
+ "logs": {
+  "all": {
+   "n": 12,
+   "modelHit": 1.0,
+   "modelTop1": 0.833,
+   "grepHit": 0.5,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 90.8
+  },
+  "grepFriendly": {
+   "n": 6,
+   "modelHit": 1.0,
+   "modelTop1": 1.0,
+   "grepHit": 1.0,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 87.7
+  },
+  "grepMisleading": {
+   "n": 6,
+   "modelHit": 1.0,
+   "modelTop1": 0.667,
+   "grepHit": 0.0,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 92.6
+  }
+ },
+ "logRows": [
+  {
+   "id": "k0-easy",
+   "hard": false,
+   "picked": [
+    391
+   ],
+   "gold": [
+    391
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 86.4,
+   "promptTokens": 2632,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 793,
+   "entries": 161
+  },
+  {
+   "id": "k0-hard",
+   "hard": true,
+   "picked": [
+    800,
+    799,
+    352,
+    353
+   ],
+   "gold": [
+    352,
+    353
+   ],
+   "hit": true,
+   "top1": false,
+   "sec": 95.5,
+   "promptTokens": 2715,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 800,
+   "entries": 167
+  },
+  {
+   "id": "k1-easy",
+   "hard": false,
+   "picked": [
+    405,
+    792,
+    793
+   ],
+   "gold": [
+    405
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 88.9,
+   "promptTokens": 2618,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 793,
+   "entries": 161
+  },
+  {
+   "id": "k1-hard",
+   "hard": true,
+   "picked": [
+    467,
+    466,
+    799,
+    800
+   ],
+   "gold": [
+    466,
+    467
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 92.5,
+   "promptTokens": 2711,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 800,
+   "entries": 168
+  },
+  {
+   "id": "k2-easy",
+   "hard": false,
+   "picked": [
+    373,
+    792
+   ],
+   "gold": [
+    373
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 86.5,
+   "promptTokens": 2624,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 158
+  },
+  {
+   "id": "k2-hard",
+   "hard": true,
+   "picked": [
+    485,
+    486
+   ],
+   "gold": [
+    485,
+    486
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 91.9,
+   "promptTokens": 2771,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  },
+  {
+   "id": "k3-easy",
+   "hard": false,
+   "picked": [
+    351
+   ],
+   "gold": [
+    351
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 90.2,
+   "promptTokens": 2572,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 158
+  },
+  {
+   "id": "k3-hard",
+   "hard": true,
+   "picked": [
+    462,
+    463
+   ],
+   "gold": [
+    462,
+    463
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 92.7,
+   "promptTokens": 2711,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  },
+  {
+   "id": "k4-easy",
+   "hard": false,
+   "picked": [
+    348,
+    792
+   ],
+   "gold": [
+    348
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 86.4,
+   "promptTokens": 2614,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 160
+  },
+  {
+   "id": "k4-hard",
+   "hard": true,
+   "picked": [
+    799,
+    357,
+    294,
+    285
+   ],
+   "gold": [
+    357,
+    358
+   ],
+   "hit": true,
+   "top1": false,
+   "sec": 91.3,
+   "promptTokens": 2662,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 164
+  },
+  {
+   "id": "k5-easy",
+   "hard": false,
+   "picked": [
+    344
+   ],
+   "gold": [
+    344
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 90.2,
+   "promptTokens": 2636,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 161
+  },
+  {
+   "id": "k5-hard",
+   "hard": true,
+   "picked": [
+    491,
+    799
+   ],
+   "gold": [
+    490,
+    491
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 97.3,
+   "promptTokens": 2708,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  }
+ ]
+}

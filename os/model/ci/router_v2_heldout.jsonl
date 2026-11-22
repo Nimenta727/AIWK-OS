@@ -1,0 +1,60 @@
+{"text": "show me what's inside the logs folder", "tier": "local"}
+{"text": "把 backup.zip 复制到 U 盘目录", "tier": "local"}
+{"text": "open the wifi settings", "tier": "local"}
+{"text": "查找名字里带 invoice 的文件", "tier": "local"}
+{"text": "read me the last 100 lines of the nginx error log", "tier": "local"}
+{"text": "create a folder named release-notes", "tier": "local"}
+{"text": "把 old 目录改名为 archive", "tier": "local"}
+{"text": "how much memory is free right now", "tier": "local"}
+{"text": "把 Downloads 里一周前的文件列出来", "tier": "local"}
+{"text": "print the contents of /etc/hostname", "tier": "local"}
+{"text": "切换到暗色主题", "tier": "local"}
+{"text": "list running services", "tier": "local"}
+{"text": "move all .log files into logs/", "tier": "local"}
+{"text": "显示 app.log 里含 timeout 的行", "tier": "local"}
+{"text": "set the keyboard layout to us", "tier": "local"}
+{"text": "show the last 5 git commits", "tier": "local"}
+{"text": "把所有 pdf 文件列出来并按大小排序", "tier": "local"}
+{"text": "view the file notes.md", "tier": "local"}
+{"text": "查看当前 IP 地址", "tier": "local"}
+{"text": "empty the trash folder", "tier": "local"}
+{"text": "给 login 函数加一个 5 次失败后锁定的检查", "tier": "flash"}
+{"text": "write a function that merges two sorted lists", "tier": "flash"}
+{"text": "把这个 JSON 解析函数的错误处理补上", "tier": "flash"}
+{"text": "add pagination to the /users endpoint", "tier": "flash"}
+{"text": "解释一下这个 Makefile 每一行的作用", "tier": "flash"}
+{"text": "run the linter and fix the warnings it reports", "tier": "flash"}
+{"text": "fix this NullPointerException, stack trace below", "tier": "flash"}
+{"text": "写一个 Python 脚本批量压缩图片", "tier": "flash"}
+{"text": "rename the function fetch_all to load_all in this file", "tier": "flash"}
+{"text": "给这个组件加上 loading 状态", "tier": "flash"}
+{"text": "write tests for the string utilities module", "tier": "flash"}
+{"text": "把这段 JavaScript 改写成 TypeScript", "tier": "flash"}
+{"text": "create a CLI that converts markdown to html using an existing library", "tier": "flash"}
+{"text": "这个 bash 脚本为什么报 unbound variable", "tier": "flash"}
+{"text": "implement the retry decorator described in the docstring", "tier": "flash"}
+{"text": "帮我写一个 Go 的 HTTP 健康检查接口", "tier": "flash"}
+{"text": "update the dependency versions in requirements.txt and run the tests", "tier": "flash"}
+{"text": "add input validation to the signup form", "tier": "flash"}
+{"text": "compile the project and summarise the compiler errors", "tier": "flash"}
+{"text": "把这个 SQL 改成用参数绑定", "tier": "flash"}
+{"text": "design how plugins should be sandboxed and upgraded without restarts", "tier": "pro"}
+{"text": "为什么我们的缓存命中率在周末凌晨会突然掉到零", "tier": "pro"}
+{"text": "audit the session handling for fixation and replay attacks", "tier": "pro"}
+{"text": "重构整个数据访问层，让 ORM 可以替换而不改业务代码", "tier": "pro"}
+{"text": "figure out why the build is not reproducible between two machines", "tier": "pro"}
+{"text": "设计多租户的数据隔离方案并给出迁移步骤", "tier": "pro"}
+{"text": "diagnose a deadlock between the job runner and the cleanup thread", "tier": "pro"}
+{"text": "这个排序算法在特定输入下退化成 O(n^2)，找出原因并给出修复", "tier": "pro"}
+{"text": "plan the migration of 40 services from REST to gRPC", "tier": "pro"}
+{"text": "design a consistent hashing scheme that handles node churn", "tier": "pro"}
+{"text": "评估这个共识协议实现的正确性，找出可能的脑裂场景", "tier": "pro"}
+{"text": "investigate random data corruption that appears only under heavy write load", "tier": "pro"}
+{"text": "为分布式任务队列设计幂等与重试语义", "tier": "pro"}
+{"text": "rework the permission model so delegation and revocation are provably safe", "tier": "pro"}
+{"text": "为什么编译器在 O2 下产生错误结果但 O0 正常", "tier": "pro"}
+{"text": "create the architecture for offline-first sync between mobile and server", "tier": "pro"}
+{"text": "找出内存占用缓慢增长的根因，只在生产环境出现", "tier": "pro"}
+{"text": "design the rollout and rollback strategy for a schema change on a 2 TB table", "tier": "pro"}
+{"text": "审查这个 JWT 校验实现里所有可被利用的缺陷", "tier": "pro"}
+{"text": "design a scheduling policy that is fair across tenants under bursty load", "tier": "pro"}

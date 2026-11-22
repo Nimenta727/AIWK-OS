@@ -1,0 +1,53 @@
+{
+ "label": "9B",
+ "model": "Qwen3.5-9B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "prompt": "B",
+ "cases": "router_v2_heldout.jsonl",
+ "loadSeconds": 2.0,
+ "routing": {
+  "n": 60,
+  "accuracy": 0.967,
+  "underRoute": 0.033,
+  "overRoute": 0.0,
+  "proRecall": 0.9,
+  "accuracyZh": 0.923,
+  "accuracyEn": 1.0,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 20,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 0,
+    "flash": 20,
+    "pro": 0
+   },
+   "pro": {
+    "local": 0,
+    "flash": 2,
+    "pro": 18
+   }
+  },
+  "medianSec": 9.39,
+  "maxSec": 10.75
+ },
+ "routingMisses": [
+  {
+   "text": "这个排序算法在特定输入下退化成 O(n^2)，找出原因并给出修复",
+   "gold": "pro",
+   "pred": "flash",
+   "sec": 9.07,
+   "promptTokens": 222
+  },
+  {
+   "text": "为什么编译器在 O2 下产生错误结果但 O0 正常",
+   "gold": "pro",
+   "pred": "flash",
+   "sec": 9.28,
+   "promptTokens": 218
+  }
+ ]
+}

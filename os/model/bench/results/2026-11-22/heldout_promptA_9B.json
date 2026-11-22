@@ -1,0 +1,123 @@
+{
+ "label": "9B",
+ "model": "Qwen3.5-9B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "prompt": "A",
+ "cases": "router_v2_heldout.jsonl",
+ "loadSeconds": 4.3,
+ "routing": {
+  "n": 60,
+  "accuracy": 0.8,
+  "underRoute": 0.2,
+  "overRoute": 0.0,
+  "proRecall": 0.95,
+  "accuracyZh": 0.654,
+  "accuracyEn": 0.912,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 20,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 11,
+    "flash": 9,
+    "pro": 0
+   },
+   "pro": {
+    "local": 0,
+    "flash": 1,
+    "pro": 19
+   }
+  },
+  "medianSec": 9.11,
+  "maxSec": 10.71
+ },
+ "routingMisses": [
+  {
+   "text": "给 login 函数加一个 5 次失败后锁定的检查",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.87,
+   "promptTokens": 219
+  },
+  {
+   "text": "write a function that merges two sorted lists",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.68,
+   "promptTokens": 212
+  },
+  {
+   "text": "解释一下这个 Makefile 每一行的作用",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.03,
+   "promptTokens": 213
+  },
+  {
+   "text": "写一个 Python 脚本批量压缩图片",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.73,
+   "promptTokens": 212
+  },
+  {
+   "text": "rename the function fetch_all to load_all in this file",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 8.74,
+   "promptTokens": 215
+  },
+  {
+   "text": "给这个组件加上 loading 状态",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.18,
+   "promptTokens": 211
+  },
+  {
+   "text": "把这段 JavaScript 改写成 TypeScript",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.38,
+   "promptTokens": 211
+  },
+  {
+   "text": "这个 bash 脚本为什么报 unbound variable",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.08,
+   "promptTokens": 213
+  },
+  {
+   "text": "帮我写一个 Go 的 HTTP 健康检查接口",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 9.03,
+   "promptTokens": 215
+  },
+  {
+   "text": "compile the project and summarise the compiler errors",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 10.17,
+   "promptTokens": 213
+  },
+  {
+   "text": "把这个 SQL 改成用参数绑定",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 10.0,
+   "promptTokens": 211
+  },
+  {
+   "text": "这个排序算法在特定输入下退化成 O(n^2)，找出原因并给出修复",
+   "gold": "pro",
+   "pred": "flash",
+   "sec": 8.92,
+   "promptTokens": 223
+  }
+ ]
+}

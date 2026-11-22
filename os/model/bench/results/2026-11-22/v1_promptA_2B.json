@@ -1,0 +1,476 @@
+{
+ "label": "2B",
+ "model": "Qwen3.5-2B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "loadSeconds": 1.8,
+ "routing": {
+  "n": 90,
+  "accuracy": 0.744,
+  "underRoute": 0.178,
+  "overRoute": 0.078,
+  "proRecall": 1.0,
+  "accuracyZh": 0.761,
+  "accuracyEn": 0.727,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 30,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 16,
+    "flash": 7,
+    "pro": 7
+   },
+   "pro": {
+    "local": 0,
+    "flash": 0,
+    "pro": 30
+   }
+  },
+  "medianSec": 2.67,
+  "maxSec": 3.61
+ },
+ "routingMisses": [
+  {
+   "text": "给 utils.py 里的 parse_date 函数加上空字符串的处理",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.69,
+   "promptTokens": 217
+  },
+  {
+   "text": "explain what this function does",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.77,
+   "promptTokens": 209
+  },
+  {
+   "text": "修复这个 off-by-one 错误：循环少处理了最后一个元素",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.6,
+   "promptTokens": 218
+  },
+  {
+   "text": "add a unit test for the add() function",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.57,
+   "promptTokens": 213
+  },
+  {
+   "text": "把 main.py 里的变量 x 重命名为 count",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.43,
+   "promptTokens": 215
+  },
+  {
+   "text": "运行测试并告诉我哪些失败了",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.59,
+   "promptTokens": 210
+  },
+  {
+   "text": "write a bash one-liner to count lines in all .py files",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.53,
+   "promptTokens": 218
+  },
+  {
+   "text": "给这个类加一个 __repr__ 方法",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.7,
+   "promptTokens": 214
+  },
+  {
+   "text": "convert this JSON file to YAML",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.44,
+   "promptTokens": 210
+  },
+  {
+   "text": "add type hints to this module",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.52,
+   "promptTokens": 210
+  },
+  {
+   "text": "这段正则是什么意思",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.49,
+   "promptTokens": 207
+  },
+  {
+   "text": "add a --verbose flag to the CLI",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.58,
+   "promptTokens": 212
+  },
+  {
+   "text": "给 README 加一个安装说明章节",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.66,
+   "promptTokens": 212
+  },
+  {
+   "text": "why does this line throw a KeyError, here is the traceback",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.48,
+   "promptTokens": 216
+  },
+  {
+   "text": "把这个函数里的重复代码提取成一个辅助函数",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.54,
+   "promptTokens": 213
+  },
+  {
+   "text": "generate a .gitignore for a rust project",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.63,
+   "promptTokens": 213
+  },
+  {
+   "text": "编译这个 C 程序并把报错贴给我",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 3.38,
+   "promptTokens": 213
+  },
+  {
+   "text": "add logging to the upload handler",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.67,
+   "promptTokens": 210
+  },
+  {
+   "text": "summarize this file in three sentences",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 3.22,
+   "promptTokens": 212
+  },
+  {
+   "text": "这个 SQL 查询怎么加上按日期排序",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 3.4,
+   "promptTokens": 213
+  },
+  {
+   "text": "update the version number in package.json to 1.2.0",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.62,
+   "promptTokens": 218
+  },
+  {
+   "text": "把这个类的注释翻译成英文",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.71,
+   "promptTokens": 209
+  },
+  {
+   "text": "write a regex that matches ipv4 addresses",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 3.11,
+   "promptTokens": 212
+  }
+ ],
+ "logs": {
+  "all": {
+   "n": 12,
+   "modelHit": 0.667,
+   "modelTop1": 0.667,
+   "grepHit": 0.5,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 21.2
+  },
+  "grepFriendly": {
+   "n": 6,
+   "modelHit": 1.0,
+   "modelTop1": 1.0,
+   "grepHit": 1.0,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 19.6
+  },
+  "grepMisleading": {
+   "n": 6,
+   "modelHit": 0.333,
+   "modelTop1": 0.333,
+   "grepHit": 0.0,
+   "tailHit": 0.0,
+   "goldSurvivesCompression": 1.0,
+   "medianSec": 21.7
+  }
+ },
+ "logRows": [
+  {
+   "id": "k0-easy",
+   "hard": false,
+   "picked": [
+    391
+   ],
+   "gold": [
+    391
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 18.3,
+   "promptTokens": 2632,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 793,
+   "entries": 161
+  },
+  {
+   "id": "k0-hard",
+   "hard": true,
+   "picked": [
+    102,
+    156,
+    161,
+    195
+   ],
+   "gold": [
+    352,
+    353
+   ],
+   "hit": false,
+   "top1": false,
+   "sec": 21.9,
+   "promptTokens": 2715,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 800,
+   "entries": 167
+  },
+  {
+   "id": "k1-easy",
+   "hard": false,
+   "picked": [
+    405
+   ],
+   "gold": [
+    405
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 19.7,
+   "promptTokens": 2618,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 793,
+   "entries": 161
+  },
+  {
+   "id": "k1-hard",
+   "hard": true,
+   "picked": [
+    467,
+    466
+   ],
+   "gold": [
+    466,
+    467
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 23.3,
+   "promptTokens": 2711,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 800,
+   "entries": 168
+  },
+  {
+   "id": "k2-easy",
+   "hard": false,
+   "picked": [
+    373
+   ],
+   "gold": [
+    373
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 20.9,
+   "promptTokens": 2624,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 158
+  },
+  {
+   "id": "k2-hard",
+   "hard": true,
+   "picked": [
+    485,
+    486
+   ],
+   "gold": [
+    485,
+    486
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 21.5,
+   "promptTokens": 2771,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  },
+  {
+   "id": "k3-easy",
+   "hard": false,
+   "picked": [
+    351
+   ],
+   "gold": [
+    351
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 21.1,
+   "promptTokens": 2572,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 158
+  },
+  {
+   "id": "k3-hard",
+   "hard": true,
+   "picked": [
+    95,
+    149,
+    188,
+    199
+   ],
+   "gold": [
+    462,
+    463
+   ],
+   "hit": false,
+   "top1": false,
+   "sec": 24.2,
+   "promptTokens": 2711,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  },
+  {
+   "id": "k4-easy",
+   "hard": false,
+   "picked": [
+    348
+   ],
+   "gold": [
+    348
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 19.6,
+   "promptTokens": 2614,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 160
+  },
+  {
+   "id": "k4-hard",
+   "hard": true,
+   "picked": [
+    176,
+    253,
+    285,
+    294
+   ],
+   "gold": [
+    357,
+    358
+   ],
+   "hit": false,
+   "top1": false,
+   "sec": 21.5,
+   "promptTokens": 2662,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 164
+  },
+  {
+   "id": "k5-easy",
+   "hard": false,
+   "picked": [
+    344
+   ],
+   "gold": [
+    344
+   ],
+   "hit": true,
+   "top1": true,
+   "sec": 19.0,
+   "promptTokens": 2636,
+   "grepHit": true,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 792,
+   "entries": 161
+  },
+  {
+   "id": "k5-hard",
+   "hard": true,
+   "picked": [
+    121,
+    206,
+    302
+   ],
+   "gold": [
+    490,
+    491
+   ],
+   "hit": false,
+   "top1": false,
+   "sec": 21.3,
+   "promptTokens": 2708,
+   "grepHit": false,
+   "tailHit": false,
+   "goldInCompressed": true,
+   "rawLines": 799,
+   "entries": 168
+  }
+ ]
+}

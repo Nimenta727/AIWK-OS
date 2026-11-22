@@ -1,0 +1,165 @@
+{
+ "label": "2B",
+ "model": "Qwen3.5-2B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "prompt": "A",
+ "cases": "router_v2_heldout.jsonl",
+ "loadSeconds": 1.8,
+ "routing": {
+  "n": 60,
+  "accuracy": 0.7,
+  "underRoute": 0.05,
+  "overRoute": 0.25,
+  "proRecall": 1.0,
+  "accuracyZh": 0.654,
+  "accuracyEn": 0.735,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 20,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 3,
+    "flash": 2,
+    "pro": 15
+   },
+   "pro": {
+    "local": 0,
+    "flash": 0,
+    "pro": 20
+   }
+  },
+  "medianSec": 2.84,
+  "maxSec": 3.17
+ },
+ "routingMisses": [
+  {
+   "text": "给 login 函数加一个 5 次失败后锁定的检查",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.75,
+   "promptTokens": 219
+  },
+  {
+   "text": "把这个 JSON 解析函数的错误处理补上",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.79,
+   "promptTokens": 213
+  },
+  {
+   "text": "add pagination to the /users endpoint",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.54,
+   "promptTokens": 211
+  },
+  {
+   "text": "解释一下这个 Makefile 每一行的作用",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.77,
+   "promptTokens": 213
+  },
+  {
+   "text": "run the linter and fix the warnings it reports",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.66,
+   "promptTokens": 214
+  },
+  {
+   "text": "fix this NullPointerException, stack trace below",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.78,
+   "promptTokens": 211
+  },
+  {
+   "text": "写一个 Python 脚本批量压缩图片",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.77,
+   "promptTokens": 212
+  },
+  {
+   "text": "rename the function fetch_all to load_all in this file",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.72,
+   "promptTokens": 215
+  },
+  {
+   "text": "给这个组件加上 loading 状态",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.92,
+   "promptTokens": 211
+  },
+  {
+   "text": "write tests for the string utilities module",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.75,
+   "promptTokens": 211
+  },
+  {
+   "text": "把这段 JavaScript 改写成 TypeScript",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.85,
+   "promptTokens": 211
+  },
+  {
+   "text": "这个 bash 脚本为什么报 unbound variable",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 3.12,
+   "promptTokens": 213
+  },
+  {
+   "text": "implement the retry decorator described in the docstring",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.96,
+   "promptTokens": 213
+  },
+  {
+   "text": "帮我写一个 Go 的 HTTP 健康检查接口",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 3.02,
+   "promptTokens": 215
+  },
+  {
+   "text": "update the dependency versions in requirements.txt and run the tests",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 3.06,
+   "promptTokens": 215
+  },
+  {
+   "text": "add input validation to the signup form",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 3.02,
+   "promptTokens": 211
+  },
+  {
+   "text": "compile the project and summarise the compiler errors",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.86,
+   "promptTokens": 213
+  },
+  {
+   "text": "把这个 SQL 改成用参数绑定",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.95,
+   "promptTokens": 211
+  }
+ ]
+}

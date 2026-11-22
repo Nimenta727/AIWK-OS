@@ -1,0 +1,81 @@
+{
+ "label": "2B",
+ "model": "Qwen3.5-2B-Q4_K_M.gguf",
+ "ctx": 4096,
+ "threads": 4,
+ "prompt": "B",
+ "cases": "router_v2_heldout.jsonl",
+ "loadSeconds": 0.9,
+ "routing": {
+  "n": 60,
+  "accuracy": 0.9,
+  "underRoute": 0.067,
+  "overRoute": 0.033,
+  "proRecall": 0.9,
+  "accuracyZh": 0.808,
+  "accuracyEn": 0.971,
+  "confusion(gold->pred)": {
+   "local": {
+    "local": 20,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 2,
+    "flash": 16,
+    "pro": 2
+   },
+   "pro": {
+    "local": 1,
+    "flash": 1,
+    "pro": 18
+   }
+  },
+  "medianSec": 2.75,
+  "maxSec": 3.09
+ },
+ "routingMisses": [
+  {
+   "text": "给 login 函数加一个 5 次失败后锁定的检查",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.91,
+   "promptTokens": 218
+  },
+  {
+   "text": "把这个 JSON 解析函数的错误处理补上",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.88,
+   "promptTokens": 212
+  },
+  {
+   "text": "这个 bash 脚本为什么报 unbound variable",
+   "gold": "flash",
+   "pred": "local",
+   "sec": 2.69,
+   "promptTokens": 212
+  },
+  {
+   "text": "帮我写一个 Go 的 HTTP 健康检查接口",
+   "gold": "flash",
+   "pred": "pro",
+   "sec": 2.61,
+   "promptTokens": 214
+  },
+  {
+   "text": "为什么我们的缓存命中率在周末凌晨会突然掉到零",
+   "gold": "pro",
+   "pred": "local",
+   "sec": 2.47,
+   "promptTokens": 215
+  },
+  {
+   "text": "investigate random data corruption that appears only under heavy write load",
+   "gold": "pro",
+   "pred": "flash",
+   "sec": 2.91,
+   "promptTokens": 215
+  }
+ ]
+}

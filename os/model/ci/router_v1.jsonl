@@ -1,0 +1,90 @@
+{"text": "列出下载文件夹里的所有文件", "tier": "local"}
+{"text": "把 report.pdf 移动到 docs 目录", "tier": "local"}
+{"text": "show me the last 200 lines of build.log", "tier": "local"}
+{"text": "rename notes.txt to notes-old.txt", "tier": "local"}
+{"text": "打开项目里的 README", "tier": "local"}
+{"text": "搜索所有包含 TODO 的文件并列出文件名", "tier": "local"}
+{"text": "what's the current wifi connection", "tier": "local"}
+{"text": "把屏幕分辨率改成 1920x1080", "tier": "local"}
+{"text": "请仔细地把 images 文件夹里的所有文件列出来，并告诉我一共有多少个", "tier": "local"}
+{"text": "读一下 /var/log 里最新的 syslog 末尾 50 行", "tier": "local"}
+{"text": "copy config.yaml to config.bak", "tier": "local"}
+{"text": "delete the empty folder tmp_old", "tier": "local"}
+{"text": "查看磁盘还剩多少空间", "tier": "local"}
+{"text": "create a new folder called experiments", "tier": "local"}
+{"text": "把桌面上的截图全部放进 screenshots 文件夹", "tier": "local"}
+{"text": "switch the input method to Chinese", "tier": "local"}
+{"text": "show the first 30 lines of server.log", "tier": "local"}
+{"text": "这个文件有多大", "tier": "local"}
+{"text": "find files modified in the last 24 hours", "tier": "local"}
+{"text": "打开预览看看 dist 目录", "tier": "local"}
+{"text": "what is the git status of this project", "tier": "local"}
+{"text": "把 data.csv 重命名为 data_2024.csv", "tier": "local"}
+{"text": "tail the error log and show it to me", "tier": "local"}
+{"text": "调大一点系统音量", "tier": "local"}
+{"text": "list all python files in src", "tier": "local"}
+{"text": "把这个日志文件读出来给我看", "tier": "local"}
+{"text": "show disk usage per folder", "tier": "local"}
+{"text": "restart the network connection", "tier": "local"}
+{"text": "读取 install.log 里包含 error 的行", "tier": "local"}
+{"text": "打开 docs 文件夹", "tier": "local"}
+{"text": "给 utils.py 里的 parse_date 函数加上空字符串的处理", "tier": "flash"}
+{"text": "write a python script that renames all jpg files by date", "tier": "flash"}
+{"text": "explain what this function does", "tier": "flash"}
+{"text": "修复这个 off-by-one 错误：循环少处理了最后一个元素", "tier": "flash"}
+{"text": "add a unit test for the add() function", "tier": "flash"}
+{"text": "把 main.py 里的变量 x 重命名为 count", "tier": "flash"}
+{"text": "运行测试并告诉我哪些失败了", "tier": "flash"}
+{"text": "write a bash one-liner to count lines in all .py files", "tier": "flash"}
+{"text": "给这个类加一个 __repr__ 方法", "tier": "flash"}
+{"text": "convert this JSON file to YAML", "tier": "flash"}
+{"text": "帮我写一个读取 CSV 并求平均值的函数", "tier": "flash"}
+{"text": "add type hints to this module", "tier": "flash"}
+{"text": "这段正则是什么意思", "tier": "flash"}
+{"text": "write a Dockerfile for a simple flask app", "tier": "flash"}
+{"text": "把这个 for 循环改成列表推导式", "tier": "flash"}
+{"text": "add a --verbose flag to the CLI", "tier": "flash"}
+{"text": "写一个 hello world 的 Go 程序并编译运行", "tier": "flash"}
+{"text": "fix the typo in the error message in app.js", "tier": "flash"}
+{"text": "给 README 加一个安装说明章节", "tier": "flash"}
+{"text": "why does this line throw a KeyError, here is the traceback", "tier": "flash"}
+{"text": "把这个函数里的重复代码提取成一个辅助函数", "tier": "flash"}
+{"text": "generate a .gitignore for a rust project", "tier": "flash"}
+{"text": "编译这个 C 程序并把报错贴给我", "tier": "flash"}
+{"text": "add logging to the upload handler", "tier": "flash"}
+{"text": "写一个简单的二分查找", "tier": "flash"}
+{"text": "summarize this file in three sentences", "tier": "flash"}
+{"text": "这个 SQL 查询怎么加上按日期排序", "tier": "flash"}
+{"text": "update the version number in package.json to 1.2.0", "tier": "flash"}
+{"text": "把这个类的注释翻译成英文", "tier": "flash"}
+{"text": "write a regex that matches ipv4 addresses", "tier": "flash"}
+{"text": "设计一个支持离线同步和冲突解决的笔记应用架构", "tier": "pro"}
+{"text": "refactor the authentication module across all services to use short-lived tokens and rotate keys", "tier": "pro"}
+{"text": "为什么这个服务偶尔会死锁，线程转储在附件里", "tier": "pro"}
+{"text": "review this codebase for security vulnerabilities", "tier": "pro"}
+{"text": "把整个项目从 callback 风格迁移到 async/await，并保证不改变行为", "tier": "pro"}
+{"text": "find the root cause of the memory leak that only appears after 3 days of uptime", "tier": "pro"}
+{"text": "设计一个插件系统，要求插件之间相互隔离并且可以热更新", "tier": "pro"}
+{"text": "optimize this query planner, it is 10x slower than the baseline and I don't know why", "tier": "pro"}
+{"text": "分析这个分布式锁实现是否存在竞态条件", "tier": "pro"}
+{"text": "design the data model and migration plan for splitting our monolith database into three services", "tier": "pro"}
+{"text": "重写调度器，使它在 10 万个任务下仍然公平且不会饿死低优先级任务", "tier": "pro"}
+{"text": "why do the integration tests fail only on CI and only sometimes", "tier": "pro"}
+{"text": "审查这个支付流程有没有可能被重复扣款", "tier": "pro"}
+{"text": "implement a lock-free queue and prove it correct", "tier": "pro"}
+{"text": "这个编译器的类型推断在泛型递归时出错，帮我找出原因并修复", "tier": "pro"}
+{"text": "plan a zero-downtime migration from postgres 12 to 16 with rollback", "tier": "pro"}
+{"text": "帮我设计缓存失效策略，要兼顾一致性和吞吐", "tier": "pro"}
+{"text": "evaluate whether we should move to an event sourcing architecture given these constraints", "tier": "pro"}
+{"text": "找出这个崩溃的根本原因：只在 ARM 上发生，堆栈里没有有用的信息", "tier": "pro"}
+{"text": "design a rate limiter that works across multiple regions", "tier": "pro"}
+{"text": "为这个内核模块写一个线程安全的环形缓冲区，并分析内存序", "tier": "pro"}
+{"text": "untangle the circular dependencies between these twelve packages and propose a new layering", "tier": "pro"}
+{"text": "这个加密协议实现可能有侧信道问题，请做完整审计", "tier": "pro"}
+{"text": "reproduce and fix the race that corrupts the index when two writers flush at once", "tier": "pro"}
+{"text": "设计整个系统的权限模型，包含用户、组、临时委托和审计", "tier": "pro"}
+{"text": "investigate why latency doubled after last week's release using the traces and the diff", "tier": "pro"}
+{"text": "把这个单体前端拆成微前端，给出分阶段的方案和风险", "tier": "pro"}
+{"text": "prove or find a counterexample: does this merge algorithm preserve ordering", "tier": "pro"}
+{"text": "设计一个能在断电后恢复的写入日志格式", "tier": "pro"}
+{"text": "rewrite the build graph so incremental builds are correct under symlinks and generated files", "tier": "pro"}
