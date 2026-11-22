@@ -1,5 +1,7 @@
 # 云端模型怎么接：官方插件调研与连接方案（2026-11-22）
 
+> **2026-11-22 更新：决定先不适配 CLI，改为直接用 DeepSeek API 自带智能体循环，见 [AIWS_DEEPSEEK.md](AIWS_DEEPSEEK.md)。** 本文保留为 CLI 路线的调研记录；其中“同步批准、计划、子智能体”的需求在新方案里是原生满足的。
+
 **English summary.** Claude Code and Codex share three open conventions we should build on instead of inventing our own: `SKILL.md` skills, MCP servers, and `AGENTS.md`/`CLAUDE.md` guidance. Best connection: for **Claude Code**, keep the `stream-json` process and add a **PreToolUse hook that calls our local broker** (a synchronous gate: real prevention instead of detect-after) plus an **MCP server** exposing a curated read-only subset of our tools; for **Codex**, use **`codex app-server` over stdio** (it sends approval requests to us, streams plans, sub-agent items and token usage) with `codex exec --json` as fallback. The local model never approves anything; it routes, compresses context, summarises results and retrieves tools. Items marked ⚠ were **not verified against a real CLI**.
 
 > 资料来源有两类：一手（官方文档页、官方仓库目录）和二手（博客、社区库）。每条结论后标了可信度；官方页面被截断或由工具摘要的部分单独标注。**没有一条经过真机运行验证。**

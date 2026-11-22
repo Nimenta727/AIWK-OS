@@ -28,13 +28,13 @@ class Coverage(unittest.TestCase):
         missing = [m for m in set(re.findall(r'"error": ?"([^"]{3,120})"', src)) if not covered(m)]
         self.assertEqual(missing, [], "add these to workbench/src/model/errors.mjs")
     def test_shell_modules_are_fully_translated(self):
-        for mod in ("aiws_system", "aiws_changes", "aiws_capabilities"):
+        for mod in ("aiws_system", "aiws_changes", "aiws_capabilities", "aiws_secrets"):
             missing = [m for m in static_messages(mod) if not covered(m) and not re.search(r"[%{]", m)]
             # messages that embed a value are covered by PATTERNS; checked by the translator tests in the frontend
             self.assertEqual([m for m in missing if m not in ("Memory must be 1–", "Skill is larger than ")], [], mod)
     def test_overall_coverage_floor(self):
         total = ok = 0
-        for mod in ("aiws_workbench", "aiws_mandate", "aiws_supervisor", "aiws_tasks", "aiws_apps", "aiws_model_router", "aiws_system", "aiws_changes", "aiws_capabilities"):
+        for mod in ("aiws_workbench", "aiws_mandate", "aiws_supervisor", "aiws_tasks", "aiws_apps", "aiws_model_router", "aiws_system", "aiws_changes", "aiws_capabilities", "aiws_secrets"):
             for m in static_messages(mod):
                 total += 1; ok += covered(m)
         self.assertGreaterEqual(ok / total, 0.78, "translated %d of %d user-reachable messages" % (ok, total))

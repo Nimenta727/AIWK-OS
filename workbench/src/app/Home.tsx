@@ -42,11 +42,14 @@ export default function Home({english,tr,data,onCommand,onOpen}:{english:boolean
 
   <Section title={tr('需要你','Needs you')} count={needs}>
    {needs===0&&<p className="muted pad">{tr('现在没有需要你处理的事。','Nothing needs you right now.')}</p>}
-   {(s?.runApprovals||[]).map(a=><div className="inbox" key={a.runId}>
-    <div><strong><Icon name="warning"/> {tr('构建想要执行敏感操作：','The build wants a sensitive action: ')}{a.category}</strong><div className="muted">{a.tool} · {a.detail}</div>
-     <div className="muted">{tr('构建已暂停。操作可能在被发现前已经开始；批准只是让它继续。','Paused. The action may have started before it was noticed; approving lets it continue.')}</div></div>
-    <div className="btns"><Button variant="primary" icon="check" disabled={act.busy} onClick={()=>void act.post('/builder/runs/'+a.runId+'/approve')}>{tr('批准继续','Approve')}</Button>
-     <Button icon="close" disabled={act.busy} onClick={()=>void act.post('/builder/runs/'+a.runId+'/deny')}>{tr('拒绝并终止','Deny & stop')}</Button></div></div>)}
+   {(s?.runApprovals||[]).map(a=>{
+    const label:Record<string,string>={plan:tr('提交了一份计划，等你批准','submitted a plan and waits for your approval'),delete:tr('想要删除文件','wants to delete a file'),write:tr('想要写入文件','wants to write a file')};
+    const ends=a.terminates!==false;
+    return <div className="inbox" key={a.runId}>
+    <div><strong><Icon name="warning"/> {tr('构建','The build')} {label[a.category]||tr('想要执行敏感操作：','wants a sensitive action: ')+a.category}</strong><div className="muted">{a.tool} · {a.detail}</div>
+     <div className="muted">{ends?tr('构建已暂停。操作可能在被发现前已经开始；批准只是让它继续。','Paused. The action may have started before it was noticed; approving lets it continue.'):tr('构建正在等你回答，批准之前这一步不会执行。拒绝只会拒绝这一步，运行会继续。','The build is waiting for your answer; this step does not run before you approve. Denying refuses only this step and the run continues.')}</div></div>
+    <div className="btns"><Button variant="primary" icon="check" disabled={act.busy} onClick={()=>void act.post('/builder/runs/'+a.runId+'/approve')}>{tr('批准','Approve')}</Button>
+     <Button icon="close" disabled={act.busy} onClick={()=>void act.post('/builder/runs/'+a.runId+'/deny')}>{ends?tr('拒绝并终止','Deny & stop'):tr('拒绝','Deny')}</Button></div></div>;})}
    {(s?.tasks.needsApproval||[]).map(w=><div className="inbox" key={w.taskId+w.stageKey}>
     <div><strong>{w.label}</strong><div className="muted">{w.tool} · {w.taskTitle}</div></div>
     <div className="btns">{w.ready?<Button variant="primary" icon="check" disabled={act.busy} onClick={()=>void approveAndRun(w)}>{tr('批准并运行','Approve & run')}</Button>:<span className="muted">{tr('等待前置步骤','waiting')}</span>}

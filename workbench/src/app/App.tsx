@@ -161,7 +161,7 @@ export default function App(){
    case 'plans':return <Plans english={english} tr={tr} focus={focus.plans||null} onStop={stopRun} activeRun={s?.status.builder.runId||null} reload={data.reload}/>;
    case 'agents':return <AgentTree english={english} tr={tr} sessions={s?.sessions||[]} focus={focus.agents||null} onOpenFile={openFile}/>;
    case 'changes':return <ChangesPage tr={tr} folders={folders}/>;
-   case 'build':return <Build tr={tr} data={data}/>;
+   case 'build':return <Build tr={tr} english={english} data={data}/>;
    case 'system':return <SystemPage tr={tr}/>;
    case 'files':return <div className="legacy"><GuestFiles csrf={csrf} english={english} command={cmd} onPlanCreated={()=>open('plans')}/></div>;
    case 'tasks':case 'model':return <div className="legacy"><GuestTaskStudio csrf={csrf} english={english} capabilities={caps as never} focus={id==='model'?'model':'tasks'}/></div>;

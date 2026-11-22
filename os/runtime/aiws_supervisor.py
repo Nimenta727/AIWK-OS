@@ -22,11 +22,13 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 
 import aiws_plans
-from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, MAX_LINE
+import aiws_secrets
+from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, NativeAdapter, MAX_LINE
 from aiws_events import EventError, make_event, redact
 from aiws_mandate import MandateError
 
@@ -105,8 +107,13 @@ def codex_argv(exe, mandate, prompt, cwd):
 
 ARGV = {"claude": ("claude", claude_argv), "codex": ("codex", codex_argv)}
 
+RUNNER = Path(__file__).resolve().parent / "aiws_cloud_agent.py"        # our own DeepSeek runner, installed next to this module
+
+
 def default_launcher(which=shutil.which):
     def launch(mandate, prompt, cwd):
+        if mandate["provider"] == "deepseek":
+            return [which("python3") or sys.executable, str(RUNNER)], {}
         name, builder = ARGV[mandate["provider"]]
         exe = which(name)
         if not exe:
@@ -256,6 +263,9 @@ class _Run:
         self.paused = False
         self.before = {"input": 0, "output": 0}
         self.iso = None
+        self.stdin = None            # only for the native runner: the control channel (key, approval decisions)
+        self.last_plan = None
+        self.plan_ids = {}
 
     def effective(self):
         if self.tot_in is not None or self.tot_out is not None:
@@ -270,14 +280,24 @@ class Supervisor:
             return
         for kind, payload in drain():
             try:
-                self.plans.upsert(aiws_plans.from_cloud(run.id, kind, payload))
+                if kind == "native_update":
+                    pid = run.plan_ids.get(payload.get("seq")) or run.last_plan
+                    if pid:
+                        self.plans.update_step(pid, payload.get("step"), payload.get("state"))
+                    continue
+                plan = aiws_plans.from_cloud(run.id, kind, payload)
+                self.plans.upsert(plan)
+                if kind == "native":
+                    run.last_plan, run.plan_ids[plan["seq"]] = plan["id"], plan["id"]
             except Exception:
                 pass
 
     def __init__(self, mandates, events, workspace, launcher=None, config=None, clock=time.time, approval_timeout=APPROVAL_TIMEOUT,
-                 isolation_factory=None, plans=None):
+                 isolation_factory=None, plans=None, results=None, key_loader=None):
         self.mandates, self.events, self.clock = mandates, events, clock
-        self.plans = plans                      # optional PlanStore: cloud plans announced by the CLI
+        self.plans = plans                      # optional PlanStore: cloud plans announced by the CLI or the native runner
+        self.results = results                  # optional ResultStore: the native runner's final answer
+        self.key_loader = key_loader or aiws_secrets.load
         self.isolation_factory = isolation_factory or default_isolation_factory
         self.workspace = Path(workspace).resolve(strict=True)
         self.launcher = launcher or default_launcher()
@@ -316,10 +336,10 @@ class Supervisor:
 
     @staticmethod
     def _adapter(provider, session, clock):
-        return (ClaudeStreamAdapter if provider == "claude" else CodexJsonAdapter)(session, clock)
+        return {"claude": ClaudeStreamAdapter, "codex": CodexJsonAdapter, "deepseek": NativeAdapter}[provider](session, clock)
 
     # ---- public API ----------------------------------------------------------------------
-    def start(self, mandate_id, prompt):
+    def start(self, mandate_id, prompt, language="zh"):
         if not self.config().get("enabled"):
             raise PermissionError("The builder is disabled (enable it in ~/.config/aiws/builder.json)")
         prompt = validate_prompt(prompt)
@@ -329,6 +349,15 @@ class Supervisor:
         remaining = self.mandates.remaining(mandate_id)
         if remaining["input"] <= 0 or remaining["output"] <= 0:
             raise PermissionError("The mandate's token budget is used up")
+        native = mandate["provider"] == "deepseek"
+        key = None
+        if native:
+            try:
+                key = self.key_loader()
+            except aiws_secrets.SecretError as exc:
+                raise SupervisorError(str(exc)) from exc
+            if not key:
+                raise SupervisorError("No DeepSeek API key is configured")
         with self.lock:
             if self.active is not None:
                 raise SupervisorError("A build is already running; only one run at a time")
@@ -346,7 +375,7 @@ class Supervisor:
             session = "build-" + run_id[:12]
             adapter = self._adapter(mandate["provider"], session, self.clock)
             try:
-                proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE if native else subprocess.DEVNULL,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
                                         close_fds=True, shell=False, bufsize=0)
             except OSError as exc:
@@ -357,6 +386,20 @@ class Supervisor:
             deadline = self.clock() + mandate["wallClockMinutes"] * 60
             run = _Run(run_id, mandate, adapter, proc, deadline, cwd)
             run.iso = iso
+            if native:
+                run.stdin = proc.stdin
+                init = {"t": "init", "key": key, "task": prompt, "project": cwd, "language": "en" if language == "en" else "zh",
+                        "deadlineSeconds": mandate["wallClockMinutes"] * 60,
+                        "mandate": {**{k: mandate[k] for k in ("allowedTools", "model", "thinking", "effort", "maxTurns", "wallClockMinutes", "needApprovalFor", "planApproval")},
+                                    "tokenBudget": {"input": remaining["input"], "output": remaining["output"]}}}
+                ok = self._send(run, init)
+                key = init = None                           # the key now exists only in the child's memory
+                if not ok:
+                    self._terminate(run)
+                    if iso is not None:
+                        iso.cleanup(Path(cwd))
+                    self.mandates.run_update(run_id, state="failed", reason="could not send the task", ended=self.clock())
+                    raise SupervisorError("Could not start the runner")
             run.before = dict(mandate["used"])       # budget already spent by earlier runs of this mandate
             self.active = run
         self.mandates.run_update(run_id, session=session)
@@ -420,6 +463,24 @@ class Supervisor:
             time.sleep(0.1)
         self._signal(run, signal.SIGKILL)
 
+    @staticmethod
+    def _send(run, obj):
+        """One JSON line to the native runner's stdin (task, key, approval decisions). False if the pipe is gone."""
+        try:
+            run.stdin.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+            run.stdin.flush()
+            return True
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def _gate(self, run, gate):
+        """The native runner is BLOCKED on this question: nothing runs until the user answers (real prevention, no SIGSTOP needed)."""
+        run.pending = {"category": gate["category"], "tool": gate["tool"], "detail": gate["detail"][:120], "since": self.clock(), "gate": gate["id"], "sync": True}
+        self.mandates.run_update(run.id, state="awaiting-approval", pending=json.dumps(run.pending))
+        self._emit("sup-" + run.id[:12], "approval", status="pending", detail=gate["category"])
+        if gate["category"] == "plan" and run.last_plan and self.plans:
+            self.plans.set_status(run.last_plan, "awaiting-approval")
+
     def _pause(self, run, category, tool, detail, session):
         if self._signal(run, signal.SIGSTOP):
             run.paused = True
@@ -456,6 +517,12 @@ class Supervisor:
                 self._pause(run, category, event.get("tool", ""), event.get("detail"), session)
         return None
 
+    def _pick_up_gate(self, run):
+        gate = getattr(run.adapter, "pending_gate", None)
+        if gate and run.pending is None:
+            run.adapter.pending_gate = None
+            self._gate(run, gate)
+
     def _resolve_approval(self, run):
         if run.pending is None:
             return
@@ -464,11 +531,21 @@ class Supervisor:
             return
         approved = bool(run.decision)
         waited = self.clock() - run.pending["since"]
-        category = run.pending["category"]
+        pending = run.pending
+        category = pending["category"]
         run.pending, run.decision = None, None
         run.deadline += waited                    # time spent waiting for the user is not build time
         self._emit("sup-" + run.id[:12], "approval", status="ok" if approved else "denied", detail=category)
         self.mandates.run_update(run.id, state="running", pending=None)
+        if pending.get("sync"):
+            # the runner answers "denied" to the model and carries on; only an absent user (timeout) ends the run
+            self._send(run, {"t": "decision", "id": pending["gate"], "approve": approved})
+            if category == "plan" and run.last_plan and self.plans:
+                self.plans.set_status(run.last_plan, "approved" if approved else "rejected")
+            if timed_out:
+                run.stop_reason = "approval-timeout"
+                self._terminate(run)
+            return
         if approved:
             if self._signal(run, signal.SIGCONT):
                 run.paused = False
@@ -496,6 +573,7 @@ class Supervisor:
             elif line:
                 events_now = run.adapter.feed(line)
                 self._store_plans(run)
+                self._pick_up_gate(run)
                 for event in events_now:
                     try:
                         stored = self.events.append(event)
@@ -532,6 +610,17 @@ class Supervisor:
                 pass
         if run.iso is not None:
             run.iso.cleanup(Path(run.project_abs))
+        if run.stdin is not None:
+            try:
+                run.stdin.close()
+            except OSError:
+                pass
+        result = getattr(run.adapter, "result", None)
+        if result and self.results:
+            try:
+                self.results.put(run.id, result)
+            except OSError:
+                pass
         used_in, used_out = run.effective()
         if run.stop_reason:
             state = "stopped" if run.stop_reason == "user-stop" else "killed"

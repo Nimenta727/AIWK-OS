@@ -7,9 +7,11 @@ export type Waiting={taskId:string;stageKey:string;tool:string;label:string;task
 export type Failure={taskId:string;stageKey:string;tool:string;label:string;error:string};
 export type RecentTask={id:string;title:string;createdAt:number;stages:Record<string,number>};
 export type Budget={mandateId:string;used:number;limit:number;input:{used:number;limit:number};output:{used:number;limit:number}};
-export type RunApproval={runId:string;category:string;tool:string;detail:string};
-export type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number};
-export type BuilderInfo={enabled:boolean;providers:Record<string,{installed:boolean}>;mandates:Mandate[];status:{isolation?:{mode:string;user:string};active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
+export type RunApproval={runId:string;category:string;tool:string;detail:string;terminates?:boolean};
+export type Mandate={id:string;provider:string;projectDir:string;allowedTools:string[];tokenBudget:{input:number;output:number};used:{input:number;output:number};state:string;wallClockMinutes:number;maxTurns:number;model?:string;thinking?:boolean;effort?:string;planApproval?:boolean};
+export type Provider={installed:boolean;keyConfigured?:boolean;keyProblem?:string|null;models?:string[]};
+export type LastResult={runId:string;text:string;ts:number}|null;
+export type BuilderInfo={enabled:boolean;providers:Record<string,Provider>;lastResult?:LastResult;mandates:Mandate[];status:{isolation?:{mode:string;user:string};active:{runId:string;state:string;turns:number;usedInput:number;usedOutput:number}|null}};
 export type Summary={demo:boolean;runApprovals:RunApproval[];
  status:{localModel:{configured:boolean;online:boolean;weightsPresent:boolean;gate?:{loaded:boolean;rssMiB?:number}|null};builder:{state:string;enabled?:boolean;runId?:string|null;turns?:number};router:{externalEnabled:boolean}};
  tokens:{total:Totals;byAgent:Record<string,Totals>;budget:Budget|null};

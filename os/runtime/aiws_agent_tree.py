@@ -5,6 +5,7 @@ node comes from events the provider actually reported: its parent, label, model 
 the context references it used (files, searches, URLs, commands, prompt size), tool-call count, tokens and time.
 Where the stream did not say something, the field stays None/"unknown" instead of being guessed.
 """
+SPAWN_TOOLS = ("Task", "Agent", "agent.spawn")      # Claude Code / Codex-style names and our own native runner
 MAX_NODES = 500
 MAX_CTX = 12
 ROOT = "root"
@@ -55,7 +56,7 @@ def build(events):
         for key in ("label", "model"):
             if e.get(key):
                 n[key] = e[key]
-        if e.get("kind") == "tool" and e.get("tool") in ("Task", "Agent") and e.get("node") and not e.get("parent"):
+        if e.get("kind") == "tool" and e.get("tool") in SPAWN_TOOLS and e.get("node") and not e.get("parent"):
             # the result of the spawning call: the child finished (this is the only "done" signal some streams give)
             if e.get("status") in ("ok", "error"):
                 n["state"] = "done" if e["status"] == "ok" else "error"

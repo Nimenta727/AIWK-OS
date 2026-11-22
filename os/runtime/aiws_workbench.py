@@ -33,6 +33,8 @@ import aiws_changes
 import aiws_agent_tree
 import aiws_plans
 import aiws_sysverify
+import aiws_secrets
+import aiws_deepseek
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -84,7 +86,8 @@ class Controller:
         self.events = EventStore(state_home / "aiws-observatory")
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
         self.plans = aiws_plans.PlanStore(state_home / "aiws" / "plans.json")
-        self.supervisor = Supervisor(self.mandates, self.events, self.workspace, plans=self.plans)
+        self.results = aiws_plans.ResultStore(state_home / "aiws" / "results.json")
+        self.supervisor = Supervisor(self.mandates, self.events, self.workspace, plans=self.plans, results=self.results)
         if os.environ.get("AIWS_OBSERVATORY_DEMO") == "1":
             self._seed_demo()
 
@@ -232,7 +235,7 @@ class Controller:
     def _mandate_view(m):
         keys = ("id", "provider", "projectDir", "allowedTools", "permissionMode", "maxTurns", "tokenBudget",
                 "wallClockMinutes", "needApprovalFor", "requireMetering", "expires", "state", "used")
-        return {k: m[k] for k in keys}
+        return {**{k: m[k] for k in keys}, **{k: m[k] for k in ("model", "thinking", "effort", "planApproval") if k in m}}
 
     def builder_overview(self):
         try:
@@ -240,17 +243,34 @@ class Controller:
         except SupervisorError:
             config = {"enabled": False, "envAllow": []}
         providers = {name: {"installed": shutil.which(name) is not None} for name in ("claude", "codex")}
+        key = aiws_secrets.status()
+        providers["deepseek"] = {"installed": key["configured"], "keyConfigured": key["configured"], "keyProblem": key["problem"], "models": list(aiws_deepseek.MODELS)}
         return {"enabled": config["enabled"], "providers": providers,
                 "mandates": [self._mandate_view(m) for m in self.mandates.active()],
-                "status": self.supervisor.status()}
+                "status": self.supervisor.status(), "lastResult": self.results.last()}
 
     def builder_grant(self, payload):
         if not load_builder_config()["enabled"]:
             raise PermissionError("The builder is disabled (enable it in ~/.config/aiws/builder.json)")
         return self._mandate_view(self.mandates.grant(payload))
 
-    def builder_start(self, mandate_id, prompt):
-        return self.supervisor.start(mandate_id, prompt)
+    def builder_start(self, mandate_id, prompt, language="zh"):
+        return self.supervisor.start(mandate_id, prompt, language)
+
+    def cloud_key(self, payload):
+        """Save or clear the DeepSeek key. The key is only ever written to the private config file; it is never echoed back."""
+        now = time.monotonic()
+        if now - getattr(self, "_key_last", -10) < 2:
+            raise ValueError("Too many system operations; wait a moment")
+        self._key_last = now
+        try:
+            if payload == {"clear": True}:
+                return aiws_secrets.clear()
+            if set(payload) == {"key"}:
+                return aiws_secrets.save(payload["key"], forbidden_roots=[self.workspace])
+        except aiws_secrets.SecretError as exc:
+            raise SupervisorError(str(exc))
+        raise ValueError("Expected {key} or {clear: true}")
 
     def observatory(self):
         overview = self.tasks.overview()
@@ -274,7 +294,8 @@ class Controller:
         active = status["active"]
         mandates = self.mandates.active()
         in_use = next((m for m in mandates if active and m["id"] == active["mandateId"]), mandates[0] if mandates else None)
-        run_approvals = ([{"runId": active["runId"], **{k: active["pending"][k] for k in ("category", "tool", "detail")}}]
+        run_approvals = ([{"runId": active["runId"], **{k: active["pending"][k] for k in ("category", "tool", "detail")},
+                           "terminates": not active["pending"].get("sync")}]
                          if active and active["pending"] else [])
         builder = {"state": ("disabled" if not builder_enabled else active["state"] if active else "idle"),
                    "enabled": builder_enabled, "runId": active["runId"] if active else None,
@@ -784,6 +805,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"hits": hits, "counts": app.capabilities.counts()})
         if path == "/api/v1/memory":
             return self.reply(200, {"memory": app.memory.list()})
+        if path == "/api/v1/cloud/key":
+            return self.reply(200, aiws_secrets.status())
         if path in ("/api/v1/changes", "/api/v1/changes/diff"):
             from urllib.parse import parse_qs
             qs = parse_qs(urlsplit(self.path).query)
@@ -852,7 +875,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -894,6 +917,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = app.apps_launch(payload["id"])
             elif path == "/api/v1/memory":
                 result = app.memory_op(payload)
+            elif path == "/api/v1/cloud/key":
+                result = app.cloud_key(payload)
             elif path.startswith("/api/v1/system/"):
                 result = app.system_op(path.rsplit("/", 1)[1], payload)
             elif path == "/api/v1/ide/open":
@@ -903,9 +928,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/builder/mandates":
                 result = app.builder_grant(payload)
             elif path == "/api/v1/builder/runs":
-                if set(payload) != {"mandateId", "prompt"}:
+                if not {"mandateId", "prompt"} <= set(payload) <= {"mandateId", "prompt", "language"}:
                     raise ValueError("Expected mandateId and prompt")
-                result = app.builder_start(payload["mandateId"], payload["prompt"])
+                result = app.builder_start(payload["mandateId"], payload["prompt"], "en" if payload.get("language") == "en" else "zh")
             elif route[:3] == ["api", "v1", "builder"]:
                 if payload:
                     raise ValueError("No arguments allowed")

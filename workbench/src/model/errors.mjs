@@ -44,7 +44,16 @@ const EXACT = [
   ['Unknown run', '未知的运行'], ['Unknown run field', '运行包含未知字段'], ['allowedTools needs 1-16 entries', '允许的工具需要 1–16 项'],
   ['permissionMode may not bypass permission prompts', '权限模式不能绕过权限确认'], ['projectDir may not contain symlinks', '项目文件夹不能包含符号链接'],
   ['projectDir may not use protected or parent folders', '项目文件夹不能使用受保护目录或上级目录'], ['projectDir must be a relative workspace folder', '项目文件夹必须是工作区内的相对路径'],
-  ['projectDir must be an existing sub-folder of the workspace', '项目文件夹必须是工作区中已存在的子文件夹'], ['provider must be claude or codex', '云端模型只能是 claude 或 codex'],
+  ['projectDir must be an existing sub-folder of the workspace', '项目文件夹必须是工作区中已存在的子文件夹'], ['provider must be claude, codex or deepseek', '云端模型只能是 claude、codex 或 deepseek'],
+  ['model, thinking, effort and planApproval are only for the deepseek provider', 'model、thinking、effort、planApproval 只适用于 deepseek'],
+  ['model is not one of the supported DeepSeek models', '不是受支持的 DeepSeek 模型'], ['effort must be low, high or max', '推理强度只能是 low、high 或 max'],
+  ['thinking and planApproval must be true or false', 'thinking 和 planApproval 必须是 true 或 false'],
+  // DeepSeek key and runner
+  ['No DeepSeek API key is configured', '还没有配置 DeepSeek API 密钥'], ['Could not start the runner', '无法启动云端运行器'], ['Expected {key} or {clear: true}', '需要 {key} 或 {clear: true}'],
+  ['The key file must be a regular file, not a link', '密钥文件必须是普通文件，不能是链接'], ['The key file must belong to this user', '密钥文件必须属于当前用户'],
+  ['The key file must not be readable by others (use mode 600)', '密钥文件不能被其他用户读取（请用权限 600）'], ['The key file is too large', '密钥文件过大'],
+  ['The key file does not contain a valid key', '密钥文件里不是有效的密钥'], ['That does not look like an API key', '这看起来不像 API 密钥'],
+  ['The key cannot be stored inside the workspace', '密钥不能存放在工作区内'], ['The config directory must not be a link', '配置目录不能是链接'],
   ['requireMetering must be true or false', 'requireMetering 必须是 true 或 false'], ['tokenBudget needs input and output limits', 'token 预算需要同时给出输入和输出上限'],
   // router
   ['Instruction must contain 1-1000 characters', '指令需要 1–1000 个字符'], ['Unknown agent', '未知的代理'], ['externalEnabled must be true or false', 'externalEnabled 必须是 true 或 false'],
@@ -72,7 +81,7 @@ const PATTERNS = [
   [/^The mandate is (.+)$/, '这份授权的状态是 $1，不能运行'], [/^The official (.+) CLI is not installed on this machine$/, '这台机器上没有安装官方的 $1 命令行工具'],
   [/^Could not start the CLI: (.*)$/, '无法启动命令行工具：$1'], [/^Prerequisite has not completed: (.*)$/, '前置步骤尚未完成：$1'],
   [/^(.+) failed \(exit (.+)\)$/, '$1 执行失败（退出码 $2）'], [/^(.+) failed: (.*)$/, '$1 执行失败：$2'], [/^(.+) is required for the isolated builder$/, '隔离构建需要 $1'],
-  [/^Git (.*)$/, 'Git：$1'],
+  [/^Git (.*)$/, 'Git：$1'], [/^allowedTools needs 1-(\d+) entries$/, '允许的工具需要 1–$1 项'],
 ];
 
 const map = new Map(EXACT);

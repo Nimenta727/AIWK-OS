@@ -377,3 +377,44 @@ def replay(path, adapter, store):
         store.append(event)
         events += 1
     return {"lines": adapter.lines, "events": events, "errors": errors}
+
+
+class NativeAdapter(_Base):
+    """Our own runner (aiws_cloud_agent.py): it already speaks the event vocabulary, so this only validates and routes its lines.
+
+    {"t":"event",...} -> an event (validated by the same strict schema as every other source)
+    {"t":"plan"} / {"t":"plan_update"} -> plan panel (drain_plans), {"t":"gate"} -> pending_gate (the supervisor turns it into an
+    approval), {"t":"result"} -> result text. Message text never becomes an event."""
+    agent = "deepseek"
+
+    def __init__(self, session, clock=time.time):
+        super().__init__(session, clock)
+        self.plan_updates, self.pending_gate, self.result = [], None, None
+
+    def drain_plans(self):
+        out, self.plan_updates = self.plan_updates, []
+        return out
+
+    def handle(self, data):
+        t = data.get("t")
+        if t == "event":
+            fields = {k: v for k, v in data.items() if k not in ("t", "kind")}
+            kind = data.get("kind")
+            events = self._ev(kind, **fields) if isinstance(kind, str) else self._unrecognized("event")
+            for e in events:
+                if e["kind"] == "usage":
+                    self.turns += 1                       # one model call = one turn (sub-agents included)
+                elif e["kind"] == "end":
+                    self.ended, self.failed = True, e.get("status") != "ok"
+            return events
+        if t == "plan" and isinstance(data.get("plan"), dict):
+            self.plan_updates.append(("native", data["plan"]))
+        elif t == "plan_update":
+            self.plan_updates.append(("native_update", {k: data.get(k) for k in ("step", "state", "seq")}))
+        elif t == "gate" and all(isinstance(data.get(k), str) for k in ("id", "category", "tool", "detail")):
+            self.pending_gate = {k: data[k][:120] for k in ("id", "category", "tool", "detail")}
+        elif t == "result" and isinstance(data.get("text"), str):
+            self.result = data["text"][:20000]
+        else:
+            return self._unrecognized(str(t))
+        return []

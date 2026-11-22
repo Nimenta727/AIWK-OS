@@ -39,4 +39,7 @@ aiws_observatory.py
 aiws_mandate.py
 aiws_supervisor.py
 aiws_cli_adapters.py
+aiws_deepseek.py
+aiws_cloud_agent.py
+aiws_secrets.py
 aiws_egress_proxy.py

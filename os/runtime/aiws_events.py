@@ -18,7 +18,7 @@ import threading
 EVENT_VERSION = 1
 EVENT_KINDS = ("start", "message", "tool", "usage", "approval", "error", "end")
 STATUSES = ("ok", "error", "denied", "pending", "unknown")
-AGENTS = ("claude", "codex", "local", "router", "supervisor")
+AGENTS = ("claude", "codex", "deepseek", "local", "router", "supervisor")
 TOKEN_FIELDS = ("in", "out", "cacheRead", "cacheWrite")
 CTX_KINDS = ("file", "url", "search", "command", "prompt")
 SCOPES = ("delta", "total", "turn")      # turn: reported per turn, cumulative-vs-increment NOT verified

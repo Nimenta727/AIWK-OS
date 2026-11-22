@@ -6,7 +6,7 @@ import {msg} from './common';
 import type {Tr} from './common';
 
 export type PlanStep={id:string;title:string;detail:string|null;tool:string|null;targets:string[];risk:string;hints?:string[];deps:string[];state:string;needsApproval:boolean;parsed:string|null};
-export type Plan={id:string;source:'local'|'cloud';title:string;goal?:string;status:string;steps:PlanStep[];createdAt?:number;parsedFromText?:boolean;kind?:string};
+export type Plan={id:string;source:'local'|'cloud';title:string;goal?:string;status:string;steps:PlanStep[];createdAt?:number;parsedFromText?:boolean;kind?:string;runId?:string};
 
 const RISK_TONE:Record<string,'ok'|'warn'|'err'|undefined>={low:'ok',medium:'warn',high:'err'};
 const STATE_ICON:Record<string,string>={completed:'pass',running:'sync',failed:'error',pending:'circle-large-outline',interrupted:'warning',unknown:'question'};
@@ -30,6 +30,11 @@ export default function Plans({english,tr,focus,onStop,activeRun,reload}:{englis
    await new Promise(r=>setTimeout(r,400));await load();await reload();}
   catch(e){setError(msg(e));}finally{setBusy(false);}
  };
+ const decide=async(runId:string,action:'approve'|'deny')=>{
+  setBusy(true);setError('');
+  try{await api('/builder/runs/'+encodeURIComponent(runId)+'/'+action,{method:'POST',body:'{}'});await new Promise(r=>setTimeout(r,300));await load();await reload();}
+  catch(e){setError(msg(e));}finally{setBusy(false);}
+ };
  const ready=(p:Plan,s:PlanStep)=>s.needsApproval&&s.deps.every(d=>p.steps.find(x=>x.id===d)?.state==='completed');
  const safeToBatch=plan?plan.steps.filter(s=>plan.source==='local'&&ready(plan,s)&&s.risk==='low'):[];
  const riskLabel=(r:string)=>({low:tr('低','low'),medium:tr('中','medium'),high:tr('高','high'),unknown:tr('未知','unknown')} as Record<string,string>)[r]||r;
@@ -44,11 +49,15 @@ export default function Plans({english,tr,focus,onStop,activeRun,reload}:{englis
    <header><div><h2>{plan.title}</h2>{plan.goal&&<p>{plan.goal}</p>}</div>
     <div className="pl-actions">
      {safeToBatch.length>0&&<Button variant="primary" icon="check-all" disabled={busy} onClick={()=>void (async()=>{for(const s of safeToBatch)await approve(plan,s);})()}>{tr('批准全部低风险步骤','Approve all low-risk')} ({safeToBatch.length})</Button>}
+     {plan.kind==='native'&&plan.status==='awaiting-approval'&&plan.runId&&<>
+      <Button variant="primary" icon="check" disabled={busy} onClick={()=>void decide(plan.runId as string,'approve')}>{tr('批准计划','Approve plan')}</Button>
+      <Button icon="close" disabled={busy} onClick={()=>void decide(plan.runId as string,'deny')}>{tr('驳回，让它重做','Reject, ask it to revise')}</Button></>}
      {plan.source==='cloud'&&activeRun&&plan.status!=='done'&&<Button icon="debug-stop" onClick={()=>onStop(activeRun)}>{tr('停止云端运行','Stop the cloud run')}</Button>}
     </div></header>
    {error&&<Notice tone="err">{error}</Notice>}
    {plan.parsedFromText&&<Notice tone="warn">{tr('这份计划是模型写的文字，由平台按列表格式拆成步骤，可能不完全准确；风险无法判定，下面只是关键词提示。','This plan is free text written by the model; the platform split it into steps by list format, which may be inexact. Risk cannot be determined, only keyword hints are shown.')}</Notice>}
-   {plan.source==='cloud'&&<Notice>{tr('云端 CLI 自己决定每一步，平台无法逐步拦截；实际的约束来自你授权的范围（工具、预算、需批准的操作）。','The cloud CLI decides each step itself; the platform cannot gate steps one by one. The real limits are your mandate (tools, budget, actions needing approval).')}</Notice>}
+   {plan.kind==='native'?<Notice>{plan.status==='awaiting-approval'?tr('模型在等你批准这份计划，批准之前它不会动手。风险一列由平台按工具类型计算，不是模型自己说的。','The model is waiting for you to approve this plan and will not act before. The risk column is computed by the platform from each tool, not claimed by the model.'):tr('风险一列由平台按工具类型计算。每一次工具调用仍然由平台执行，需要批准的操作会在“总览”里等你。','The risk column is computed by the platform from each tool. Every tool call is still executed by the platform; actions needing approval wait for you on the Overview.')}</Notice>
+    :plan.source==='cloud'&&<Notice>{tr('云端 CLI 自己决定每一步，平台无法逐步拦截；实际的约束来自你授权的范围（工具、预算、需批准的操作）。','The cloud CLI decides each step itself; the platform cannot gate steps one by one. The real limits are your mandate (tools, budget, actions needing approval).')}</Notice>}
    <table className="pl-table"><thead><tr><th>#</th><th>{tr('步骤','Step')}</th><th>{tr('工具 / 对象','Tool / targets')}</th><th>{tr('风险','Risk')}</th><th>{tr('依赖','Needs')}</th><th>{tr('状态','State')}</th><th/></tr></thead>
     <tbody>{plan.steps.map((s,i)=><tr key={s.id} className={s.risk==='high'?'hi':''}>
      <td>{i+1}</td>

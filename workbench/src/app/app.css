@@ -38,3 +38,4 @@ fieldset{border:1px solid var(--border-strong);border-radius:var(--r);padding:8p
  --c-red:var(--err);--c-green:var(--ok);--c-amber:var(--warn);--c-red-bg:var(--diff-del);--c-green-bg:var(--diff-add);--c-amber-bg:var(--bg-widget);--c-blue-bg:var(--bg-select-inactive);
  --c-border-red:var(--err);--c-border-green:var(--ok);--c-border-amber:var(--warn);--c-selection:var(--bg-select);padding:8px 12px;color:var(--fg)}
 .legacy button{cursor:var(--cur-action)}.legacy button:disabled{cursor:var(--cur-disabled)}.legacy input,.legacy textarea,.legacy select{background:var(--bg-input);color:var(--fg);border:1px solid var(--border-strong);border-radius:var(--r)}
+.result{margin:0;padding:8px 12px;white-space:pre-wrap;word-break:break-word;max-height:40vh;overflow:auto;font-family:var(--font-ui)}

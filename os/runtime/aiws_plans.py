@@ -107,8 +107,25 @@ def parse_text(text):
     return " ".join(goal)[:300], steps
 
 
+def from_native(run_id, plan):
+    """A plan proposed by our own runner: structured, so risk is computed from each step's tool, like a local plan."""
+    steps = []
+    for i, st in enumerate(plan.get("steps") or [], 1):
+        tool = st.get("tool") if isinstance(st.get("tool"), str) else None
+        title = _clean(redact(st.get("title", ""), 160), 160)
+        steps.append({"id": "n%d" % i, "title": title, "detail": None, "tool": tool, "targets": [_clean(t, 120) for t in (st.get("targets") or [])][:3],
+                      "risk": risk_of(tool) if tool else "unknown", "hints": hints_of(title), "deps": ["n%d" % d for d in (st.get("deps") or []) if isinstance(d, int) and 1 <= d < i],
+                      "state": "pending", "needsApproval": False, "parsed": None})
+    seq = plan.get("seq") if isinstance(plan.get("seq"), int) else 1
+    return {"id": "cloud-" + re.sub(r"[^A-Za-z0-9_-]", "_", str(run_id))[:48] + "-native-%d" % seq, "source": "cloud", "kind": "native", "runId": str(run_id)[:64], "seq": seq,
+            "title": _clean(plan.get("title", ""), 120) or "DeepSeek plan", "goal": _clean(plan.get("goal", ""), 300), "status": "proposed",
+            "steps": steps[:MAX_STEPS], "createdAt": time.time(), "parsedFromText": False}
+
+
 def from_cloud(run_id, kind, payload):
-    """kind 'todo' or 'text'. Returns a plan in the common shape."""
+    """kind 'todo', 'text' or 'native'. Returns a plan in the common shape."""
+    if kind == "native":
+        return from_native(run_id, payload)
     if kind == "todo":
         steps, goal = from_todos(payload), ""
     else:
@@ -147,3 +164,65 @@ class PlanStore:
 
     def list(self):
         return sorted(self._read().values(), key=lambda p: p.get("createdAt") or 0, reverse=True)
+
+    def _modify(self, plan_id, fn):
+        data = self._read()
+        if plan_id not in data:
+            return False
+        fn(data[plan_id])
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp.chmod(0o600)
+        tmp.replace(self.path)
+        return True
+
+    def set_status(self, plan_id, status):
+        return self._modify(plan_id, lambda p: p.__setitem__("status", status))
+
+    def update_step(self, plan_id, step, state):
+        """step is 1-based. Marks the plan done when every step is completed, running while any is."""
+        def fn(p):
+            if isinstance(step, int) and 1 <= step <= len(p["steps"]) and state in ("running", "completed", "failed"):
+                p["steps"][step - 1]["state"] = state
+            states = {s["state"] for s in p["steps"]}
+            if states == {"completed"}:
+                p["status"] = "done"
+            elif "failed" in states:
+                p["status"] = "failed"
+            elif "running" in states or "completed" in states:
+                p["status"] = "running"
+        return self._modify(plan_id, fn)
+
+
+class ResultStore:
+    """The final answer of each run (bounded, private). Event store never holds message text, so the answer lives here."""
+    MAX = 30
+
+    def __init__(self, path):
+        self.path = Path(path)
+
+    def _read(self):
+        try:
+            d = json.loads(self.path.read_text(encoding="utf-8"))
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def put(self, run_id, text):
+        data = self._read()
+        data[str(run_id)[:64]] = {"text": str(text)[:20000], "ts": time.time()}
+        for k in sorted(data, key=lambda k: data[k]["ts"])[:max(0, len(data) - self.MAX)]:
+            data.pop(k)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp.chmod(0o600)
+        tmp.replace(self.path)
+
+    def last(self):
+        data = self._read()
+        if not data:
+            return None
+        k = max(data, key=lambda k: data[k]["ts"])
+        return {"runId": k, **data[k]}

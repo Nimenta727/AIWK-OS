@@ -15,9 +15,13 @@ import threading
 import time
 import uuid
 
-PROVIDERS = ("claude", "codex")
+from aiws_cloud_agent import NATIVE_TOOLS
+from aiws_deepseek import EFFORTS, MODELS
+
+PROVIDERS = ("claude", "codex", "deepseek")
+NATIVE_ONLY = ("model", "thinking", "effort", "planApproval")   # fields that only the in-house DeepSeek runner understands
 PERMISSION_MODES = ("default", "plan", "acceptEdits")       # never "bypassPermissions" / "dontAsk"
-APPROVAL_CATEGORIES = ("delete", "install-dependency", "git-push", "network", "shell", "outside-project")
+APPROVAL_CATEGORIES = ("delete", "install-dependency", "git-push", "network", "shell", "outside-project", "write")
 MAX_TURNS_LIMIT, MAX_MINUTES_LIMIT, MAX_TOKENS_LIMIT = 200, 480, 50_000_000
 MAX_EXPIRY_SECONDS = 7 * 24 * 3600
 TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}(\([^()\x00-\x1f]{1,80}\))?\Z")
@@ -36,11 +40,14 @@ def validate_mandate(data, workspace, now=None):
     """Return a normalised mandate dict or raise MandateError. `workspace` is the guest workspace root."""
     now = time.time() if now is None else now
     allowed = {"provider", "projectDir", "allowedTools", "permissionMode", "maxTurns", "tokenBudget",
-               "wallClockMinutes", "needApprovalFor", "requireMetering", "expiresInMinutes"}
+               "wallClockMinutes", "needApprovalFor", "requireMetering", "expiresInMinutes", *NATIVE_ONLY}
     if not isinstance(data, dict) or set(data) - allowed:
         raise MandateError("Unknown mandate fields")
     if data.get("provider") not in PROVIDERS:
-        raise MandateError("provider must be claude or codex")
+        raise MandateError("provider must be claude, codex or deepseek")
+    native = data["provider"] == "deepseek"
+    if not native and any(k in data for k in NATIVE_ONLY):
+        raise MandateError("model, thinking, effort and planApproval are only for the deepseek provider")
     project = data.get("projectDir")
     if not isinstance(project, str) or not project or len(project) > 200 or "\\" in project or project.startswith("/"):
         raise MandateError("projectDir must be a relative workspace folder")
@@ -57,10 +64,16 @@ def validate_mandate(data, workspace, now=None):
     if not target.is_dir() or target.resolve(strict=True) == root or not target.resolve(strict=True).is_relative_to(root):
         raise MandateError("projectDir must be an existing sub-folder of the workspace")
     tools = data.get("allowedTools")
-    if not isinstance(tools, list) or not 1 <= len(tools) <= 16:
-        raise MandateError("allowedTools needs 1-16 entries")
+    if not isinstance(tools, list) or not 1 <= len(tools) <= (len(NATIVE_TOOLS) if native else 16):
+        raise MandateError("allowedTools needs 1-%d entries" % (len(NATIVE_TOOLS) if native else 16))
     clean_tools = []
     for tool in tools:
+        if native:                                   # the runner has no shell at all: only its own named tools, never patterns
+            if tool not in NATIVE_TOOLS:
+                raise MandateError("Invalid tool entry")
+            if tool not in clean_tools:
+                clean_tools.append(tool)
+            continue
         if not isinstance(tool, str) or not TOOL_NAME.match(tool):
             raise MandateError("Invalid tool entry")
         if tool in UNRESTRICTED:
@@ -86,7 +99,19 @@ def validate_mandate(data, workspace, now=None):
     if not isinstance(metering, bool):
         raise MandateError("requireMetering must be true or false")
     minutes = _int(data.get("expiresInMinutes", 24 * 60), 1, MAX_EXPIRY_SECONDS // 60, "expiresInMinutes")
-    return {"provider": data["provider"], "projectDir": "/".join(parts), "allowedTools": clean_tools,
+    extra = {}
+    if native:
+        model = data.get("model", MODELS[0])
+        if model not in MODELS:
+            raise MandateError("model is not one of the supported DeepSeek models")
+        effort = data.get("effort", "high")
+        if effort not in EFFORTS:
+            raise MandateError("effort must be low, high or max")
+        thinking, plan_approval = data.get("thinking", True), data.get("planApproval", True)
+        if not isinstance(thinking, bool) or not isinstance(plan_approval, bool):
+            raise MandateError("thinking and planApproval must be true or false")
+        extra = {"model": model, "thinking": thinking, "effort": effort, "planApproval": plan_approval}
+    return {**extra, "provider": data["provider"], "projectDir": "/".join(parts), "allowedTools": clean_tools,
             "permissionMode": mode, "maxTurns": _int(data.get("maxTurns"), 1, MAX_TURNS_LIMIT, "maxTurns"),
             "tokenBudget": {"input": _int(budget["input"], 1, MAX_TOKENS_LIMIT, "tokenBudget.input"),
                             "output": _int(budget["output"], 1, MAX_TOKENS_LIMIT, "tokenBudget.output")},
