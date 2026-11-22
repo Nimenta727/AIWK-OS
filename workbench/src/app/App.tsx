@@ -23,6 +23,8 @@ import {api,onCsrfChange,refreshCsrf} from '../os/api';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
 import {closeTab,cycleTab,fileTabId,fileTitle,flattenTree,isEditableTarget,loadPrefs,matchKey,openTab,savePrefs} from '../model/shell.mjs';
 import {msg} from './common';
+import {LangProvider} from '../ui/lang';
+import {setLang} from '../os/lang';
 
 type TreeNode={name:string;path:string;type:'dir'|'file';children:TreeNode[]};
 type AppRow={id:string;kind:string;category:string;zh:string;en:string;installed:boolean;path:string|null;launchable:boolean};
@@ -43,7 +45,7 @@ const writeNum=(k:string,v:number)=>{try{window.localStorage.setItem(k,String(v)
 export default function App(){
  const storage=useMemo(store,[]);
  const initial=useMemo(()=>loadPrefs(storage||({getItem:()=>null} as unknown as Storage)),[storage]);
- const [english,setEnglish]=useState(false);
+ const [english,setEnglish]=useState<boolean>(()=>{try{const v=window.localStorage.getItem('aiws.lang');if(v==='en')return true;if(v==='zh')return false;}catch{/* optional */}return !(navigator.language||'zh').toLowerCase().startsWith('zh');});
  const tr=useCallback((zh:string,en:string)=>english?en:zh,[english]);
  const [theme,setTheme]=useState<'dark'|'light'>(initial.theme as 'dark'|'light');
  const [sidebar,setSidebar]=useState<boolean>(initial.sidebar);
@@ -68,7 +70,7 @@ export default function App(){
  const data=useObservatoryData();
  const s=data.summary;
 
- useEffect(()=>{document.documentElement.dataset.theme=theme;document.documentElement.lang=english?'en':'zh-CN';},[theme,english]);
+ useEffect(()=>{document.documentElement.dataset.theme=theme;document.documentElement.lang=english?'en':'zh-CN';document.title=english?'AIWS · AI Workbench':'AIWS · AI 工作台';setLang(english?'en':'zh');try{window.localStorage.setItem('aiws.lang',english?'en':'zh');}catch{/* optional */}},[theme,english]);
  useEffect(()=>{if(storage)savePrefs(storage,{theme,sidebar,panel,activity});},[storage,theme,sidebar,panel,activity]);
  useEffect(()=>{writeNum('aiws.sbw',sbW);},[sbW]);useEffect(()=>{writeNum('aiws.bph',bpH);},[bpH]);
  const loadTree=useCallback(async()=>{try{const t=await api<{files:string[];dirs?:string[]}>('/workspace/tree');setTree(buildTree(t.files,t.dirs) as TreeNode[]);}catch(e){setNote(msg(e));}},[]);
@@ -169,7 +171,7 @@ export default function App(){
   }
  };
  const modelOnline=s?.status.localModel.online;
- return <div className="app">
+ return <LangProvider english={english}><div className="app">
   <a className="skip" href="#editor">{tr('跳到内容','Skip to content')}</a>
   <header className="titlebar"><Icon name="circuit-board"/><strong>AIWS</strong><span className="grow">{workspace?workspace.split('/').pop():''}</span>
    <Button variant="ghost" icon="search" onClick={()=>setPalette(true)}>{tr('命令','Commands')} <kbd>Ctrl+Shift+P</kbd></Button></header>
@@ -194,5 +196,5 @@ export default function App(){
    right={[{id:'audit',icon:s?.verdict.level==='red'?'error':s?.verdict.level==='yellow'?'warning':'pass',tone:s?.verdict.level==='red'?'err':s?.verdict.level==='yellow'?'warn':'ok',text:tr('审计','Audit'),title:s?.verdict.sentences[0]?(english?s.verdict.sentences[0].en:s.verdict.sentences[0].zh):undefined},
     {id:'panel',icon:'layout-panel',text:tr('面板','Panel'),onClick:()=>setPanel(x=>!x)}]}/>
   {palette&&<Palette commands={commands} onClose={()=>setPalette(false)} placeholder={tr('输入命令…','Type a command…')} empty={tr('没有匹配的命令','No matching command')}/>}
- </div>;
+ </div></LangProvider>;
 }

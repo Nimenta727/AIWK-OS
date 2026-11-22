@@ -4,6 +4,8 @@
  * token fetched once at page load can go stale ("Invalid CSRF"). All mutating calls therefore go through here:
  * the token is attached automatically (callers' own X-AIWS-CSRF headers are overridden), fetched lazily when
  * missing, and refreshed + retried exactly once when the service answers 403 "Invalid CSRF". */
+import {localizeError} from '../model/errors.mjs';
+import {getLang} from './lang';
 let csrfToken='';
 let csrfPending:Promise<string>|null=null;
 const listeners=new Set<(token:string)=>void>();
@@ -23,7 +25,7 @@ export function refreshCsrf():Promise<string>{
   csrfPending=fetch('/api/v1/session',{cache:'no-store',credentials:'omit'})
    .then(async r=>{
     const body=await r.json() as {csrf?:string;error?:string};
-    if(!r.ok||typeof body.csrf!=='string'||!body.csrf)throw new Error(body.error||'Session unavailable');
+    if(!r.ok||typeof body.csrf!=='string'||!body.csrf)throw new Error(localizeError(body.error||'Session unavailable',getLang()==='en'));
     setToken(body.csrf);
     return body.csrf;
    })
@@ -56,6 +58,6 @@ export async function api<T>(url:string,options?:RequestInit):Promise<T>{
   response=await send(url,options,true);
   data=await response.json().catch(()=>({error:'Invalid response from guest service'})) as T&{error?:string};
  }
- if(!response.ok)throw new Error(data.error||'Guest service request failed');
+ if(!response.ok)throw new Error(localizeError(data.error||'Guest service request failed',getLang()==='en'));
  return data;
 }

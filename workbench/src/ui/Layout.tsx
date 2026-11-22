@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {ReactNode} from 'react';
 import {Icon,IconButton} from './kit';
+import {useTr} from './lang';
 import {filterCommands} from '../model/shell.mjs';
 
 export type Tab={id:string;title:string;icon?:string;pinned?:boolean;dirty?:boolean};
@@ -19,7 +20,8 @@ export function Sash({dir,value,min,max,onChange,invert,label}:{dir:'x'|'y';valu
 }
 
 export function ActivityBar({items,active,open,onSelect,bottom}:{items:{id:string;label:string;icon:string;badge?:number}[];active:string;open:boolean;onSelect:(id:string)=>void;bottom:{id:string;label:string;icon:string;onClick:()=>void}[]}){
- return <nav className="ab" aria-label="Views">
+ const tr=useTr();
+ return <nav className="ab" aria-label={tr('视图','Views')}>
   <div>{items.map(i=><button key={i.id} type="button" className={'ab-item'+(open&&active===i.id?' on':'')} title={i.label} aria-label={i.label} aria-pressed={open&&active===i.id} onClick={()=>onSelect(i.id)}>
    <Icon name={i.icon}/>{i.badge?<span className="ab-badge">{i.badge>99?'99+':i.badge}</span>:null}</button>)}</div>
   <div>{bottom.map(b=><button key={b.id} type="button" className="ab-item" title={b.label} aria-label={b.label} onClick={b.onClick}><Icon name={b.icon}/></button>)}</div>
@@ -43,9 +45,10 @@ export function Tabs({tabs,active,onActivate,onClose,closeLabel}:{tabs:Tab[];act
 }
 
 export function BottomPanel({tabs,active,onSelect,onClose,children,actions}:{tabs:{id:string;label:string;count?:number}[];active:string;onSelect:(id:string)=>void;onClose:()=>void;children:ReactNode;actions?:ReactNode}){
- return <section className="bp" aria-label="Panel">
+ const tr=useTr();
+ return <section className="bp" aria-label={tr('面板','Panel')}>
   <header><div role="tablist">{tabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={t.id===active} className={t.id===active?'on':''} onClick={()=>onSelect(t.id)}>{t.label}{t.count?<em>{t.count}</em>:null}</button>)}</div>
-   <div>{actions}<IconButton icon="close" label="Close panel" onClick={onClose}/></div></header>
+   <div>{actions}<IconButton icon="close" label={tr('关闭面板','Close panel')} onClick={onClose}/></div></header>
   <div className="bp-body">{children}</div>
  </section>;
 }
@@ -59,6 +62,7 @@ export function StatusBar({left,right}:{left:StatusItem[];right:StatusItem[]}){
 
 /** Command palette: type to filter, ↑/↓ to move, Enter to run, Esc to close; focus returns to the opener. */
 export function Palette({commands,onClose,placeholder,empty}:{commands:Command[];onClose:()=>void;placeholder:string;empty:string}){
+ const tr=useTr();
  const [q,setQ]=useState('');const [i,setI]=useState(0);const input=useRef<HTMLInputElement>(null);
  const opener=useRef<Element|null>(document.activeElement);
  const shown=useMemo(()=>(filterCommands(commands,q) as Command[]).slice(0,12),[commands,q]);
@@ -66,7 +70,7 @@ export function Palette({commands,onClose,placeholder,empty}:{commands:Command[]
  useEffect(()=>setI(0),[q]);
  const run=useCallback((c?:Command)=>{if(!c)return;onClose();c.run();},[onClose]);
  return <div className="pal-back" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
-  <div className="pal" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div className="pal" role="dialog" aria-modal="true" aria-label={tr('命令面板','Command palette')}>
    <input ref={input} className="k-input" value={q} placeholder={placeholder} aria-label={placeholder} role="combobox" aria-expanded="true" aria-controls="pal-list" aria-activedescendant={shown[i]?'pal-'+shown[i].id:undefined}
     onChange={e=>setQ(e.target.value)} onKeyDown={e=>{
      if(e.key==='Escape'){e.preventDefault();onClose();}

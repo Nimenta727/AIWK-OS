@@ -1,10 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {transformSync} from 'esbuild';
-import {readFileSync} from 'node:fs';
+import {buildSync} from 'esbuild';
 
-// api.ts is TypeScript; compile it on the fly so the real module is what gets tested.
-const code=transformSync(readFileSync(new URL('../src/os/api.ts',import.meta.url),'utf8'),{loader:'ts',format:'esm'}).code;
+// api.ts is TypeScript with imports; bundle it on the fly so the real module (and its error translation) is what gets tested.
+const code=buildSync({entryPoints:[new URL('../src/os/api.ts',import.meta.url).pathname],bundle:true,format:'esm',write:false,logLevel:'silent'}).outputFiles[0].text;
 const load=()=>import('data:text/javascript;base64,'+Buffer.from(code).toString('base64')+'#'+Math.random());
 
 function fakeServer(){
@@ -36,10 +35,17 @@ test('a stale token is refreshed and the request retried exactly once',async()=>
 test('a persistent 403 is surfaced, not retried forever',async()=>{
  const s=fakeServer();const {api}=await load();
  globalThis.fetch=async(url)=>url==='/api/v1/session'?{ok:true,status:200,json:async()=>({csrf:'a'})}:{ok:false,status:403,json:async()=>({error:'Invalid CSRF'})};
- await assert.rejects(api('/x',{method:'POST',body:'{}'}),/Invalid CSRF/);
+ await assert.rejects(api("/x",{method:"POST",body:"{}"}),/令牌/);   // surfaced (in the default Chinese UI language)
 });
 test('GET never sends a token and listeners hear token changes',async()=>{
  const s=fakeServer();const {api,onCsrfChange,refreshCsrf}=await load();
  await api('/snapshot');assert.equal(s.calls[0].csrf,null);
  const seen=[];onCsrfChange(t=>seen.push(t));await refreshCsrf();assert.deepEqual(seen,['t1']);
+});
+
+test('service errors are shown in the current language',async()=>{
+ fakeServer();
+ globalThis.fetch=async(url)=>url==='/api/v1/session'?{ok:true,status:200,json:async()=>({csrf:'a'})}:{ok:false,status:400,json:async()=>({error:'Not a folder'})};
+ const {api}=await load();
+ await assert.rejects(api('/x'),/不是文件夹/);   // default language is Chinese
 });
