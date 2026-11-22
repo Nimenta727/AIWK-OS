@@ -18,9 +18,9 @@ import time
 from urllib.request import urlopen
 from aiws_guest_boundary import _mounts, FORBIDDEN_FILESYSTEMS
 
-DIGEST=re.compile(r"^[a-f0-9]{64}$")
-RELEASE=re.compile(r"^[A-Za-z0-9._+-]{1,90}$")
-NAME=re.compile(r"^[A-Za-z0-9._+-]{1,120}$")
+DIGEST=re.compile(r"^[a-f0-9]{64}\Z")
+RELEASE=re.compile(r"^[A-Za-z0-9._+-]{1,90}\Z")
+NAME=re.compile(r"^[A-Za-z0-9._+-]{1,120}\Z")
 TRIES=3
 KNOWN_GOOD="aiws-A.conf"
 TRY_ENTRY="aiws-B+3.conf"

@@ -31,7 +31,7 @@ IDLE_TIMEOUT = 120.0
 MAX_TUNNEL_SECONDS = 3600.0
 MAX_TUNNEL_BYTES = 2 * 1024 ** 3
 MAX_CONNECTIONS = 16
-LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\Z")
 LOG_LIMIT = 1024 * 1024
 
 class PolicyError(ValueError):

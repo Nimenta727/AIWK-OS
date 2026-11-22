@@ -21,6 +21,8 @@ aiws_permission_broker.py
 aiws_guest_boundary.py
 aiws_guest_ops.py
 aiws_boot_slots.py
+aiws_workdisk.py
+aiws_sysverify.py
 
 # Local model and router
 aiws_local_model.py

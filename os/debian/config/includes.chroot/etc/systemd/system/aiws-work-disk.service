@@ -1,0 +1,19 @@
+[Unit]
+Description=AIWS work disk (separate disk, noexec, snapshots)
+Documentation=file:///usr/local/share/aiws/docs/AIWS_DUAL_DISK.md
+# live-config creates the login user; the ACLs below name it
+After=local-fs.target live-config.service
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/lib/aiws/aiws_workdisk.py setup
+ExecStartPost=-/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/aiws-work.conf
+NoNewPrivileges=yes
+PrivateTmp=yes
+# A missing second disk is a normal state (the workbench says so); it must not fail the boot.
+SuccessExitStatus=1
+
+[Install]
+WantedBy=multi-user.target

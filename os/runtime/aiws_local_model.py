@@ -29,7 +29,7 @@ MAX_STEPS = 8
 READ_TOOLS = frozenset(PLANE_READ_TOOLS)
 MODEL_WRITE_TOOLS = frozenset({"file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "app.launch"})
 FINGERPRINTED = frozenset({"file.copy", "file.move", "file.trash"})
-TRASH_ID = re.compile(r"^[a-f0-9]{32}$")
+TRASH_ID = re.compile(r"^[a-f0-9]{32}\Z")
 # Token thrift (step O5): small outputs by default, a larger budget only when the request looks multi-step,
 # and a single retry only if the server reports the answer was cut off (finish_reason == "length").
 TOKENS_SINGLE, TOKENS_PLAN, TOKENS_RETRY = 192, 512, 640

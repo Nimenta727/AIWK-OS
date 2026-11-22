@@ -62,8 +62,11 @@ class ModelGate:
     def __init__(self, child_argv, listen_port=18080, child_port=18081, idle_seconds=300.0, start_timeout=180.0,
                  request_timeout=180.0, queue_timeout=60.0, allowed_names=("llama-server",), popen=subprocess.Popen, clock=time.monotonic):
         self.argv = validate_child_argv(child_argv, child_port, allowed_names)
-        if not 0.2 <= idle_seconds <= 86400:
-            raise GateError("idle_seconds must be between 0.2 and 86400")
+        # idle_seconds == 0 means RESIDENT: the model is loaded at start-up, never unloaded for being idle, and is restarted
+        # if it dies. Right for a dedicated GPU (nothing else needs that memory); the idle unload is for shared CPU RAM.
+        if idle_seconds != 0 and not 0.2 <= idle_seconds <= 86400:
+            raise GateError("idle_seconds must be 0 (resident) or between 0.2 and 86400")
+        self.resident = idle_seconds == 0
         self.child_port, self.idle_seconds = child_port, idle_seconds
         self.start_timeout, self.request_timeout, self.queue_timeout = start_timeout, request_timeout, queue_timeout
         self.popen, self.clock = popen, clock
@@ -159,8 +162,26 @@ class ModelGate:
             except (OSError, subprocess.TimeoutExpired):
                 pass
 
+    def _keep_resident(self):
+        """Resident mode: (re)start the model whenever it is not running. A failing model is retried only after the
+        crash cooldown that ensure_loaded() already enforces, so a broken model cannot spin the CPU."""
+        with self.lock:
+            needs = not self.loaded() and self.clock() >= self.cooldown_until and self.inflight == 0
+        if needs:
+            try:
+                self.ensure_loaded()
+                self.stats["residentRestarts"] = self.stats.get("residentRestarts", 0) + (1 if self.stats["coldStarts"] > 1 else 0)
+            except GateError:
+                pass
+
     def _monitor(self):
+        tick = 0
         while not self.stop.wait(0.2):
+            tick += 1
+            if self.resident:
+                if tick % 5 == 1:                       # about once a second
+                    self._keep_resident()
+                continue
             with self.lock:
                 if (self.child is not None and self.child.poll() is None and self.inflight == 0
                         and self.clock() - self.last_activity > self.idle_seconds):
@@ -202,7 +223,7 @@ class ModelGate:
     def status(self):
         with self.lock:
             pid = self.child.pid if self.loaded() else None
-            data = {"gate": True, "loaded": pid is not None, "childPid": pid, "idleSeconds": self.idle_seconds,
+            data = {"gate": True, "loaded": pid is not None, "childPid": pid, "idleSeconds": self.idle_seconds, "resident": self.resident,
                     "secondsSinceLastRequest": round(self.clock() - self.last_activity, 1), "inflight": self.inflight, **self.stats}
         data.update(read_rss_mib(pid) if pid else {"rssMiB": None, "peakRssMiB": None})
         return data
@@ -305,13 +326,14 @@ def main():
     parser.add_argument("--listen-port", type=int, default=18080)
     parser.add_argument("--child-port", type=int, default=18081)
     parser.add_argument("--idle-seconds", type=float, default=300.0)
+    parser.add_argument("--resident", action="store_true", help="keep the model loaded and restart it if it dies")
     parser.add_argument("child", nargs=argparse.REMAINDER, help="-- llama-server ...")
     args = parser.parse_args()
     child = args.child[1:] if args.child and args.child[0] == "--" else args.child
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         parser.error("The model gate must not run as root")
     try:
-        gate = ModelGate(child, listen_port=args.listen_port, child_port=args.child_port, idle_seconds=args.idle_seconds)
+        gate = ModelGate(child, listen_port=args.listen_port, child_port=args.child_port, idle_seconds=0 if args.resident else args.idle_seconds)
     except GateError as exc:
         parser.error(str(exc))
     signal.signal(signal.SIGTERM, lambda *a: (gate.close(), sys.exit(0)))

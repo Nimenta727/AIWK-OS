@@ -25,7 +25,7 @@ SCOPES = ("delta", "total", "turn")      # turn: reported per turn, cumulative-v
 UNRECOGNIZED = "unrecognized"            # detail marker for provider events we do not understand
 MAX_EVENTS_PER_SESSION = 20000
 MAX_TOKEN = 10 ** 12
-SAFE_NAME = re.compile(r"^[A-Za-z0-9_.:\-]{1,64}$")
+SAFE_NAME = re.compile(r"^[A-Za-z0-9_.:\-]{1,64}\Z")
 SECRET = re.compile(r"(?i)\b([A-Za-z0-9_]*(?:token|secret|password|passwd|api[_-]?key|authorization))\b\s*[=:]\s*(?:bearer\s+)?\S+")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}")

@@ -6,7 +6,7 @@ import './app.css';
 import '../os/OsWorkbench.css';
 import {ActivityBar,BottomPanel,Palette,Sash,SideBar,StatusBar,Tabs} from '../ui/Layout';
 import type {Command,Tab} from '../ui/Layout';
-import {Button,IconButton,Icon,Row,Section} from '../ui/kit';
+import {Button,IconButton,Icon,Notice,Row,Section} from '../ui/kit';
 import Home from './Home';
 import Plans from './Plans';
 import AgentTree from './AgentTree';
@@ -58,6 +58,8 @@ export default function App(){
  const [csrf,setCsrf]=useState('');
  const [caps,setCaps]=useState<Cap[]>([]);
  const [workspace,setWorkspace]=useState('');
+ type Health={systemVerify:{ok:boolean;modified:string[];missing:string[];unlisted:string[];error:string|null}|null;workDisk:boolean};
+ const [health,setHealth]=useState<Health|null>(null);
  const [tree,setTree]=useState<TreeNode[]>([]);
  const [expanded,setExpanded]=useState<Set<string>>(new Set());
  const [apps,setApps]=useState<AppRow[]>([]);
@@ -73,7 +75,7 @@ export default function App(){
  useEffect(()=>{
   const off=onCsrfChange(setCsrf);
   void refreshCsrf().catch(e=>setNote(msg(e)));
-  void api<{capabilities:Cap[];health:{workspace:string}}>('/snapshot').then(x=>{setCaps(x.capabilities);setWorkspace(x.health.workspace||'');}).catch(e=>setNote(msg(e)));
+  void api<{capabilities:Cap[];health:{workspace:string}&Health}>('/snapshot').then(x=>{setCaps(x.capabilities);setWorkspace(x.health.workspace||'');setHealth(x.health);}).catch(e=>setNote(msg(e)));
   void api<{apps:AppRow[]}>('/apps').then(x=>setApps(x.apps)).catch(()=>setApps([]));
   void loadTree();
   return off;
@@ -176,6 +178,7 @@ export default function App(){
     bottom={[{id:'theme',label:tr('切换主题','Toggle theme'),icon:'color-mode',onClick:()=>setTheme(x=>x==='dark'?'light':'dark')},{id:'lang',label:tr('切换语言','Language'),icon:'globe',onClick:()=>setEnglish(x=>!x)}]}/>
    {sidebar&&<><div style={{width:sbW,display:'flex'}}>{side()}</div><Sash dir="x" value={sbW} min={180} max={520} onChange={setSbW} label={tr('调整侧边栏宽度','Resize side bar')}/></>}
    <div className="center">
+    {health?.systemVerify&&!health.systemVerify.ok&&<Notice tone="err">{tr('系统文件与镜像清单不一致：','System files differ from the image manifest: ')}{health.systemVerify.error||[...health.systemVerify.modified.map(x=>x+' ('+tr('被改','modified')+')'),...health.systemVerify.missing.map(x=>x+' ('+tr('缺失','missing')+')'),...health.systemVerify.unlisted.map(x=>x+' ('+tr('多出','unlisted')+')')].slice(0,4).join(', ')}</Notice>}
     <Tabs tabs={tabList} active={active} onActivate={setActive} onClose={close} closeLabel={tr('关闭','Close')}/>
     <main id="editor" className="editor" tabIndex={-1}>{pageOf(active)}</main>
     {panel&&<><Sash dir="y" value={bpH} min={80} max={480} invert onChange={setBpH} label={tr('调整面板高度','Resize panel')}/>
@@ -186,6 +189,7 @@ export default function App(){
   <StatusBar left={[
    {id:'model',icon:'hubot',text:modelOnline?tr('本地模型在线','Local model online'):s?.status.localModel.configured?tr('本地模型待机','Local model idle'):tr('本地模型未配置','Local model off'),onClick:()=>open('model')},
    {id:'build',icon:'rocket',text:tr('构建 ','Build ')+(s?.status.builder.state||'–'),onClick:()=>open('build')},
+   ...(health?.systemVerify?[{id:'wd',icon:'database',text:health.workDisk?tr('工作盘','Work disk'):tr('无工作盘','No work disk'),tone:health.workDisk?undefined:('warn' as const),title:tr('AI 的工作区放在独立的工作盘上（只读系统盘、工作盘不可执行）','The AI works on a separate disk (system read-only, work disk noexec)')}]:[]),
    ...(approvals?[{id:'appr',icon:'bell',text:approvals+' '+tr('待审批','to review'),tone:'warn' as const,onClick:()=>open('plans')}]:[])]}
    right={[{id:'audit',icon:s?.verdict.level==='red'?'error':s?.verdict.level==='yellow'?'warning':'pass',tone:s?.verdict.level==='red'?'err':s?.verdict.level==='yellow'?'warn':'ok',text:tr('审计','Audit'),title:s?.verdict.sentences[0]?(english?s.verdict.sentences[0].en:s.verdict.sentences[0].zh):undefined},
     {id:'panel',icon:'layout-panel',text:tr('面板','Panel'),onClick:()=>setPanel(x=>!x)}]}/>

@@ -56,5 +56,19 @@ class Api(unittest.TestCase):
             self.assertEqual(self.get("/api/v1/observatory/tree?session=" + bad.replace(" ", "%20"))[0], 400, bad)
         self.assertEqual(self.get("/api/v1/observatory/tree?session=unknown")[1]["count"], 1)   # unknown session: just the root
 
+class HealthFlags(Api):
+    def test_health_reports_system_verify_and_work_disk(self):
+        import aiws_sysverify
+        self.assertIsNone(self.get("/api/v1/health")[1]["systemVerify"] if not os.path.exists(aiws_sysverify.RESULT) else None)
+        result = Path(self.temp.name) / "verify.json"
+        result.write_text(json.dumps({"ok": False, "modified": ["/usr/local/lib/aiws/x.py"], "missing": [], "unlisted": ["y" * 500]}))
+        with patch.object(aiws_sysverify, "RESULT", str(result)):
+            v = self.get("/api/v1/health")[1]["systemVerify"]
+        self.assertFalse(v["ok"]); self.assertEqual(v["modified"], ["/usr/local/lib/aiws/x.py"]); self.assertEqual(len(v["unlisted"][0]), 200)
+        result.write_text("not json")
+        with patch.object(aiws_sysverify, "RESULT", str(result)):
+            self.assertIsNone(self.get("/api/v1/health")[1]["systemVerify"])
+        self.assertIn("workDisk", self.get("/api/v1/health")[1])
+
 if __name__ == "__main__":
     unittest.main()

@@ -19,7 +19,7 @@ from aiws_toolplane import _path
 
 MODEL_ID = "Qwen/Qwen3.5-2B"
 MAX_BYTES = 4 * 1024 * 1024 * 1024
-DIGEST = re.compile(r"^[a-f0-9]{64}$")
+DIGEST = re.compile(r"^[a-f0-9]{64}\Z")
 
 class ModelArtifactError(ValueError):
     pass

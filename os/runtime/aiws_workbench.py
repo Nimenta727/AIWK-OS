@@ -32,6 +32,7 @@ import aiws_capabilities
 import aiws_changes
 import aiws_agent_tree
 import aiws_plans
+import aiws_sysverify
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore, MandateError
@@ -183,6 +184,20 @@ class Controller:
         self.capabilities.refresh()
         return result
 
+    @staticmethod
+    def _system_verify():
+        """Result of the boot-time system file check (bounded read; None when it has not run, e.g. outside the image)."""
+        try:
+            with open(aiws_sysverify.RESULT, "rb") as fh:
+                data = json.loads(fh.read(65536))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        return {"ok": data.get("ok") is True, "modified": [str(x)[:200] for x in (data.get("modified") or [])[:20]],
+                "missing": [str(x)[:200] for x in (data.get("missing") or [])[:20]],
+                "unlisted": [str(x)[:200] for x in (data.get("unlisted") or [])[:20]], "error": str(data.get("error", ""))[:120] or None}
+
     def system_op(self, kind, payload):
         """Display / input method / network / power. Strict per-operation payloads, a shared 2 s rate limit."""
         now = time.monotonic()
@@ -281,6 +296,8 @@ class Controller:
                 "agentPrivileged": False, "guestOnly": True,
                 "workspace": str(self.workspace),
                 "desktopInstalled": bool(shutil.which("openbox")),
+                "systemVerify": self._system_verify(),
+                "workDisk": os.path.ismount("/srv/aiws-work"),
                 "displayManagerInstalled": bool(shutil.which("lightdm")),
                 "uiBundled": (self.ui / "index.html").is_file(),
                 "toolCount": len(EXPOSED) + len(GUEST_OP_TOOLS), "tasksPersistent": True,

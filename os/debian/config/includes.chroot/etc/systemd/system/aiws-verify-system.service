@@ -1,0 +1,19 @@
+[Unit]
+Description=AIWS system file integrity check
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/lib/aiws/aiws_sysverify.py
+# Exit 1 means "files differ": recorded in /run/aiws/system-verify.json and shown by the workbench; it must not block boot.
+SuccessExitStatus=1
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+RuntimeDirectory=aiws
+RuntimeDirectoryPreserve=yes
+
+[Install]
+WantedBy=multi-user.target

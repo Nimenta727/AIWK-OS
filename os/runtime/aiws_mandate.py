@@ -20,7 +20,7 @@ PERMISSION_MODES = ("default", "plan", "acceptEdits")       # never "bypassPermi
 APPROVAL_CATEGORIES = ("delete", "install-dependency", "git-push", "network", "shell", "outside-project")
 MAX_TURNS_LIMIT, MAX_MINUTES_LIMIT, MAX_TOKENS_LIMIT = 200, 480, 50_000_000
 MAX_EXPIRY_SECONDS = 7 * 24 * 3600
-TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}(\([^()\x00-\x1f]{1,80}\))?$")
+TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}(\([^()\x00-\x1f]{1,80}\))?\Z")
 UNRESTRICTED = {"Bash", "bash", "*", "Shell", "shell", "Bash(*)", "Bash(:*)"}
 DANGEROUS_PATTERN = re.compile(r"(?i)\b(sudo|su|rm|dd|mkfs|chmod|chown|curl|wget|nc|ncat|ssh|scp|eval|exec)\b|[;&|`$<>]")
 

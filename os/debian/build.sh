@@ -136,6 +136,11 @@ chmod 755 "$out/config/includes.chroot/usr/local/bin/aiws-broker" \
   "$out/config/includes.chroot/usr/local/bin/aiws-open-workbench" \
   "$out/config/includes.chroot/usr/local/bin/aiws-boot-smoke"
 echo "Building AIWS OS Live ISO using Debian package repositories..."
+# System file manifest (the LAST staging step, so it covers everything above): the guest re-checks it at every boot
+# (aiws-verify-system.service) because the live system's writable overlay would otherwise hide a modified file.
+mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/docs"
+cp -- "$repo/docs/AIWS_DUAL_DISK.md" "$out/config/includes.chroot/usr/local/share/aiws/docs/AIWS_DUAL_DISK.md"
+python3 "$repo/os/runtime/aiws_sysverify.py" build "$out/config/includes.chroot/usr/local/share/aiws/system.sha256.json" "$out/config/includes.chroot"
 lb build
 iso="$out/live-image-amd64.hybrid.iso"
 if [[ ! -s "$iso" ]]; then echo "ERROR: live-build did not produce expected ISO ($iso)" >&2; exit 1; fi

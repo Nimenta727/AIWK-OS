@@ -22,7 +22,11 @@ fi
 idle="${AIWS_MODEL_IDLE_SECONDS:-300}"
 case "$idle" in ''|*[!0-9]*) idle=300 ;; esac
 if [ "$idle" -lt 30 ] || [ "$idle" -gt 86400 ]; then idle=300; fi
-exec python3 /usr/local/lib/aiws/aiws_model_gate.py --listen-port 18080 --child-port 18081 --idle-seconds "$idle" -- \
+# Resident by default: the model is loaded at start-up, is not unloaded for being idle, and is restarted if it dies.
+# Set AIWS_MODEL_RESIDENT=0 on a machine short of RAM to get the old lazy-start / idle-unload behaviour back.
+resident=--resident
+[ "${AIWS_MODEL_RESIDENT:-1}" = "0" ] && resident=
+exec python3 /usr/local/lib/aiws/aiws_model_gate.py --listen-port 18080 --child-port 18081 --idle-seconds "$idle" $resident -- \
   llama-server --model "$model" --alias aiws-local \
   --host 127.0.0.1 --port 18081 --ctx-size 4096 \
   --gpu-layers 0 --parallel 1
