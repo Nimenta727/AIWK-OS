@@ -69,7 +69,7 @@ def validate_isolation(value):
 def load_builder_config(path=None):
     """~/.config/aiws/builder.json: strict, default DISABLED."""
     path = Path(path) if path is not None else Path.home() / ".config/aiws/builder.json"
-    config = {"enabled": False, "envAllow": [], "isolation": dict(ISOLATION_DEFAULT)}
+    config = {"enabled": False, "envAllow": [], "isolation": dict(ISOLATION_DEFAULT), "execWithoutIsolation": False}
     if path.is_symlink():
         raise SupervisorError("Builder config must not be a symlink")
     if not path.exists():
@@ -88,6 +88,11 @@ def load_builder_config(path=None):
         if not isinstance(data["enabled"], bool):
             raise SupervisorError("enabled must be true or false")
         config["enabled"] = data["enabled"]
+    if "execWithoutIsolation" in data:
+        # DANGEROUS: lets model-written programs run with YOUR privileges (they could read your files and key). Off unless you say so.
+        if not isinstance(data["execWithoutIsolation"], bool):
+            raise SupervisorError("execWithoutIsolation must be true or false")
+        config["execWithoutIsolation"] = data["execWithoutIsolation"]
     if "envAllow" in data:
         names = data["envAllow"]
         if (not isinstance(names, list) or len(names) > 8
@@ -389,6 +394,7 @@ class Supervisor:
             if native:
                 run.stdin = proc.stdin
                 init = {"t": "init", "key": key, "task": prompt, "project": cwd, "language": "en" if language == "en" else "zh",
+                        "exec": iso is not None or bool(self.config().get("execWithoutIsolation")),
                         "deadlineSeconds": mandate["wallClockMinutes"] * 60,
                         "mandate": {**{k: mandate[k] for k in ("allowedTools", "model", "thinking", "effort", "maxTurns", "wallClockMinutes", "needApprovalFor", "planApproval")},
                                     "tokenBudget": {"input": remaining["input"], "output": remaining["output"]}}}
@@ -436,6 +442,7 @@ class Supervisor:
         isolation = (self.config().get("isolation") or ISOLATION_DEFAULT)
         return {"enabled": bool(self.config().get("enabled")), "isolation": {"mode": isolation.get("mode", "none"),
                                                                               "user": isolation.get("user", "aiws-builder")},
+                "execAllowed": isolation.get("mode", "none") == "user" or bool(self.config().get("execWithoutIsolation")),
                 "active": current,
                 "runs": self.mandates.runs(5)}
 

@@ -401,7 +401,7 @@ class BuilderConfigTests(unittest.TestCase):
     def test_default_disabled_and_strict(self):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / "builder.json"
-            self.assertEqual(load_builder_config(p), {"enabled": False, "envAllow": [], "isolation": {"mode": "none", "user": "aiws-builder", "proxy": "http://127.0.0.1:3128"}})
+            self.assertEqual(load_builder_config(p), {"enabled": False, "envAllow": [], "isolation": {"mode": "none", "user": "aiws-builder", "proxy": "http://127.0.0.1:3128"}, "execWithoutIsolation": False})
             p.write_text('{"enabled": true, "envAllow": ["HTTPS_PROXY"]}')
             self.assertEqual(load_builder_config(p)["envAllow"], ["HTTPS_PROXY"])
             for bad in ('{"enabled": "yes"}', '{"x": 1}', '{"envAllow": ["lower"]}', '{"envAllow": ["A"] }'.replace('["A"]', '["A"]*9') if False else '{"envAllow": "A"}', "[1]", "{bad"):

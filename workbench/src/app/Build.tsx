@@ -10,6 +10,7 @@ const READ=['workspace.tree','file.read','file.stat','code.search','doc.text','g
 const INTERNAL=['plan.propose','plan.update','agent.spawn'];
 const EDIT=['file.replace','file.mkdir','file.copy','file.move'];
 const DELETE=['file.trash','file.restore'];
+const EXEC=['build.run'];
 type KeyStatus={configured:boolean;source:string|null;last4:string|null;problem:string|null};
 const EFFORT_LABEL=(tr:Tr)=>({low:tr('低（快、省）','low (fast, cheap)'),high:tr('高（默认）','high (default)'),max:tr('最高（慢、贵）','max (slow, costly)')} as Record<string,string>);
 
@@ -38,18 +39,19 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
  const {builder,reload}=data;
  const act=useAction(reload);
  const [f,setF]=useState({provider:'deepseek',projectDir:'',prompt:'',inputK:'400',outputK:'100',minutes:'30',turns:'40',tools:'Read,Edit,Write,Bash(npm test)',del:true,install:true,push:true,
-  model:'deepseek-flash',thinking:true,effort:'high',planApproval:true,edit:true,remove:false,askWrite:false});
+  model:'deepseek-flash',thinking:true,effort:'high',planApproval:true,edit:true,remove:false,askWrite:false,build:true,askBuild:true});
  const set=(k:string,v:string|boolean)=>setF(x=>({...x,[k]:v}));
  const native=f.provider==='deepseek';
+ const execOk=!!builder?.status.execAllowed;
  const start=async()=>{
   if(!f.prompt.trim()||!f.projectDir.trim())return;
   try{
    let body:Record<string,unknown>;
    if(native){
-    const tools=[...READ,...INTERNAL,...(f.edit?EDIT:[]),...(f.remove?DELETE:[])];
+    const tools=[...READ,...INTERNAL,...(f.edit?EDIT:[]),...(f.remove?DELETE:[]),...(f.build&&execOk?EXEC:[])];
     body={provider:'deepseek',projectDir:f.projectDir.trim(),allowedTools:tools,model:f.model,thinking:f.thinking,effort:f.effort,planApproval:f.planApproval,maxTurns:Number(f.turns),
      wallClockMinutes:Number(f.minutes),tokenBudget:{input:Number(f.inputK)*1000,output:Number(f.outputK)*1000},
-     needApprovalFor:['network','shell','outside-project',...(f.remove?['delete']:[]),...(f.askWrite?['write']:[])]};
+     needApprovalFor:['network','shell','outside-project',...(f.remove?['delete']:[]),...(f.askWrite?['write']:[]),...(f.build&&execOk&&f.askBuild?['build']:[])]};
    }else{
     const approvals=['network','shell','outside-project',...(f.del?['delete']:[]),...(f.install?['install-dependency']:[]),...(f.push?['git-push']:[])];
     body={provider:f.provider,projectDir:f.projectDir.trim(),allowedTools:f.tools.split(',').map(x=>x.trim()).filter(Boolean),permissionMode:'default',maxTurns:Number(f.turns),
@@ -87,8 +89,11 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
       <Check label={tr('创建/修改/复制/移动文件','Create / edit / copy / move files')} checked={f.edit} onChange={v=>set('edit',v)}/>
       <Check label={tr('删除（进回收站，每次都要你批准）','Delete (to trash, always needs your approval)')} checked={f.remove} onChange={v=>set('remove',v)}/>
       <Check label={tr('每次写入文件前先问我','Ask me before every file write')} checked={f.askWrite} disabled={!f.edit} onChange={v=>set('askWrite',v)}/>
+      <Check label={tr('允许编译、检查、测试、运行代码（C、C++、Go、Python、Rust、C#、Java、JavaScript）','Allow compiling, checking, testing and running code (C, C++, Go, Python, Rust, C#, Java, JavaScript)')} checked={f.build&&execOk} disabled={!execOk} onChange={v=>set('build',v)}/>
+      <Check label={tr('每次编译/运行前先问我（会显示完整命令）','Ask me before every build/run (the exact command is shown)')} checked={f.askBuild} disabled={!execOk||!f.build} onChange={v=>set('askBuild',v)}/>
       <Check label={tr('动手前先给我看计划，等我批准','Show me a plan first and wait for my approval')} checked={f.planApproval} onChange={v=>set('planApproval',v)}/>
-      <p className="muted">{tr('这个运行器没有 shell，也不能联网访问别的地址；它只能用上面的文件工具，并被限制在项目文件夹内。','This runner has no shell and cannot reach any other address; it only has the file tools above, confined to the project folder.')}</p></fieldset>
+      {!execOk&&<Notice tone="warn">{tr('编译和运行代码目前不可用：模型写的程序会以你自己的权限运行，所以只在构建通道使用专用低权限用户（isolation.mode="user"）时才开放。','Building and running code is unavailable for now: programs written by the model would run with your own privileges, so it is only offered when the builder uses its dedicated low-privilege user (isolation.mode="user").')}</Notice>}
+      <p className="muted">{tr('没有 shell，也没有任意命令：编译只用每种语言的固定命令，离线进行（依赖需事先备好），结果在隔离的临时目录里。文件工具被限制在项目文件夹内。','There is no shell and no free-form command: builds use one fixed command per language, offline (dependencies must already be present), in an isolated scratch folder. File tools are confined to the project folder.')}</p></fieldset>
      :<><label>{tr('允许的工具（逗号分隔；不能授予不受限的 Bash）','Allowed tools (comma separated; unrestricted Bash can never be granted)')}<Input value={f.tools} onChange={e=>set('tools',e.target.value)}/></label>
       <fieldset><legend>{tr('下列操作发生时暂停并问你','Pause and ask me before')}</legend><Check label={tr('删除','delete')} checked={f.del} onChange={v=>set('del',v)}/><Check label={tr('安装依赖','install dependencies')} checked={f.install} onChange={v=>set('install',v)}/><Check label="git push" checked={f.push} onChange={v=>set('push',v)}/>
        <p className="muted">{tr('联网、shell、越出项目文件夹：始终需要批准，无法关闭。','Network, shell and leaving the project folder always need approval and cannot be switched off.')}</p></fieldset></>}

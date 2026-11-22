@@ -41,5 +41,6 @@ aiws_supervisor.py
 aiws_cli_adapters.py
 aiws_deepseek.py
 aiws_cloud_agent.py
+aiws_build_tool.py
 aiws_secrets.py
 aiws_egress_proxy.py

@@ -18,7 +18,7 @@
               ▲  stdin: 任务+密钥（管道）/ 批准结果          │ stdout: 事件、计划、批准请求、最终答案
               └───────────────────────────────────────────────┘
 runner ──HTTPS──→ api.deepseek.com（唯一放行的域名）
-runner 的工具：工具平面（限定在项目文件夹内）+ plan_propose / plan_update / agent_spawn；**没有 shell**
+runner 的工具：工具平面（限定在项目文件夹内）+ plan_propose / plan_update / agent_spawn + **build_run（受限的编译/测试/运行，见第 8 节）**；**没有 shell**
 ```
 - 事件进事件库（与其他来源同一套严格模式，不含消息正文）；计划进计划库；最终答案进结果库（事件库不存正文）。
 - 预算、墙钟时间、调用次数由 runner 自己限制，**监督器再独立执行一次**（任何一方失效另一方兜底）。
@@ -35,7 +35,7 @@ runner 的工具：工具平面（限定在项目文件夹内）+ plan_propose /
 
 ## 4. 安全
 - **密钥**：只存在 `~/.config/aiws/deepseek.key`（权限 600，普通文件、非链接、属于本人、≤512 字节）；不进工作区、任务数据、事件库、日志、命令行、环境变量。监督器读取后通过管道交给 runner；界面只能看到“已配置/来源/末 4 位”，可保存或清除，无法读回。
-- **runner 没有 shell，也没有联网工具**：只有工具平面的文件/搜索工具，路径被限制在项目文件夹内（`..`、绝对路径、符号链接、`.git` 都被拒）。网络出口只有它自己的模型调用，经域名白名单代理时只放行 `api.deepseek.com`。
+- **runner 没有 shell，也没有联网工具**：只有工具平面的文件/搜索工具（路径被限制在项目文件夹内：`..`、绝对路径、符号链接、`.git` 都被拒）和第 8 节的 `build_run`（固定命令，默认关闭）。网络出口只有它自己的模型调用，经域名白名单代理时只放行 `api.deepseek.com`。
 - **提示注入**：系统提示声明工具返回内容是数据而不是指令；真正的防线是上面的“没有 shell + 路径限制 + 同步批准”。
 - **授权令牌**：`deepseek` 令牌只能列出 runner 自带的工具名（无模式、无通配）；`network`/`shell`/`outside-project` 批准仍然不可关闭；写入类可选“每次先问”，删除类（进回收站）每次都要你批准。
 
@@ -46,10 +46,31 @@ runner 的工具：工具平面（限定在项目文件夹内）+ plan_propose /
 
 ## 6. 没做 / 没验证（如实）
 - **从未对真实服务发过请求**：参数名（`thinking`、`reasoning_effort`、`user_id` 等）、400 的触发条件、`usage` 字段，都来自官方文档的抓取摘要；抓取工具对部分页面有截断/摘要，已在日志里标注。第一次真实运行请观察：是否 400（尤其 reasoning_content）、`usage` 是否带缓存字段、模型名是否被接受。
-- **没有 shell = 不能跑测试/构建**：这是有意的安全取舍，但对“写代码”类任务是大限制。下一步建议加一个只允许固定命令（如 `npm test`、`python -m pytest`）的 `shell.run`：需批准、在构建专用用户下、工作盘可执行位置运行。
+- **没有 shell**；编译/测试/运行靠 `build_run`（第 8 节），默认关闭，要专用用户隔离才开放。
 - **不流式**；**不计费**（不用价目表估算金额；只显示 API 上报的 token）；**一次只跑一个运行**；子智能体顺序执行、不能再派子智能体、最多 8 个。
 - 本地小模型还没接入这条链路：下一步用它压缩工具结果、把长答案摘要给你看、预审明显越界的任务。
 - 真机上的网络路径（专用用户、防火墙、代理放行 `api.deepseek.com`）未验证。
+
+## 8. 编译、测试、运行：`build_run`（不是 shell）
+模型只能选「语言 + 动作 + 一个目标」，命令是**固定模板**：没有自由参数、没有管道、没有 `sh -c`。
+
+| 语言 | 动作 check / build / test / run 实际执行的命令（节选） |
+| --- | --- |
+| C / C++ | `cc -std=c17 …` / `c++ -std=c++20 …`；文件夹里有 `CMakeLists.txt` 用 cmake+ctest，有 `Makefile` 用 make |
+| Go | `go vet / build / test / run`（`GOPROXY=off`、`GOTOOLCHAIN=local`） |
+| Python | `py_compile` / `compileall`；测试用 pytest（有就用）否则 `unittest`；运行 `python3 文件` |
+| Rust | 有 `Cargo.toml` 用 `cargo … --offline`，否则 `rustc` 单文件（含 `--test`） |
+| Java | 有 `pom.xml` 用 `mvn -o`，否则 `javac` + `java -cp`（自动识别 `package`） |
+| JavaScript | `node --check` / `node 文件` / `node --test` 或 `npm test --offline` |
+| C# | 有 `dotnet` 用 `dotnet build/test/run`，否则用 Mono 的 `mcs` + `mono`；**镜像里目前两者都没有** |
+
+- **每次先问你**（可在构建页取消）：批准框显示完整命令，拒绝则程序不会运行。
+- **目标校验**：相对路径、在项目内、无符号链接、不以 `-` 开头、扩展名要对；多余参数一律拒绝。
+- **沙箱**：最小环境变量（不继承任何密钥/令牌）、cwd=项目、独立进程组、超时后整组杀掉（含孙进程）、CPU/文件大小限制、stdin 关闭、输出写临时文件并只回传头尾各 4000 字符。
+- **离线**：不给这些进程网络，cargo/go/npm/pip 也被告知不要联网，所以**依赖必须事先备好**（Maven 需要预先填充好的本地仓库）。
+- **产物在可执行的临时目录**（`AIWS_BUILD_SCRATCH`，默认 `/var/tmp`），不在 `noexec` 的工作盘上，运行结束即删除；项目里不留 `target/`、`__pycache__`、`CMake*` 等（测试验证过）。
+- **只在构建通道有专用用户隔离时才开放**（`isolation.mode="user"`）。原因：模型写的程序会以运行器的身份运行，没有隔离就等于以**你自己的权限**运行（能读你的文件和密钥文件）。确实想在不隔离的机器上用，需在 `builder.json` 写 `"execWithoutIsolation": true`——这是明确标注的危险开关，默认关。
+- 子智能体拿不到 `build_run`。
 
 ## 7. 来源
 - DeepSeek API 文档：https://api-docs.deepseek.com/ （聊天补全、思考模式 /guides/thinking_mode、工具调用 /guides/tool_calls、缓存 /guides/kv_cache、错误码 /quick_start/error_codes、限速 /quick_start/rate_limit、模型与价格 /quick_start/pricing）

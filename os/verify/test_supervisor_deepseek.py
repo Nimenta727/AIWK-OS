@@ -165,5 +165,44 @@ class MandateForDeepSeek(unittest.TestCase):
         self.assertTrue(set(A.READ_TOOLS + A.WRITE_TOOLS) <= known, "the runner offers a tool the tool plane does not have")
         self.assertFalse(set(A.READ_TOOLS) & aiws_toolplane.FILE_WRITE_TOOLS); self.assertTrue(set(A.WRITE_TOOLS) <= aiws_toolplane.FILE_WRITE_TOOLS)
 
+
+class BuildToolThroughTheSupervisor(Rig):
+    """Running programs is opt-in: off by default, on only with isolation or the owner's explicit (dangerous) setting."""
+    CALL = lambda self: tool_call("build__run", {"language": "python", "action": "run", "target": "h.py"})
+    def setUp(self):
+        super().setUp(); (self.ws / "app" / "h.py").write_text("print('built and ran')\n")
+        self.cfg = {"enabled": True, "envAllow": []}; self.sup.config = lambda: self.cfg
+    def offered(self): return [t["function"]["name"] for t in self.fake.requests[0]["body"]["tools"]]
+    def test_not_offered_by_default_and_status_says_why(self):
+        self.assertFalse(self.sup.status()["execAllowed"])
+        self.start([reply("done")], allowedTools=GOOD["allowedTools"] + ["build.run"]); self.assertNotIn("build__run", self.offered())
+    def test_offered_and_gated_when_the_owner_accepted_the_risk(self):
+        self.cfg["execWithoutIsolation"] = True; self.assertTrue(self.sup.status()["execAllowed"])
+        m, r = self.start([reply("", [self.CALL()]), reply("all good")], wait=False, allowedTools=GOOD["allowedTools"] + ["build.run"],
+                          needApprovalFor=["build", "network", "shell", "outside-project"])
+        pending = self.wait_pending(); self.assertIn("build__run", self.offered())              # the first request has been sent by now
+        self.assertEqual((pending["category"], pending["tool"], pending["sync"]), ("build", "build.run", True)); self.assertIn("h.py", pending["detail"])
+        self.sup.decide(r["runId"], True); self.assertTrue(self.sup.wait(60)); self.assertEqual(self.run_row(r)["state"], "completed")
+        self.assertIn("built and ran", json.dumps(self.fake.requests[1]["body"]["messages"]))
+    def test_refusing_the_build_means_the_program_never_ran(self):
+        self.cfg["execWithoutIsolation"] = True; (self.ws / "app" / "h.py").write_text("open('ran','w').write('x')\n")
+        m, r = self.start([reply("", [self.CALL()]), reply("ok")], wait=False, allowedTools=GOOD["allowedTools"] + ["build.run"], needApprovalFor=["build", "network", "shell", "outside-project"])
+        self.wait_pending(); self.sup.decide(r["runId"], False); self.assertTrue(self.sup.wait(60)); self.assertFalse((self.ws / "app" / "ran").exists())
+    def test_the_built_program_does_not_see_the_key(self):
+        self.cfg["execWithoutIsolation"] = True; (self.ws / "app" / "h.py").write_text("import os; print(sorted(os.environ))\n")
+        self.start([reply("", [self.CALL()]), reply("ok")], allowedTools=GOOD["allowedTools"] + ["build.run"], needApprovalFor=["network", "shell", "outside-project"])
+        self.assertNotIn(KEY, json.dumps(self.fake.requests[1]["body"]["messages"])); self.assertNotIn("DEEPSEEK", json.dumps(self.fake.requests[1]["body"]["messages"]))
+    def test_config_key_is_validated(self):
+        import tempfile as tf
+        d = Path(tf.mkdtemp()); self.addCleanup(__import__("shutil").rmtree, d, True)
+        good = d / "ok.json"; good.write_text('{"enabled": true, "execWithoutIsolation": true}'); self.assertTrue(sup.load_builder_config(good)["execWithoutIsolation"])
+        self.assertFalse(sup.load_builder_config(d / "missing.json")["execWithoutIsolation"])
+        bad = d / "bad.json"; bad.write_text('{"execWithoutIsolation": "yes"}')
+        with self.assertRaises(SupervisorError): sup.load_builder_config(bad)
+    def test_mandate_accepts_the_tool_and_the_category_and_keeps_shell_mandatory(self):
+        m = validate_mandate({**GOOD, "allowedTools": ["file.read", "build.run"], "needApprovalFor": ["build", "network", "shell", "outside-project"]}, self.ws)
+        self.assertIn("build.run", m["allowedTools"]); self.assertIn("build", m["needApprovalFor"])
+        with self.assertRaises(MandateError): validate_mandate({**GOOD, "needApprovalFor": ["build"]}, self.ws)
+
 if __name__ == "__main__":
     unittest.main()

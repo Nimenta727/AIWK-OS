@@ -49,6 +49,7 @@ const EXACT = [
   ['model is not one of the supported DeepSeek models', '不是受支持的 DeepSeek 模型'], ['effort must be low, high or max', '推理强度只能是 low、high 或 max'],
   ['thinking and planApproval must be true or false', 'thinking 和 planApproval 必须是 true 或 false'],
   // DeepSeek key and runner
+  ['execWithoutIsolation must be true or false', 'execWithoutIsolation 必须是 true 或 false'],
   ['No DeepSeek API key is configured', '还没有配置 DeepSeek API 密钥'], ['Could not start the runner', '无法启动云端运行器'], ['Expected {key} or {clear: true}', '需要 {key} 或 {clear: true}'],
   ['The key file must be a regular file, not a link', '密钥文件必须是普通文件，不能是链接'], ['The key file must belong to this user', '密钥文件必须属于当前用户'],
   ['The key file must not be readable by others (use mode 600)', '密钥文件不能被其他用户读取（请用权限 600）'], ['The key file is too large', '密钥文件过大'],

@@ -119,3 +119,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-22 09:00 — S4/S5：本地模型常驻、宿主推理服务与基准、双盘系统文件](2026-11-22_0900-s4-s5-resident-model-dual-disk.md)
 - [2026-11-22 12:00 — 全界面双语、官方插件调研、云端连接方案](2026-11-22_1200-bilingual-and-cloud-connection-research.md)
 - [2026-11-22 15:00 — 云端模型改为直接接 DeepSeek API（自带智能体循环）](2026-11-22_1500-deepseek-native-runner.md)
+- [2026-11-22 17:00 — 受限的编译/测试/运行工具（build_run）](2026-11-22_1700-restricted-build-tool.md)
