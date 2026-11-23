@@ -4,12 +4,15 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| `aiws_workbench.py` | 客户机 localhost Web API、前端与 Agent 接口 |
+| `aiws_workbench.py` | 工作台应用层（Controller：任务、模型、构建、预览、IDE 等的业务逻辑） |
+| `aiws_workbench_http.py` | 工作台 HTTP 层：Host/Origin/CSRF/大小检查、GET/POST 路由表、静态资源；表外路径一律 404 |
 | `aiws_agent_service.py` / `aiws_agent_client.py` | 独立 systemd 用户 Agent、UNIX IPC |
 | `aiws_permission_broker.py` | 同 UID、fail-closed、私有 UNIX Socket 的策略服务 |
 | `aiws_tasks.py` | SQLite DAG、审批、执行状态、审计 |
 | `aiws_mcp.py` | 只读 MCP stdio 门面，经 Agent/Broker 转发 |
-| `aiws_toolplane.py` | 工具实现和静态工具清单；不是安全沙箱 |
+| `aiws_toolplane.py` | 工具清单、工具类别、工作区路径约束（`_path`）与分发（`invoke`）；不是安全沙箱 |
+| `aiws_tools_files.py` | 文件类工具：读、改、复制/移动/回收站、目录树、搜索、日志、文档 |
+| `aiws_tools_system.py` | 系统类工具：系统/网络状态、下载、git、运行时、本地浏览器文本 |
 | `aiws_guest_ops.py` | 受限的客户机服务/内核候选操作 |
 | `aiws_local_model.py` | 可选 GGUF/llama.cpp 建议、读/写分级、多步计划及拒绝协议 |
 | `aiws_model_router.py` | 规则路由（本地 / 外部官方 CLI / 询问用户）、拒绝不升级、交接文件；不联网、不启动进程 |

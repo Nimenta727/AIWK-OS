@@ -126,3 +126,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-23 09:00 — 构建页的模型档位建议；发布 0.3.0-preview.1（带 9B）](2026-11-23_0900-build-tier-suggestion-and-release-0.3.0.md)
 - [2026-11-23 12:54 — ISO 构建/发布不稳定的审计与修复（启动菜单永远等待、标签预检、KVM）](2026-11-23_125415-ci-iso-build-stability-audit.md)
 - [2026-11-23 13:10 — 全项目代码审计与优化（死代码、索引、测试断言、lint 进 CI）](2026-11-23_131044-full-code-audit-and-cleanup.md)
+- [2026-11-23 13:28 — 工作台路由表 + 两个大文件按功能拆分](2026-11-23_132810-workbench-route-table-and-module-split.md)

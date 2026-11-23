@@ -24,7 +24,8 @@ def covered(msg):
 
 class Coverage(unittest.TestCase):
     def test_http_layer_literals_are_all_translated(self):
-        src = (ROOT / "runtime/aiws_workbench.py").read_text()
+        src = "".join((ROOT / "runtime" / name).read_text() for name in ("aiws_workbench.py", "aiws_workbench_http.py"))
+        self.assertIn('"error": "Invalid CSRF"', src)                      # the scan must see the HTTP layer
         missing = [m for m in set(re.findall(r'"error": ?"([^"]{3,120})"', src)) if not covered(m)]
         self.assertEqual(missing, [], "add these to workbench/src/model/errors.mjs")
     def test_shell_modules_are_fully_translated(self):
@@ -34,7 +35,7 @@ class Coverage(unittest.TestCase):
             self.assertEqual([m for m in missing if m not in ("Memory must be 1–", "Skill is larger than ")], [], mod)
     def test_overall_coverage_floor(self):
         total = ok = 0
-        for mod in ("aiws_workbench", "aiws_mandate", "aiws_supervisor", "aiws_tasks", "aiws_apps", "aiws_model_router", "aiws_system", "aiws_changes", "aiws_capabilities", "aiws_secrets"):
+        for mod in ("aiws_workbench", "aiws_workbench_http", "aiws_mandate", "aiws_supervisor", "aiws_tasks", "aiws_apps", "aiws_model_router", "aiws_system", "aiws_changes", "aiws_capabilities", "aiws_secrets"):
             for m in static_messages(mod):
                 total += 1; ok += covered(m)
         self.assertGreaterEqual(ok / total, 0.78, "translated %d of %d user-reachable messages" % (ok, total))

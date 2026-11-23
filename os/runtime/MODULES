@@ -3,6 +3,7 @@
 
 # Entry points and HTTP/UI
 aiws_workbench.py
+aiws_workbench_http.py
 aiws_agent_service.py
 aiws_agent_client.py
 aiws_mcp.py
@@ -16,6 +17,8 @@ aiws_exttools.py
 
 # Tool plane, task graph and permission
 aiws_toolplane.py
+aiws_tools_files.py
+aiws_tools_system.py
 aiws_tasks.py
 aiws_plans.py
 aiws_permission_broker.py

@@ -15,6 +15,7 @@ RUNTIME = Path(__file__).resolve().parents[1] / "runtime"
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME))
 import aiws_toolplane as plane
+import aiws_tools_system as system_tools
 import aiws_tasks
 import aiws_local_model as lm
 from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
@@ -80,13 +81,13 @@ class LocalReadToolTests(unittest.TestCase):
             "/proc/net/tcp": "  sl  local_address rem_address   st\n   0: 0100007F:1F90 00000000:0000 0A\n   1: 0F02000A:C350 22020A0A:01BB 01\n",
             "/proc/net/tcp6": "  sl  local_address rem_address   st\n",
         }
-        with patch.object(plane, "_proc", lambda path, limit=0: files.get(path, "")):
-            self.assertEqual(plane._default_route(), {"interface": "eth0", "gateway": "192.168.2.1"})
-            self.assertEqual(plane._local_ipv4(), ["10.0.2.15", "127.0.0.1"])
-            s = plane._socket_summary()
+        with patch.object(system_tools, "_proc", lambda path, limit=0: files.get(path, "")):
+            self.assertEqual(system_tools._default_route(), {"interface": "eth0", "gateway": "192.168.2.1"})
+            self.assertEqual(system_tools._local_ipv4(), ["10.0.2.15", "127.0.0.1"])
+            s = system_tools._socket_summary()
             self.assertEqual(s["tcp"]["established"], 1)
             self.assertEqual(s["listeningPorts"], [8080])
-            self.assertEqual(plane._network_status(self.root, {})["dnsServers"], ["10.0.2.3"])
+            self.assertEqual(system_tools._network_status(self.root, {})["dnsServers"], ["10.0.2.3"])
 
     def test_download_list_and_states(self):
         self.assertEqual(self.inv("download.list")["downloads"], [])

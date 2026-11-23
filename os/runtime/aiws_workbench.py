@@ -1,9 +1,9 @@
-"""AIWS OS guest-local workbench with persistent guest task/DAG control.
+"""AIWS OS guest-local workbench with persistent guest task/DAG control (the application layer).
 
 An unprivileged single-user prototype; not an autonomous model or privileged broker.
 """
 from concurrent.futures import ThreadPoolExecutor
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import argparse
 import json
 import os
@@ -16,7 +16,6 @@ import socket
 import subprocess
 import threading
 import time
-from urllib.parse import urlsplit
 from uuid import uuid4
 from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, APP_LAUNCH_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
@@ -24,36 +23,29 @@ from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
-from aiws_events import EventStore, EventError, SAFE_NAME, make_event
+from aiws_events import EventStore, EventError, make_event
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 import aiws_observatory
 import aiws_apps
 import aiws_system
 import aiws_capabilities
 import aiws_assistant
-import aiws_route
-from aiws_local_agent import AgentError as LocalAgentError
 import aiws_changes
-import aiws_agent_tree
 import aiws_plans
 import aiws_sysverify
 import aiws_secrets
 import aiws_deepseek
 import aiws_preview
 import aiws_launcher
-from aiws_toolplane import _path as workspace_path, _workspace
 from aiws_mandate import MandateStore
 from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 
-HOST = "127.0.0.1"
+# The HTTP layer (request checks, the route table) is aiws_workbench_http.py; this module is the application.
+from aiws_workbench_http import Handler, HOST, EXPOSED, ASSETS  # noqa: F401  (re-exported for callers and tests)
+
 PORT = 17640
 READ_ONLY = PLANE_READ_TOOLS
-# No direct guest write through transient /jobs: use approved durable DAG.
-EXPOSED = READ_ONLY
-ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
-          ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon",
-          ".woff2": "font/woff2"}
 
 class Controller:
     def __init__(self, workspace, ui, singleton=False):
@@ -478,6 +470,10 @@ class Controller:
 
 
 
+    def route_config(self):
+        """The router config as the route page shows it (read-only in the UI)."""
+        return load_config()
+
     def configure_model(self, enabled):
         # A button click only creates a pending durable DAG. The user must
         # separately approve and dispatch before any guest systemd action.
@@ -676,437 +672,6 @@ class Controller:
             except TaskError:
                 pass
             audit(action["tool"], action["arguments"], False)
-
-class Handler(BaseHTTPRequestHandler):
-    server_version = "AIWS-Guest/0.2"
-
-    def log_message(self, format, *args):
-        pass
-
-    def reply(self, status, data, media="application/json; charset=utf-8"):
-        if not isinstance(data, bytes):
-            data = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", media)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy",
-                         "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                         "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
-                         "frame-src 'self' http://127.0.0.1:* http://localhost:*; "
-                         "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
-        self.end_headers()
-        self.wfile.write(data)
-
-    RAW_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
-                 ".svg": "image/svg+xml", ".pdf": "application/pdf", ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8"}
-    RAW_MAX = 20 * 1024 * 1024
-
-    def reply_raw(self, relative):
-        """Serve ONE workspace file for the viewer. Allowlisted types only; documents that can run script are sandboxed
-        into an opaque origin (no access to this service's API) with no network."""
-        try:
-            path = workspace_path(_workspace(), relative)
-            media = self.RAW_TYPES.get(path.suffix.lower())
-            if media is None or not path.is_file() or path.stat().st_size > self.RAW_MAX:
-                return self.reply(415, {"error": "Not a previewable file type or too large"})
-            body = path.read_bytes()
-        except (ValueError, OSError, PermissionError) as exc:
-            return self.reply(403, {"error": str(exc)[:240]})
-        scripted = media.startswith("text/html") or media.startswith("image/svg")
-        csp = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; "
-               "font-src data:; frame-ancestors 'self'" if scripted else
-               "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'")
-        self.send_response(200)
-        self.send_header("Content-Type", media)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "SAMEORIGIN")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", csp)
-        self.end_headers()
-        self.wfile.write(body)
-
-    def check_host(self):
-        return self.headers.get("Host") == HOST + ":" + str(self.server.server_port)
-
-    def do_GET(self):
-        if not self.check_host():
-            return self.reply(403, {"error": "Invalid host"})
-        app = self.server.application
-        path = urlsplit(self.path).path
-        if path == "/api/v1/workspace/tree":
-            try:
-                result = (app.file_tools.invoke("workspace.tree", {"path": "."})
-                          if app.file_tools is not None else invoke("workspace.tree", {"path": "."}))
-                if app.file_tools is None:
-                    audit("workspace.tree", {"path": "."}, True)
-                return self.reply(200, result)
-            except AgentUnavailable as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-            except (ValueError, OSError, PermissionError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path in ("/api/v1/workspace/stat", "/api/v1/workspace/trash"):
-            from urllib.parse import parse_qs
-            if path.endswith("/stat"):
-                paths = parse_qs(urlsplit(self.path).query).get("path", [])
-                if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
-                    return self.reply(400, {"error": "One bounded guest-workspace path required"})
-                tool, args = "file.stat", {"path": paths[0]}
-            else:
-                tool, args = "file.trashList", {}
-            try:
-                result = (app.file_tools.invoke(tool, args)
-                          if app.file_tools is not None else invoke(tool, args))
-                if app.file_tools is None:
-                    audit(tool, args, True)
-                return self.reply(200, result)
-            except AgentUnavailable as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-            except (ValueError, OSError, PermissionError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path == "/api/v1/workspace/file":
-            from urllib.parse import parse_qs
-            paths = parse_qs(urlsplit(self.path).query).get("path", [])
-            if len(paths) != 1 or not paths[0] or len(paths[0]) > 512:
-                return self.reply(400, {"error": "One bounded guest-workspace path required"})
-            try:
-                result = (app.file_tools.invoke("file.read", {"path": paths[0]})
-                          if app.file_tools is not None else invoke("file.read", {"path": paths[0]}))
-                if app.file_tools is None:
-                    audit("file.read", {"path": paths[0]}, True)
-                return self.reply(200, result)
-            except (ValueError, OSError, PermissionError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path == "/api/v1/workspace/doc":
-            from urllib.parse import parse_qs
-            docs = parse_qs(urlsplit(self.path).query).get("path", [])
-            if len(docs) != 1 or not docs[0] or len(docs[0]) > 512:
-                return self.reply(400, {"error": "One bounded guest-workspace path required"})
-            try:
-                result = (app.file_tools.invoke("doc.text", {"path": docs[0]})
-                          if app.file_tools is not None else invoke("doc.text", {"path": docs[0]}))
-                if app.file_tools is None:
-                    audit("doc.text", {"path": docs[0]}, True)
-                return self.reply(200, result)
-            except AgentUnavailable as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-            except (ValueError, OSError, PermissionError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path == "/api/v1/audit/verify":
-            try:
-                return self.reply(200, app.tasks.verify_audit())
-            except (AgentUnavailable, AgentError) as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-        if path == "/api/v1/tasks":
-            try:
-                return self.reply(200, {"tasks": app.tasks.list()})
-            except (AgentUnavailable, AgentError) as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-        if path.startswith("/api/v1/tasks/"):
-            parts = path.strip("/").split("/")
-            if len(parts) == 4:
-                try:
-                    return self.reply(200, app.tasks.get(parts[3]))
-                except TaskError as exc:
-                    return self.reply(404, {"error": str(exc)})
-                except (AgentUnavailable, AgentError) as exc:
-                    return self.reply(503, {"error": str(exc)[:240]})
-            if len(parts) == 5 and parts[4] == "audit":
-                try:
-                    return self.reply(200, {"events": app.tasks.audit(parts[3])})
-                except TaskError as exc:
-                    return self.reply(404, {"error": str(exc)})
-                except (AgentUnavailable, AgentError) as exc:
-                    return self.reply(503, {"error": str(exc)[:240]})
-        if path == "/api/v1/guest/services":
-            try:
-                return self.reply(200, {"services": [
-                    app.guest_ops.execute("service.inspect", {"service": name})
-                    for name in ("aiws-workbench.service", "aiws-agent.service",
-                                 "aiws-permission-broker.service", "aiws-local-model.service")]})
-            except (PermissionError, ValueError, OSError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path == "/api/v1/guest/kernel":
-            try:
-                return self.reply(200, app.guest_ops.execute("kernel.inspect", {}))
-            except (PermissionError, ValueError, OSError) as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-        if path == "/api/v1/observatory":
-            try:
-                return self.reply(200, app.observatory())
-            except (AgentUnavailable, AgentError) as exc:
-                return self.reply(503, {"error": str(exc)[:240]})
-        if path == "/api/v1/observatory/events":
-            from urllib.parse import parse_qs
-            query = parse_qs(urlsplit(self.path).query)
-            session = (query.get("session") or [""])[0]
-            try:
-                after = int((query.get("after") or ["0"])[0])
-            except ValueError:
-                return self.reply(400, {"error": "after must be an integer"})
-            if not SAFE_NAME.match(session) or after < 0:
-                return self.reply(400, {"error": "A valid session id is required"})
-            return self.reply(200, {"session": session, "events": app.events.events(session, after=after, limit=200)})
-        if path == "/api/v1/plans":
-            plans = list(app.plans.list())[:30]
-            try:
-                for row in (app.tasks.overview().get("recent") or [])[:8]:
-                    detail = app.tasks.get(row["id"])
-                    plans.append(aiws_plans.from_local(detail["task"], detail["stages"]))
-            except (TaskError, AgentUnavailable, AgentError):
-                pass
-            return self.reply(200, {"plans": plans})
-        if path == "/api/v1/observatory/tree":
-            from urllib.parse import parse_qs
-            session = (parse_qs(urlsplit(self.path).query).get("session") or [""])[0]
-            if not SAFE_NAME.match(session):
-                return self.reply(400, {"error": "A valid session id is required"})
-            events, after = [], 0
-            while len(events) < 5000:                      # bounded: the tree never needs more than this
-                page = app.events.events(session, after=after, limit=500)
-                if not page:
-                    break
-                events += page
-                after = page[-1]["seq"]
-            return self.reply(200, {"session": session, **aiws_agent_tree.build(events)})
-        if path == "/api/v1/capabilities":
-            from urllib.parse import parse_qs
-            qs = parse_qs(urlsplit(self.path).query)
-            query = (qs.get("q") or [""])[0][:300]
-            try:
-                k = int((qs.get("k") or ["6"])[0])
-                kinds = [x for x in (qs.get("kind") or [""])[0].split(",") if x] or None
-                hits = app.capabilities.select(query, k, kinds) if query else []
-            except (ValueError, aiws_capabilities.CapabilityError) as exc:
-                return self.reply(400, {"error": str(exc)[:120]})
-            return self.reply(200, {"hits": hits, "counts": app.capabilities.counts()})
-        if path == "/api/v1/assistant/status":
-            return self.reply(200, app.assistant.status())
-        if path == "/api/v1/assistant/threads":
-            return self.reply(200, app.assistant.threads())
-        if path == "/api/v1/assistant/thread":
-            from urllib.parse import parse_qs
-            ident = (parse_qs(urlsplit(self.path).query).get("id") or [""])[0]
-            try:
-                return self.reply(200, app.assistant.thread(ident))
-            except LocalAgentError as exc:
-                return self.reply(404 if "No such" in str(exc) else 400, {"error": str(exc)[:160]})
-        if path == "/api/v1/assistant/plugins":
-            return self.reply(200, app.assistant.plugin_list())
-        if path == "/api/v1/memory":
-            return self.reply(200, {"memory": app.memory.list()})
-        if path == "/api/v1/cloud/key":
-            return self.reply(200, aiws_secrets.status())
-        if path == "/api/v1/preview":
-            return self.reply(200, app.preview.status())
-        if path in ("/api/v1/changes", "/api/v1/changes/diff"):
-            from urllib.parse import parse_qs
-            qs = parse_qs(urlsplit(self.path).query)
-            try:
-                if path.endswith("/diff"):
-                    return self.reply(200, aiws_changes.diff(app.workspace, (qs.get("path") or ["."])[0], (qs.get("file") or [""])[0]))
-                return self.reply(200, aiws_changes.changes(app.workspace, (qs.get("path") or ["."])[0]))
-            except aiws_changes.ChangesError as exc:
-                return self.reply(400, {"error": str(exc)})
-        if path == "/api/v1/system":
-            return self.reply(200, app.system.status())
-        if path == "/api/v1/ide":
-            return self.reply(200, app.ide_status())
-        if path == "/api/v1/apps":
-            return self.reply(200, {"apps": aiws_apps.listing()})
-        if path == "/api/v1/workspace/raw":
-            from urllib.parse import parse_qs
-            raws = parse_qs(urlsplit(self.path).query).get("path", [])
-            if len(raws) != 1 or not raws[0] or len(raws[0]) > 512:
-                return self.reply(400, {"error": "One bounded guest-workspace path required"})
-            return self.reply_raw(raws[0])
-        if path == "/api/v1/builder":
-            return self.reply(200, app.builder_overview())
-        if path == "/api/v1/route/config":
-            try:
-                config = load_config()
-            except RouterError as exc:
-                return self.reply(403, {"error": str(exc)[:240]})
-            return self.reply(200, {"config": config, "file": "~/.config/aiws/routes.json", "editableInUi": False})
-        if path == "/api/v1/model/status":
-            return self.reply(200, app.model.status())
-        if path == "/api/v1/health":
-            return self.reply(200, app.health())
-        if path == "/api/v1/session":
-            return self.reply(200, {"csrf": app.csrf, "mode": "linux-guest"})
-        if path == "/api/v1/snapshot":
-            return self.reply(200, {"health": app.health(), "jobs": app.recent(),
-                                    "capabilities": [x for x in catalog() if x["name"] in EXPOSED] + guest_catalog()})
-        if path.startswith("/api/v1/jobs/"):
-            job = app.job(path.removeprefix("/api/v1/jobs/"))
-            return self.reply(200, job) if job else self.reply(404, {"error": "Unknown job"})
-        if path == "/":
-            try:
-                source = (app.ui / "index.html").read_text(encoding="utf-8")
-                if "</head>" not in source:
-                    raise ValueError("Missing head")
-            except (OSError, ValueError):
-                return self.reply(503, {"error": "React workbench assets missing"})
-            return self.reply(200, source.encode("utf-8"), "text/html; charset=utf-8")
-        if not path.startswith("/assets/"):
-            return self.reply(404, {"error": "Not found"})
-        target = app.ui / path.lstrip("/")
-        try:
-            ui_assets = (app.ui / "assets").resolve(strict=True)
-            file = target.resolve(strict=True)
-            if not file.is_relative_to(ui_assets) or not file.is_file():
-                raise OSError("Outside assets")
-            if target.is_symlink() or file.suffix not in ASSETS or file.stat().st_size > 8 * 1024 * 1024:
-                raise OSError("Invalid asset")
-            return self.reply(200, file.read_bytes(), ASSETS[file.suffix])
-        except OSError:
-            return self.reply(404, {"error": "Missing asset"})
-
-    def do_POST(self):
-        if not self.check_host():
-            return self.reply(403, {"error": "Invalid host"})
-        path = urlsplit(self.path).path
-        route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key", "/api/v1/preview", "/api/v1/preview/stop", "/api/v1/ide/start", "/api/v1/ide/session", "/api/v1/assistant/turn", "/api/v1/assistant/route", "/api/v1/assistant/route/override", "/api/v1/assistant/plugins/enable", "/api/v1/assistant/plugins/disable") and not (
-                len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
-                    (route[3] == "mandates" and route[5] == "revoke") or
-                    (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
-                len(route) == 7 and route[:3] == ["api", "v1", "tasks"]
-                and route[4] == "stages" and route[6] in ("approve", "dispatch")):
-            return self.reply(404, {"error": "Not found"})
-        origin = self.headers.get("Origin")
-        expected = "http://" + HOST + ":" + str(self.server.server_port)
-        if origin is not None and origin != expected:
-            return self.reply(403, {"error": "Invalid origin"})
-        if not secrets.compare_digest(self.headers.get("X-AIWS-CSRF") or "", self.server.application.csrf):
-            return self.reply(403, {"error": "Invalid CSRF"})
-        if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
-            return self.reply(415, {"error": "JSON required"})
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            return self.reply(400, {"error": "Invalid length"})
-        if not 0 < length <= 16384:
-            return self.reply(413, {"error": "Request too large or empty"})
-        try:
-            payload = json.loads(self.rfile.read(length))
-            if not isinstance(payload, dict):
-                raise ValueError("Expected JSON object")
-            app = self.server.application
-            if path == "/api/v1/jobs":
-                if set(payload) != {"tool", "arguments"}:
-                    raise ValueError("Expected tool and arguments")
-                result = app.submit(payload["tool"], payload["arguments"])
-            elif path == "/api/v1/tasks":
-                result = app.create_plan(payload)
-            elif path in ("/api/v1/model/enable", "/api/v1/model/disable"):
-                if payload:
-                    raise ValueError("Model toggle accepts no body fields")
-                result = app.configure_model(path.endswith("/enable"))
-            elif path == "/api/v1/apps/launch":
-                if set(payload) != {"id"}:
-                    raise ValueError("Expected the application id only")
-                result = app.apps_launch(payload["id"])
-            elif path == "/api/v1/assistant/turn":
-                if not {"text"} <= set(payload) <= {"text", "threadId", "tier"} or not isinstance(payload["text"], str):
-                    raise ValueError("Expected text, optionally threadId and tier")
-                tier = payload.get("tier")
-                if tier is not None and tier not in aiws_route.TIERS:
-                    raise ValueError("tier must be local, flash or pro")
-                result = app.assistant.start_turn(payload["text"], payload.get("threadId"), tier)
-            elif path == "/api/v1/assistant/route":
-                if set(payload) != {"text"} or not isinstance(payload["text"], str):
-                    raise ValueError("Expected text")
-                result = app.assistant.route(payload["text"])
-            elif path == "/api/v1/assistant/route/override":
-                if set(payload) != {"from", "to"}:
-                    raise ValueError("Expected from and to")
-                result = app.assistant.route_override(payload["from"], payload["to"])
-            elif path == "/api/v1/assistant/plugins/enable":
-                if not {"name"} <= set(payload) <= {"name", "treeSha256"} or not isinstance(payload["name"], str) or not isinstance(payload.get("treeSha256", ""), (str, type(None))):
-                    raise ValueError("Expected name and treeSha256")
-                result = app.assistant.plugin_enable(payload["name"][:64], payload.get("treeSha256"))
-            elif path == "/api/v1/assistant/plugins/disable":
-                if set(payload) != {"name"} or not isinstance(payload["name"], str):
-                    raise ValueError("Expected name")
-                result = app.assistant.plugin_disable(payload["name"][:64])
-            elif path == "/api/v1/memory":
-                result = app.memory_op(payload)
-            elif path == "/api/v1/cloud/key":
-                result = app.cloud_key(payload)
-            elif path in ("/api/v1/preview", "/api/v1/preview/stop"):
-                result = app.preview_op("stop" if path.endswith("/stop") else "start", payload)
-            elif path.startswith("/api/v1/system/"):
-                result = app.system_op(path.rsplit("/", 1)[1], payload)
-            elif path == "/api/v1/ide/start":
-                if payload:
-                    raise ValueError("No arguments allowed")
-                result = app.ide_open(server_only=True)
-            elif path == "/api/v1/ide/session":
-                if set(payload) - {"path"} or not isinstance(payload.get("path", "."), str):
-                    raise ValueError("Unexpected fields for this system operation")
-                result = app.ide_session(payload.get("path", "."))
-            elif path == "/api/v1/ide/open":
-                if payload:
-                    raise ValueError("No arguments allowed")
-                result = app.ide_open()
-            elif path == "/api/v1/builder/mandates":
-                result = app.builder_grant(payload)
-            elif path == "/api/v1/builder/runs":
-                if not {"mandateId", "prompt"} <= set(payload) <= {"mandateId", "prompt", "language"}:
-                    raise ValueError("Expected mandateId and prompt")
-                result = app.builder_start(payload["mandateId"], payload["prompt"], "en" if payload.get("language") == "en" else "zh")
-            elif route[:3] == ["api", "v1", "builder"]:
-                if payload:
-                    raise ValueError("No arguments allowed")
-                if route[3] == "mandates":
-                    result = app._mandate_view(app.mandates.revoke(route[4]))
-                elif route[5] == "stop":
-                    app.supervisor.stop(route[4])
-                    result = {"stopped": True}
-                else:
-                    app.supervisor.decide(route[4], route[5] == "approve")
-                    result = {"decided": route[5]}
-            elif path == "/api/v1/route":
-                if set(payload) != {"instruction"}:
-                    raise ValueError("Expected instruction")
-                result = app.route_decision(payload["instruction"])
-            elif path == "/api/v1/route/handoff":
-                if set(payload) != {"instruction", "agent"}:
-                    raise ValueError("Expected instruction and agent")
-                result = app.create_handoff(payload["instruction"], payload["agent"])
-            elif path == "/api/v1/model/plan":
-                if set(payload) != {"instruction"}:
-                    raise ValueError("Expected instruction")
-                result = app.model_plan(payload["instruction"])
-            elif path == "/api/v1/model/suggest":
-                if set(payload) != {"instruction"}:
-                    raise ValueError("Expected instruction")
-                result = app.local_suggest(payload["instruction"])
-            elif route[6] == "approve":
-                if payload:
-                    raise ValueError("No arguments allowed for approval")
-                result = app.tasks.approve(route[3], route[5])
-            else:
-                if payload:
-                    raise ValueError("No arguments allowed for dispatch")
-                result = app.dispatch_stage(route[3], route[5])
-        except AgentUnavailable as exc:
-            return self.reply(503, {"error": str(exc)[:240]})
-        except PermissionError as exc:
-            return self.reply(403, {"error": str(exc)[:240]})
-        except SupervisorError as exc:
-            return self.reply(409, {"error": str(exc)[:240]})
-        except LocalAgentError as exc:
-            return self.reply({"busy": 409, "unavailable": 503}.get(exc.kind, 400), {"error": str(exc)[:240]})
-        except (ValueError, KeyError, TypeError) as exc:
-            return self.reply(400, {"error": str(exc)[:240]})
-        return self.reply(202, result)
 
 def make_server(workspace, ui, port=PORT, singleton=False):
     root = Path(workspace).resolve(strict=True)

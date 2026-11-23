@@ -22,11 +22,13 @@ AIWK-OS/
 
 | 模块 | 职责 | 约束 |
 | --- | --- | --- |
-| `aiws_workbench.py` | 仅 127.0.0.1 的 HTTP 服务：UI 静态资源、观察台/任务/模型/构建/工具 API、文件原始预览 | 不直接拥有执行权；写类操作走审批 DAG |
+| `aiws_workbench.py` | 工作台应用层（Controller）与启动入口 | 不直接拥有执行权；写类操作走审批 DAG |
+| `aiws_workbench_http.py` | 仅 127.0.0.1 的 HTTP 层：路由表（GET/POST）、UI 静态资源、文件原始预览 | 表外路径 404；POST 依次检查 Origin、CSRF、JSON、16 KiB；`test_workbench_routes.py` 守护 |
 | `aiws_agent_service.py` / `aiws_agent_client.py` | 沙箱化 systemd 用户 Agent：持久 DAG 调度、工具执行 | 经 Broker；不能以 UI 布尔值替代审批 |
 | `aiws_permission_broker.py` | 独立同 UID UNIX Socket 策略决策、阶段校验、一次性回执 | **不是**内核强制隔离 |
 | `aiws_tasks.py` | SQLite DAG、状态转换、审批、哈希链审计 | |
-| `aiws_toolplane.py` | 工具目录与低层工具实现 | 路径受限，不跟随符号链接 |
+| `aiws_toolplane.py` | 工具目录、类别、路径约束与分发 | 路径受限，不跟随符号链接 |
+| `aiws_tools_files.py` / `aiws_tools_system.py` | 文件类 / 系统类工具实现 | 只经 `aiws_toolplane.invoke` 调用 |
 | `aiws_exttools.py` | 声明式外部只读命令（rg / jq / git log / sqlite SELECT） | 固定 argv、`--` 之后传值、输出有界 |
 | `aiws_apps.py` / `aiws_launcher.py` | 集成应用注册表；桌面启动器（只为“已批准且运行中”的 `app.launch` 阶段启动，自己重新核对） | 不接收参数；环境白名单；限速 |
 | `aiws_guest_ops.py` / `aiws_guest_boundary.py` | 受限系统服务/内核操作；客户机边界检查 | 客户机权限 ≠ 宿主权限 |
