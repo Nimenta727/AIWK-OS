@@ -1,4 +1,4 @@
-name: Release preview ISO (full image, model weights included)
+name: Release preview ISO (full image; model weights are NOT included)
 
 # Publishes a GitHub PRE-RELEASE, and only after the image built, passed its checksums and booted to the
 # AIWS boot smoke marker in QEMU. Anything less fails the run and publishes nothing.
@@ -13,8 +13,6 @@ permissions:
 
 env:
   LLAMA_CPP_COMMIT: 29b52d398b294509746ec0a3f28948a3107c0213
-  MODEL_URL: https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
-  MODEL_SHA256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
 
 jobs:
   plan:
@@ -133,17 +131,12 @@ jobs:
         with: {name: aiws-code, path: inputs/code}
       - uses: actions/download-artifact@v4
         with: {name: llama-server, path: inputs/llama}
-      - name: Download the model weights and verify the trusted checksum
+      - name: Verify the pinned inputs (AIWS Code and llama-server; no model weights are downloaded or shipped)
         run: |
           set -Eeuo pipefail
-          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 30 --output inputs/model.gguf "$MODEL_URL"
-          echo "$MODEL_SHA256  inputs/model.gguf" | sha256sum --check --status
-          test "$(head -c4 inputs/model.gguf)" = GGUF
           (cd inputs/code && sha256sum -c aiws-code-*.tar.zst.sha256)
           (cd inputs/llama && sha256sum -c llama-server.sha256)
-          curl --fail --location --silent https://huggingface.co/Qwen/Qwen3.5-9B/raw/main/LICENSE --output inputs/QWEN-LICENSE.txt
-          grep -q "Apache License" inputs/QWEN-LICENSE.txt
-      - name: Build the full ISO (language toolchains, AIWS Code, local model) in a Debian 13 container
+      - name: Build the full ISO (language toolchains, AIWS Code, llama-server; no model weights) in a Debian 13 container
         timeout-minutes: 120
         run: |
           set -Eeuo pipefail
@@ -152,11 +145,7 @@ jobs:
           docker run --rm --privileged -v "$PWD":/repo -w /repo \
             -e AIWS_OS_PROFILE=full \
             -e AIWS_OS_OUTPUT=/repo/out/aiws-os \
-            -e AIWS_OS_MODEL_LICENSE_REVIEWED=1 \
-            -e AIWS_OS_MODEL_ID=Qwen/Qwen3.5-9B \
-            -e AIWS_OS_MODEL_GGUF_SHA256="$MODEL_SHA256" \
             -e AIWS_OS_LLAMA_SERVER_SHA256="$(sha256sum inputs/llama/llama-server | cut -d' ' -f1)" \
-            -e AIWS_OS_BUNDLED_MODEL_GGUF=/repo/inputs/model.gguf \
             -e AIWS_OS_BUNDLED_LLAMA_SERVER=/repo/inputs/llama/llama-server \
             -e AIWS_CODE_TARBALL="/repo/$code_tar" \
             -e AIWS_CODE_SHA256="$(sha256sum "$code_tar" | cut -d' ' -f1)" \
@@ -170,7 +159,7 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" out
           ls -la out/aiws-os/*.iso out/aiws-os/*.packages 2>/dev/null || ls -la out/aiws-os
           (cd out/aiws-os && sha256sum -c live-image-amd64.hybrid.iso.sha256)
-      - name: Prove the ISO really contains the model weights, llama-server and AIWS Code
+      - name: Prove the ISO contains llama-server and AIWS Code, and does NOT contain model weights
         run: |
           set -Eeuo pipefail
           sudo apt-get install -y --no-install-recommends squashfs-tools xorriso
@@ -178,10 +167,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/content"
           xorriso -osirrox on -indev "$iso" -extract /live/filesystem.squashfs "$RUNNER_TEMP/content/fs.squashfs"
           fs="$RUNNER_TEMP/content/fs.squashfs"
-          got="$(unsquashfs -cat "$fs" usr/local/share/aiws/model-preload/aiws-local.gguf | sha256sum | cut -d' ' -f1)"
-          echo "model inside ISO: $got"
-          test "$got" = "$MODEL_SHA256"
-          unsquashfs -cat "$fs" usr/local/share/aiws/model-preload/manifest.json
+          if unsquashfs -l "$fs" | grep -E "model-preload|\.gguf$"; then echo "model weights must not be inside the release ISO"; exit 1; fi
           llama="$(unsquashfs -cat "$fs" usr/local/bin/llama-server | sha256sum | cut -d' ' -f1)"
           test "$llama" = "$(cut -d' ' -f1 inputs/llama/llama-server.sha256)"
           for f in opt/aiws-code/LICENSE.txt opt/aiws-code/ThirdPartyNotices.txt opt/aiws-code/AIWS-NOTICE.md opt/aiws-code/PROVENANCE.json; do
@@ -234,7 +220,6 @@ jobs:
           fi
           cp out/aiws-os/*.packages release-files/aiws-os-${VERSION}-packages.txt 2>/dev/null || true
           cp inputs/code/endpoint-report.json release-files/aiws-code-endpoint-report.json
-          cp inputs/QWEN-LICENSE.txt release-files/QWEN-LICENSE.txt
           cp NOTICE docs/THIRD_PARTY.md release-files/
           (cd release-files && sha256sum -- * > SHA256SUMS && echo "$iso_sha  ${name} (reassembled)" >> SHA256SUMS)
           cat > release-files/REASSEMBLE.txt <<TXT
@@ -255,21 +240,26 @@ jobs:
             echo "- 本地助手：每步一个受约束的 JSON 动作；只读工具自动执行，改动只能提案；技能（Agent Skills 格式）与插件（只取文字，从不运行钩子/脚本）；读日志工具；三档路由（local / flash / pro）。详见 docs/AIWS_LOCAL_AGENT.md"
             echo "- 开发工具链：Python、Node.js/TypeScript、Go、Rust、Java、Ruby、PHP、Lua、C/C++ 等及常用 CLI 工具"
             echo "- AIWS Code：Code - OSS ${AIWS_CODE_TAG:-1.147.0} 重新品牌化构建（MIT；保留上游许可与声明）"
-            echo "- 本地模型：Qwen3.5-9B Q4_K_M（Apache-2.0，约 5.7 GB），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**已随镜像提供，默认不加载**。**在客户机里用 CPU 跑它实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，且很慢）**：推荐经宿主显卡通道使用，或把虚拟机内存调到 ≥ 14 GiB"
+            echo "- llama.cpp 的 llama-server（固定提交 \`${LLAMA_CPP_COMMIT}\`）已随镜像提供；**镜像里没有任何模型权重**。"
+            echo
+            echo "## 模型权重：自己下载，镜像不带"
+            echo "产品模型是 Qwen3.5-9B（Q4_K_M，约 5.7 GB，Apache-2.0）。权重不随镜像发布，请自行下载并校验哈希后放入系统，**完整步骤见仓库文档 docs/AIWS_MODEL_WEIGHTS.md**。没有权重时系统其余部分（工作台、计划审核、云端构建、文件与日志的确定性工具）都能用，只是没有本地助手和本地路由。"
+            echo "- 客户机里用 CPU 跑 9B 实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，而且很慢），请把虚拟机内存调到 ≥ 14 GiB。"
+            echo "- 宿主显卡通道的代码已在仓库里，但**这个镜像和启动脚本里还没有接线**，所以现在不是可用的路径。"
             echo
             echo "## 验证状态（如实）"
-            echo "- ✅ 构建期：校验和、GGUF 魔数、AIWS Code 许可文件齐全检查、工作台测试通过"
-            echo "- ✅ 从成品 ISO 里读回：模型权重 sha256 与官方值一致；llama-server 与构建产物一致；AIWS Code 的 LICENSE / ThirdPartyNotices / 来源记录都在镜像里"
+            echo "- ✅ 构建期：校验和、AIWS Code 许可文件齐全检查、工作台测试通过"
+            echo "- ✅ 从成品 ISO 里读回：确认**没有**模型权重；llama-server 与构建产物一致；AIWS Code 的 LICENSE / ThirdPartyNotices / 来源记录都在镜像里"
             echo "- ✅ 本地助手：用真实 Qwen3.5-9B 与真实 llama-server（在开发环境里自己编的，不是镜像里固定的那个提交）做过端到端验证（9 个场景全通过）；Python 913 项、前端 45 项测试通过"
             echo "- ✅ QEMU 启动到 \`AIWS_BOOT_SMOKE_PASS\`（加速方式见 Actions 日志）"
-            echo "- ❓ **未验证**：9B 在本镜像的客户机里实际运行（默认不加载；CPU 上需约 11 GiB 内存且很慢）、真实模型门与真实 9B 一起运行、显卡通道、新外壳（无桌面环境）的输入法与分辨率、双盘/只读系统盘在真机上的行为、真实硬件/Secure Boot、模型在本镜像里的真实质量、官方 CLI（Claude Code / Codex）真实端到端、AIWS Code 在镜像内的完整可用性、桌面程序启动"
+            echo "- ❓ **未验证**：按文档把 9B 放进本镜像并在客户机里实际运行、真实模型门与真实 9B 一起运行、显卡通道、新外壳（无桌面环境）的输入法与分辨率、双盘/只读系统盘在真机上的行为、真实硬件/Secure Boot、模型在本镜像里的真实质量、官方 CLI（Claude Code / Codex）真实端到端、AIWS Code 在镜像内的完整可用性、桌面程序启动"
             echo "- 安全边界是应用层（同 UID 的 Broker），**不是内核强制隔离**"
             echo
             echo "## 校验与重组"
             echo "ISO sha256：\`${iso_sha}\`。文件被拆成 ≤1.9 GiB 的分卷（GitHub 单个附件上限 2 GiB）时，见 \`REASSEMBLE.txt\`，并用 \`SHA256SUMS\` 校验。"
             echo
             echo "## 许可与源码"
-            echo "仓库代码 Apache-2.0。镜像包含 Debian 软件包、Linux 内核、Code - OSS、llama.cpp、Qwen 模型等第三方组件，各自保留其许可；见 \`NOTICE\`、\`THIRD_PARTY.md\`、\`QWEN-LICENSE.txt\` 与随 AIWS Code 附带的 \`LICENSE.txt\`/\`ThirdPartyNotices.txt\`。Debian 包清单（含版本）见 \`aiws-os-${VERSION}-packages.txt\`，其源码可从 Debian 归档获取（\`apt-get source <包名>\`，源码索引 https://deb.debian.org/debian/ 下 trixie 的 \`deb-src\`）。"
+            echo "仓库代码 Apache-2.0。镜像包含 Debian 软件包、Linux 内核、Code - OSS、llama.cpp等第三方组件（模型权重不随镜像发布，其许可见 docs/AIWS_MODEL_WEIGHTS.md），各自保留其许可；见 \`NOTICE\`、\`THIRD_PARTY.md\`、\`QWEN-LICENSE.txt\` 与随 AIWS Code 附带的 \`LICENSE.txt\`/\`ThirdPartyNotices.txt\`。Debian 包清单（含版本）见 \`aiws-os-${VERSION}-packages.txt\`，其源码可从 Debian 归档获取（\`apt-get source <包名>\`，源码索引 https://deb.debian.org/debian/ 下 trixie 的 \`deb-src\`）。"
             echo
             echo "构建提交：\`${GITHUB_SHA}\` · Actions 运行：${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } > release-notes.md

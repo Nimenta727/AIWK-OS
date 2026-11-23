@@ -58,24 +58,32 @@ python3 "$repo/os/plugins/build_manifest.py" "$out/config/includes.chroot/usr/lo
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
 cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
 
-# Optional model-inclusive ISO, prepared only in an isolated licensed builder.
-# Never fetch model weights from a running VM or access any host directory.
-if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF || -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
-  [[ "$AIWS_OS_MODEL_LICENSE_REVIEWED" == "1" ]] || {
-    echo "ERROR: user must review source and quantization licenses" >&2; exit 2;
-  }
-  [[ "$AIWS_OS_MODEL_GGUF_SHA256" =~ ^[a-f0-9]{64}$ ]] || exit 2
-  [[ "$AIWS_OS_LLAMA_SERVER_SHA256" =~ ^[a-f0-9]{64}$ ]] || exit 2
-  for source in "$AIWS_OS_BUNDLED_MODEL_GGUF" "$AIWS_OS_BUNDLED_LLAMA_SERVER"; do
-    [[ -f "$source" && ! -L "$source" ]] || {
-      echo "ERROR: only plain local builder files may be packaged" >&2; exit 2;
-    }
-  done
-  [[ "$(sha256sum -- "$AIWS_OS_BUNDLED_MODEL_GGUF" | cut -d' ' -f1)" == "$AIWS_OS_MODEL_GGUF_SHA256" ]] || {
-    echo "ERROR: actual GGUF checksum mismatch" >&2; exit 2;
+# llama-server (the inference program) can ship WITHOUT any model weights: the release ISO does exactly that, and the customer downloads
+# the weights themselves (docs/AIWS_MODEL_WEIGHTS.md). Both pieces are optional and independent.
+if [[ -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
+  [[ "${AIWS_OS_LLAMA_SERVER_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || { echo "ERROR: AIWS_OS_LLAMA_SERVER_SHA256 is required" >&2; exit 2; }
+  [[ -f "$AIWS_OS_BUNDLED_LLAMA_SERVER" && ! -L "$AIWS_OS_BUNDLED_LLAMA_SERVER" ]] || {
+    echo "ERROR: only plain local builder files may be packaged" >&2; exit 2;
   }
   [[ "$(sha256sum -- "$AIWS_OS_BUNDLED_LLAMA_SERVER" | cut -d' ' -f1)" == "$AIWS_OS_LLAMA_SERVER_SHA256" ]] || {
     echo "ERROR: llama-server checksum mismatch" >&2; exit 2;
+  }
+  install -m 0755 "$AIWS_OS_BUNDLED_LLAMA_SERVER" "$out/config/includes.chroot/usr/local/bin/llama-server"
+  echo "llama-server included in the guest ISO (no model weights unless AIWS_OS_BUNDLED_MODEL_GGUF is also set)."
+fi
+
+# Optional model-inclusive ISO, prepared only in an isolated licensed builder (used by the CI pipeline smoke; the release does not use it).
+# Never fetch model weights from a running VM or access any host directory.
+if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF ]]; then
+  [[ "${AIWS_OS_MODEL_LICENSE_REVIEWED:-}" == "1" ]] || {
+    echo "ERROR: user must review source and quantization licenses" >&2; exit 2;
+  }
+  [[ "${AIWS_OS_MODEL_GGUF_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || exit 2
+  [[ -f "$AIWS_OS_BUNDLED_MODEL_GGUF" && ! -L "$AIWS_OS_BUNDLED_MODEL_GGUF" ]] || {
+    echo "ERROR: only plain local builder files may be packaged" >&2; exit 2;
+  }
+  [[ "$(sha256sum -- "$AIWS_OS_BUNDLED_MODEL_GGUF" | cut -d' ' -f1)" == "$AIWS_OS_MODEL_GGUF_SHA256" ]] || {
+    echo "ERROR: actual GGUF checksum mismatch" >&2; exit 2;
   }
   [[ "$(head -c4 -- "$AIWS_OS_BUNDLED_MODEL_GGUF")" == "GGUF" ]] || {
     echo "ERROR: model GGUF magic mismatch" >&2; exit 2;
@@ -83,8 +91,6 @@ if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF || -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
   preload="$out/config/includes.chroot/usr/local/share/aiws/model-preload"
   install -d -m 0755 "$preload"
   install -m 0444 "$AIWS_OS_BUNDLED_MODEL_GGUF" "$preload/aiws-local.gguf"
-  install -m 0755 "$AIWS_OS_BUNDLED_LLAMA_SERVER" \
-    "$out/config/includes.chroot/usr/local/bin/llama-server"
   model_id="${AIWS_OS_MODEL_ID:-Qwen/Qwen3.5-9B}"
   [[ "$model_id" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "ERROR: invalid AIWS_OS_MODEL_ID" >&2; exit 2; }
   printf '{"modelId":"%s","sha256":"%s","source":"license-reviewed-builder-source","licenseReviewed":true}\n' \

@@ -20,8 +20,19 @@ if [[ -n "${AIWS_WORK_DISK:-}" ]]; then
   [[ -f "$AIWS_WORK_DISK" && -r "$AIWS_WORK_DISK" && -w "$AIWS_WORK_DISK" ]] || { echo "Work disk missing or not writable: $AIWS_WORK_DISK" >&2; exit 1; }
   extra=(-drive "file=$AIWS_WORK_DISK,if=virtio,format=qcow2,cache=none,discard=unmap")
 fi
+# Memory for the virtual machine in MiB (default 6144). The 9B model needs about 11 GiB when it runs on the guest CPU: use 16384 for it.
+mem="${AIWS_VM_MEM:-6144}"
+case "$mem" in ''|*[!0-9]*) echo 'AIWS_VM_MEM must be a number of MiB.' >&2; exit 1;; esac
+if [ "$mem" -lt 2048 ] || [ "$mem" -gt 65536 ]; then echo 'AIWS_VM_MEM must be between 2048 and 65536.' >&2; exit 1; fi
+# Optional READ-ONLY third disk, e.g. one that carries the model weights you downloaded yourself (docs/AIWS_MODEL_WEIGHTS.md). The guest has no
+# network by design, so this is how a file gets in. It is attached read-only and is not mounted automatically.
+if [[ -n "${AIWS_EXTRA_DISK:-}" ]]; then
+  case "$AIWS_EXTRA_DISK" in /*) ;; *) echo 'AIWS_EXTRA_DISK must be an absolute path.' >&2; exit 1;; esac
+  [[ -f "$AIWS_EXTRA_DISK" && -r "$AIWS_EXTRA_DISK" ]] || { echo "Extra disk missing or unreadable: $AIWS_EXTRA_DISK" >&2; exit 1; }
+  extra+=(-drive "file=$AIWS_EXTRA_DISK,if=virtio,format=raw,readonly=on")
+fi
 exec qemu-system-x86_64 \
-  -machine q35,accel=kvm -cpu host -smp 4 -m 6144 \
+  -machine q35,accel=kvm -cpu host -smp 4 -m "$mem" \
   -boot d -drive "file=$iso,if=ide,media=cdrom,readonly=on,format=raw" "${extra[@]}" \
   -nic none -monitor none -serial none -parallel none \
   -display gtk -vga virtio \

@@ -122,5 +122,16 @@ class AiwsOsContract(unittest.TestCase):
                             continue                                  # build.sh only needs zstd when AIWS Code is bundled
                         self.assertIn(tool, line, wf.name)
 
+    def test_the_release_iso_does_not_carry_model_weights_and_the_docs_say_how_to_get_them(self):
+        wf = (ROOT / ".github/workflows/release-preview.yml").read_text()
+        for forbidden in ("AIWS_OS_BUNDLED_MODEL_GGUF", "inputs/model.gguf", "MODEL_URL", "QWEN-LICENSE"):
+            self.assertNotIn(forbidden, wf)
+        self.assertIn("model weights must not be inside the release ISO", wf)          # the built ISO is checked for a .gguf
+        doc = (ROOT.parent / "docs/AIWS_MODEL_WEIGHTS.md").read_text()
+        self.assertIn("03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8", doc)
+        self.assertIn("--import-guest", doc); self.assertIn("AIWS_VM_MEM", doc); self.assertIn("AIWS_EXTRA_DISK", doc)
+        run = (ROOT / "host/run-qemu-offline.sh").read_text()
+        self.assertIn("AIWS_VM_MEM", run); self.assertIn("readonly=on", run)
+
 if __name__ == "__main__":
     unittest.main()

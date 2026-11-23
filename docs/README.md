@@ -20,6 +20,7 @@
 | --- | --- |
 | AI 原生路线与已定决策 | [AIWS_NATIVE_AI_PLAN](AIWS_NATIVE_AI_PLAN.md) |
 | 观察台（首页）与 token 统计 | [AIWS_OBSERVATORY_PLAN](AIWS_OBSERVATORY_PLAN.md) |
+| **模型权重：自己下载、怎么放进系统** | [AIWS_MODEL_WEIGHTS](AIWS_MODEL_WEIGHTS.md) |
 | 本地模型的专用 Agent 接口（循环、技能、插件、路由、读日志） | [AIWS_LOCAL_AGENT](AIWS_LOCAL_AGENT.md) |
 | 本地模型与模型路由 | [AIWS_LOCAL_MODEL](AIWS_LOCAL_MODEL.md) · [AIWS_MODEL_ROUTER](AIWS_MODEL_ROUTER.md) · [微调与评测标准（含数据集 v3）](AIWS_MODEL_FINETUNING_STANDARD.md) |
 | 工具审批：AI 启动程序 / 外部工具 | [AIWS_TOOL_APPROVAL](AIWS_TOOL_APPROVAL.md) · [工具能力层](AIWS_AGENT_TOOL_FABRIC.md) |
