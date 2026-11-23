@@ -32,17 +32,20 @@ def main():
         wait=WebDriverWait(browser,30)
         browser.set_page_load_timeout(30)
         browser.get("http://127.0.0.1:17640/")
-        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-sh .aiws-sh-tabs"))
+        # The shell picks its language from the browser, and headless Chrome says en-US: the steps below click Chinese labels, so ask for Chinese.
+        browser.execute_script("window.localStorage.setItem('aiws.lang','zh')")
+        browser.get("http://127.0.0.1:17640/")
+        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".app .tabs"))
         print("AIWS_GUI_BROWSER: React workbench rendered",flush=True)
 
         def go(label):
-            """Open a view through the command palette (Ctrl+Shift+P), the shell's one uniform way to navigate."""
+            """Open a view through the command palette (Ctrl+Shift+P), the shell's one uniform way to navigate. The labels are the view names of the VS Code style shell."""
             ActionChains(browser).key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("p").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
-            box=wait.until(lambda b:b.find_element(By.CSS_SELECTOR,".aiws-sh-palette input"))
+            box=wait.until(lambda b:b.find_element(By.CSS_SELECTOR,".pal input"))
             box.send_keys(label)
-            wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-sh-palette li[role=option]"))
+            wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".pal li[role=option]"))
             box.send_keys(Keys.ENTER)
-            wait.until(lambda b:not b.find_elements(By.CSS_SELECTOR,".aiws-sh-palette"))
+            wait.until(lambda b:not b.find_elements(By.CSS_SELECTOR,".pal"))
 
         go("AI 文件管理")
         wait.until(lambda b:b.find_elements(By.XPATH,
@@ -61,23 +64,19 @@ def main():
         browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
         wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
         print("AIWS_GUI_BROWSER: DAG stage executed",flush=True)
-        go("本地 AI 助手")
+        go("本地模型开关")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
         assert "DISABLED" in browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text
         # A genuine guest-only *candidate* pipeline, not a running kernel edit.
-        go("系统与安全")
+        go("系统服务与内核")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-system-console"))
         wait.until(lambda b:"CONFIG" not in b.find_element(By.CSS_SELECTOR,".aiws-os-system-console").text)
         browser.find_element(By.XPATH,"//button[contains(.,'提交候选验证和暂存审批')]").click()
-        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
-        wait.until(lambda b:b.find_elements(By.XPATH,
-            "//button[contains(@class,'aiws-os-task') and contains(.,'验证并暂存客户机内核配置候选')]"))
-        browser.find_element(By.XPATH,
-            "//button[contains(@class,'aiws-os-task') and contains(.,'验证并暂存客户机内核配置候选')]").click()
-        wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-stage-status"))
-        browser.find_element(By.XPATH,"//button[contains(.,'批准客体写操作')]").click()
-        wait.until(lambda b:b.find_elements(By.XPATH,"//button[contains(.,'运行客户机阶段')]"))
-        browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
+        # In the VS Code style shell the submit opens the plan review page; a high-risk step needs an explicit confirmation there.
+        wait.until(lambda b:b.find_elements(By.XPATH,"//button[contains(.,'批准并运行')]"))
+        browser.find_element(By.XPATH,"//button[contains(.,'批准并运行')]").click()
+        wait.until(lambda b:b.find_elements(By.XPATH,"//button[contains(.,'我确认，运行')]"))
+        browser.find_element(By.XPATH,"//button[contains(.,'我确认，运行')]").click()
         # Read the same live guest API that backs the UI; print exact state on failure.
         # A pass still requires both the GUI receipt and actual staged evidence.
         def kernel_stage_state():
@@ -93,18 +92,15 @@ def main():
                     timeout=5) as reply:
                 return json.load(reply)
         try:
-            wait.until(lambda b:"COMPLETED" in b.find_element(
-                By.CSS_SELECTOR,".aiws-os-stage-status").text)
-            wait.until(lambda b:'"deployed": false' in b.find_element(
-                By.CSS_SELECTOR,".aiws-os-stage-status").text)
+            # The plan page does not print the result, so the proof is the live guest API: the stage completed and nothing was deployed.
+            wait.until(lambda b:kernel_stage_state().get("stages",[{}])[0].get("state")=="completed")
             state=kernel_stage_state()
             assert state["stages"][0]["state"]=="completed",state
             assert state["stages"][0]["result"]["deployed"] is False,state
         except Exception:
             print("AIWS_GUI_KERNEL_DIAGNOSTIC: "+json.dumps(
                 kernel_stage_state(),ensure_ascii=False,default=str)[:3500],flush=True)
-            print("AIWS_GUI_KERNEL_DOM: "+browser.find_element(
-                By.CSS_SELECTOR,".aiws-os-studio").text[-2500:],flush=True)
+            print("AIWS_GUI_KERNEL_DOM: "+browser.find_element(By.CSS_SELECTOR,"body").text[-2500:],flush=True)
             raise
         print("AIWS_GUI_BROWSER: kernel candidate approved/staged without deployment",flush=True)
         print("AIWS_GUI_BROWSER_PASS: files=clicked dag=executed model=optional kernel=candidate-only",flush=True)
