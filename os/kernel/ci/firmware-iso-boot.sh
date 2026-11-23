@@ -17,8 +17,11 @@ grep -Eq 'El Torito boot img.*BIOS' "$out/el-torito.txt" || {
 grep -Eq 'El Torito boot img.*(UEFI|EFI)' "$out/el-torito.txt" || {
  echo 'AIWS_FIRMWARE_ISO_FAIL missing UEFI record' >&2; exit 1;
 }
+# KVM when the runner exposes it (minutes), otherwise TCG (software, several times slower).
+accel=tcg; [[ -w /dev/kvm ]] && accel=kvm
+echo "AIWS_FIRMWARE_ISO_ACCEL=$accel"
 launch() {
- qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 \
+ qemu-system-x86_64 -machine q35,accel=$accel -cpu max -smp 2 -m 4096 \
    -boot order=d,menu=off -cdrom "$iso" \
    -nic none -display none -vga std -monitor none \
    -serial "file:$out/boot-serial.log" -no-reboot \

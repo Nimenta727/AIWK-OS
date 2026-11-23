@@ -23,15 +23,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: read
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -a; . release/PREVIEW.env; set +a
-          case "${AIWS_RELEASE_STAGE:-code}" in code|iso-dry|full) ;; *) echo "bad stage" >&2; exit 1;; esac
-          echo "stage=${AIWS_RELEASE_STAGE:-code}" >> "$GITHUB_OUTPUT"
+          stage="${AIWS_RELEASE_STAGE:-code}"
+          case "$stage" in code|iso-dry|full) ;; *) echo "bad stage" >&2; exit 1;; esac
+          # A tag can be published once. Find out now, not after a 30-minute build (run 9 failed this way when
+          # the branch was merged and PREVIEW.env arrived on main with a tag that already had a release).
+          if [[ "$stage" == full ]] && gh release view "$AIWS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_NAME" == "${{ github.event.repository.default_branch }}" ]]; then
+              echo "::notice::Release $AIWS_RELEASE_TAG already exists (this push is the merge of the branch that published it). Nothing to build."
+              stage=skip
+            else
+              echo "::error::Release $AIWS_RELEASE_TAG already exists. Set a new AIWS_RELEASE_TAG in release/PREVIEW.env (tags are never reused)."
+              exit 1
+            fi
+          fi
+          echo "stage=$stage" >> "$GITHUB_OUTPUT"
           echo "Stage: ${AIWS_RELEASE_STAGE:-code}  (code = AIWS Code + llama-server only; iso-dry = also build and boot the ISO; full = also publish)"
 
   aiws-code:
     name: Build AIWS Code (rebranded Code - OSS)
     needs: plan
+    if: needs.plan.outputs.stage != 'skip'
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -68,6 +83,7 @@ jobs:
           retention-days: 7
 
   llama-server:
+    if: needs.plan.outputs.stage != 'skip'
     name: Build llama-server for the Debian 13 guest ABI
     needs: plan
     runs-on: ubuntu-latest
@@ -77,8 +93,9 @@ jobs:
       - name: Compile the pinned llama.cpp in a Debian 13 container
         run: |
           set -Eeuo pipefail
-          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /tmp/aiws-llama
-          git -C /tmp/aiws-llama fetch origin "$LLAMA_CPP_COMMIT"
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "attempt $i failed: $*" >&2; sleep $((i * 15)); done; return 1; }
+          retry git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /tmp/aiws-llama
+          retry git -C /tmp/aiws-llama fetch origin "$LLAMA_CPP_COMMIT"
           git -C /tmp/aiws-llama checkout --detach "$LLAMA_CPP_COMMIT"
           docker build --progress=plain -t aiws-llama-debian-builder -f os/model/ci/Dockerfile.builder /tmp/aiws-llama
           container="$(docker create aiws-llama-debian-builder)"
@@ -98,7 +115,7 @@ jobs:
   iso:
     name: Build, boot-test and publish the ISO
     needs: [plan, aiws-code, llama-server]
-    if: needs.plan.outputs.stage != 'code'
+    if: needs.plan.outputs.stage == 'iso-dry' || needs.plan.outputs.stage == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     permissions:
@@ -175,6 +192,13 @@ jobs:
           done
           unsquashfs -cat "$fs" opt/aiws-code/PROVENANCE.json
           echo "CONTENT_CHECK=pass" >> "$GITHUB_ENV"
+      - name: Let the runner user open /dev/kvm (falls back to software emulation when there is none)
+        run: |
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+            sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm || true
+          fi
+          ls -l /dev/kvm || echo "no /dev/kvm: QEMU will use TCG"
       - name: Boot the ISO in QEMU and require the AIWS boot smoke marker
         timeout-minutes: 60
         run: |
