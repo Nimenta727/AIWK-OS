@@ -163,7 +163,7 @@ jobs:
             debian:trixie bash -lc '
               set -eu
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools zstd
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools zstd python3
               ./os/debian/build.sh
             '
           # The container built as root: hand the output back to the runner user before later steps write next to it.

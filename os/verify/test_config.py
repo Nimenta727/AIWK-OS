@@ -107,6 +107,20 @@ class AiwsOsContract(unittest.TestCase):
         self.assertIn("brokerReady", boot)
         self.assertIn('AgentClient().request("tool.read"', mcp)
 
+    def test_every_container_that_runs_build_sh_has_the_tools_build_sh_calls(self):
+        """The image is built in a bare debian:trixie container. build.sh calls python3 (skill, plugin and system manifests); a workflow that
+        installs live-build but not python3 fails 7 seconds into the build, which is exactly how release run 10 failed."""
+        import re
+        build = (ROOT / "os/debian/build.sh").read_text()
+        needed = [t for t in ("python3", "zstd") if re.search(r"(^|\s)%s\s" % t, build, re.M)]
+        for wf in (ROOT / ".github/workflows").glob("*.yml"):
+            text = wf.read_text()
+            for line in text.splitlines():
+                if "apt-get install" in line and "live-build" in line:
+                    for tool in needed:
+                        if tool == "zstd" and "AIWS_CODE_TARBALL" not in text:
+                            continue                                  # build.sh only needs zstd when AIWS Code is bundled
+                        self.assertIn(tool, line, wf.name)
 
 if __name__ == "__main__":
     unittest.main()

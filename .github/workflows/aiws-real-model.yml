@@ -94,7 +94,7 @@ jobs:
             debian:trixie bash -lc '
               set -eu
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap xorriso squashfs-tools python3
               ./os/debian/build.sh
             '
           (cd out/aiws-os-model && sha256sum -c live-image-amd64.hybrid.iso.sha256)

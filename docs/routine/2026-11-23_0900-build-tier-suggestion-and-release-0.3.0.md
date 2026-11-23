@@ -18,3 +18,8 @@
 ## 下一步
 1. 看 Actions 结果；失败就按日志修。
 2. 在你的机器上用宿主显卡通道启动 9B，跑 `agent_eval.py`。
+
+## 发布第 10 次运行失败与修复（09:30）
+- 失败点：构建完整 ISO 一步，7 秒退出。`build.sh` 第 53 行 `python3: command not found`——干净的 `debian:trixie` 构建容器没装 python3，而 `build.sh` 里有三处调用（技能/插件/系统校验清单，都是我之前加的，从未在容器里跑过）。
+- 修复：三个工作流的容器安装行补 `python3`；加回归测试（变异检查：去掉后测试失败）；`PREVIEW.env` 加一行注释以重新触发。
+- 同一次运行里通过的部分：9B 权重下载与 sha256 校验、AIWS Code、llama-server。
