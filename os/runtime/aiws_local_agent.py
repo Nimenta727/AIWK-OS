@@ -353,7 +353,7 @@ def observation(call_id, tool, status, text):
 
 # ------------------------------------------------------------------------------------------------------ the agent
 class LocalAgent:
-    def __init__(self, llm, port, store, skills=None, plugins=None, emit=None, limits=None, retrieval_extra=None):
+    def __init__(self, llm, port, store, skills=None, plugins=None, emit=None, limits=None):
         self.llm, self.port, self.store = llm, port, store
         self.skills = skills if skills is not None else aiws_skills.SkillBook(None, None, plugins, port.names())
         self.plugins = plugins

@@ -142,6 +142,7 @@ class MandateStore:
             id TEXT PRIMARY KEY, mandate_id TEXT NOT NULL, session TEXT NOT NULL, state TEXT NOT NULL,
             reason TEXT, started REAL NOT NULL, ended REAL, used_in INTEGER NOT NULL DEFAULT 0,
             used_out INTEGER NOT NULL DEFAULT 0, turns INTEGER NOT NULL DEFAULT 0, pending TEXT)""")
+        self.db.execute("CREATE INDEX IF NOT EXISTS runs_started ON runs(started)")
 
     def close(self):
         with self.lock:

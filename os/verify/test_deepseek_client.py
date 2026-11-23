@@ -1,5 +1,4 @@
 """DeepSeek client against the SYNTHETIC fake server: parsing, history rules, retries, error mapping, key hygiene, size caps."""
-import json
 import sys
 import unittest
 from pathlib import Path

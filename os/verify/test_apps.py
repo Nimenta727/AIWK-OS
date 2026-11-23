@@ -3,7 +3,6 @@ import http.client
 import json
 import os
 from pathlib import Path
-import stat
 import sys
 import tempfile
 import threading

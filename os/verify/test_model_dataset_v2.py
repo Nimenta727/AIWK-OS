@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "model" / "training"))
 import generate_dataset as gen
 import validate_dataset as vd
 from guest_benchmark import load_cases, benchmark, RELEASE_LIMITS
-from aiws_local_model import LocalPlanner, MODEL_WRITE_TOOLS, READ_TOOLS, system_prompt
+from aiws_local_model import MODEL_WRITE_TOOLS, READ_TOOLS, system_prompt
 
 HELD2 = ROOT / "model" / "ci" / "heldout_v2.jsonl"
 HELD1 = ROOT / "model" / "ci" / "heldout_v1.jsonl"

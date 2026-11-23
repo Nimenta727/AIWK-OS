@@ -1,6 +1,5 @@
 """O5: image wiring of the model gate (scripts, packaging, guest smoke). Static checks plus the script<->gate contract."""
 from pathlib import Path
-import re
 import shlex
 import subprocess
 import sys

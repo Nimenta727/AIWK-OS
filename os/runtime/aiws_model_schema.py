@@ -10,7 +10,6 @@ important direction: anything this schema accepts is also accepted by `validate_
 Whether the deployed llama-server version accepts `response_format: {type: json_schema, ...}` is NOT verified in
 this repository; the planner therefore treats this mode as opt-in and falls back to plain JSON mode on a 400.
 """
-import json
 import re
 
 from aiws_local_model import MAX_STEPS, MODEL_WRITE_TOOLS, READ_TOOLS, FINGERPRINTED

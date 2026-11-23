@@ -1,6 +1,5 @@
 """Guest-only security policy regression. CI mocks VM detector; no host access."""
 from pathlib import Path
-import os
 import sys
 import tempfile
 import unittest

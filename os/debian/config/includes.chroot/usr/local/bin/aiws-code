@@ -18,7 +18,7 @@ if [ ! -d "$folder" ] || [ -L "$folder" ]; then echo "Not a regular folder: $fol
 
 state="$HOME/.local/share/aiws-code"
 runtime="${XDG_RUNTIME_DIR:-$state}"
-mkdir -p -m 0700 "$state" "$state/server-data/data/User" "$state/extensions"
+mkdir -p "$state/server-data/data/User" "$state/extensions" && chmod 0700 "$state"
 token_file="$runtime/aiws-code.token"
 umask 0077
 

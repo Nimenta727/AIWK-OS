@@ -1,5 +1,4 @@
 """Independent same-UID policy decision tests, never real host/tool execution."""
-import hashlib
 import os
 from pathlib import Path
 import socket

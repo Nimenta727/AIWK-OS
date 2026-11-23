@@ -172,7 +172,7 @@ class TaskStoreTests(unittest.TestCase):
         self.store.close()
         self.store = GuestTaskStore(self.folder)
         self.assertEqual(self.store.get(taskid)["stages"][0]["state"], "interrupted")
-        action = self.store.dispatch(taskid, "first")
+        self.store.dispatch(taskid, "first")
         self.store.started(taskid, "first")
         self.store.finished(taskid, "first", error="tool unavailable")
         self.assertEqual(self.store.get(taskid)["stages"][0]["state"], "failed")

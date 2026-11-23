@@ -157,6 +157,7 @@ class EventStore:
             seq INTEGER PRIMARY KEY AUTOINCREMENT, session TEXT NOT NULL, ts REAL NOT NULL,
             kind TEXT NOT NULL, body TEXT NOT NULL)""")
         self.db.execute("CREATE INDEX IF NOT EXISTS events_session ON events(session, seq)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS sessions_started ON sessions(started)")   # recent list + pruning
 
     def close(self):
         with self.lock:

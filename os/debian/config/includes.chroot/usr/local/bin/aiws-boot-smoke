@@ -9,7 +9,7 @@ if ! command -v lightdm >/dev/null 2>&1 ||
     exit 1
 fi
 desktop=0
-for i in $(seq 1 65); do
+for _ in $(seq 1 65); do
     if systemctl is-active --quiet display-manager && pgrep -x openbox >/dev/null; then
         desktop=1
         break
@@ -21,7 +21,7 @@ if [ "$desktop" -ne 1 ] || ! pgrep -x openbox >/dev/null; then
     exit 1
 fi
 health=0
-for i in $(seq 1 35); do
+for _ in $(seq 1 35); do
     if curl --fail --silent --noproxy '*' --max-time 2 http://127.0.0.1:17640/api/v1/health |
         python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["uiBundled"] and d["guestOnly"] and d["toolCount"] >= 10' 2>/dev/null; then
         health=1
@@ -56,7 +56,7 @@ if ! /usr/local/bin/aiws-toolctl --list | grep -q '"workspace.tree"'; then
     exit 1
 fi
 visible=0
-for i in $(seq 1 45); do
+for _ in $(seq 1 45); do
     if runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
         xdotool search --onlyvisible --class Chromium >/dev/null 2>&1; then
         visible=1
@@ -73,7 +73,7 @@ fi
 # Both depend on the window manager and the clipboard owner having settled, which takes noticeably longer on a
 # software-emulated CPU, so the check is retried for up to ~60 s. It must still succeed: no retry is a pass by itself.
 focus_ok=0
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
     if runuser -u user -- env DISPLAY=:0 XAUTHORITY=/home/user/.Xauthority \
         /bin/sh -c '
           pkill -x xclip 2>/dev/null

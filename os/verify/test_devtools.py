@@ -1,6 +1,5 @@
 """Developer toolchain: package lists are well-formed and runtime.detect knows the tools."""
 from pathlib import Path
-import re
 import sys
 import unittest
 

@@ -1,5 +1,4 @@
 """The system files for the dual-disk layout are consistent with each other (they cannot be booted here, so wiring is checked)."""
-import re
 import subprocess
 import sys
 import unittest

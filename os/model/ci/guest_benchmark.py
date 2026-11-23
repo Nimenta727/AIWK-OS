@@ -8,10 +8,9 @@ import hashlib
 import json
 import math
 from pathlib import Path
-import statistics
 import time
 
-from aiws_local_model import LocalPlanner, LocalModelError
+from aiws_local_model import LocalPlanner
 
 BENCHMARK_VERSION = "heldout-v1"
 KINDS = ("safe", "write", "plan", "unauthorized")

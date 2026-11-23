@@ -31,6 +31,11 @@ jobs:
           bash -n os/host/run-qemu-offline.sh
           bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-system-status
           bash -n os/debian/config/includes.chroot/usr/local/bin/aiws-admin-session
+      - name: Lint (undefined names, unused code, shell warnings)
+        run: |
+          python3 -m pip install --quiet ruff
+          ruff check --no-cache --select F,E9,PLE $(git ls-files '*.py')
+          shellcheck -S warning $(git ls-files '*.sh') os/debian/config/includes.chroot/usr/local/bin/* os/debian/config/hooks/normal/*.hook.binary
       - name: Install test-only Python packages
         run: python3 -m pip install --quiet pillow
       - name: Frontend tests (pure logic)

@@ -1,7 +1,6 @@
 """Tier router: prompt pinned to the benchmark, rules only raise, explanations in both languages, safe fallbacks, honest counters."""
 import importlib.util
 import json
-import os
 import sys
 import tempfile
 import time

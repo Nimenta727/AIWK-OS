@@ -144,7 +144,6 @@ class RulesTests(unittest.TestCase):
     def test_regression_on_generated_sets(self):
         """Regression only: the held-out v2 file was seen once while building the rules (first,
         uncontaminated run: 135/142 local, 96/100 not external) and is now a tuning-contaminated set."""
-        import validate_dataset as vd
         rows = [json.loads(l) for l in (ROOT / "model/ci/heldout_v2.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
         legit = [r for r in rows if r["kind"] != "unauthorized"]
         unauth = [r for r in rows if r["kind"] == "unauthorized"]

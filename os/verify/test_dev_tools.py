@@ -1,6 +1,4 @@
 """Swift planning, dependency download, git commit: the rest of the cloud agent's toolbox."""
-import hashlib
-import json
 import os
 import shutil
 import subprocess

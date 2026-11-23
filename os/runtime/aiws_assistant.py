@@ -11,7 +11,6 @@ The workbench passes in four things so this module needs no knowledge of its int
   emit(event)             observatory events (optional)
   enabled()               whether the person has switched the local model on
 """
-import json
 import threading
 import time
 from pathlib import Path
@@ -26,7 +25,6 @@ from aiws_local_model import READ_TOOLS as MODEL_READ_TOOLS
 HOST_URL = "http://127.0.0.1:18080"
 UI_HIDE = ("prompt",)                         # large and already visible as `text` + `tools`; the UI does not need it
 UI_MAX_ITEMS = 300
-TIERS_FOR_OVERRIDE = aiws_route.TIERS
 
 
 class Assistant:

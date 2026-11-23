@@ -4,7 +4,6 @@ Why this exists: the gate was written for a one-shot planner (system+user only, 
 sends a conversation with assistant turns, `chat_template_kwargs` and a growing history. A client that passes every unit test against a
 permissive fake can still be rejected by the real gate, so this test sends the agent's real requests through it."""
 import json
-import os
 import socket
 import sys
 import tempfile

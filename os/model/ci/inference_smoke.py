@@ -4,8 +4,6 @@ Only synthetic prompts. The model response is never executed as an OS action.
 Real resources and validation quality are recorded, not assumed.
 """
 import json
-import os
-import resource
 import subprocess
 import time
 import urllib.error

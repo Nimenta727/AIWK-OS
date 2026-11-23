@@ -21,7 +21,6 @@ import re
 from pathlib import Path
 
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-LEGACY_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 TOOL_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 MAX_FRONT = 8 * 1024
 MAX_FILE = 64 * 1024

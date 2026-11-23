@@ -1,6 +1,5 @@
 """Skills (Agent Skills format) and plugins (Claude Code layout, text only): parsing, trust, enabling, guards, commands."""
 import json
-import os
 import shutil
 import stat
 import sys

@@ -11,7 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "runtime"))
 import aiws_events as ev
-from aiws_events import EventError, EventStore, make_event, validate_event, redact, UNRECOGNIZED
+from aiws_events import EventError, EventStore, make_event, validate_event, redact
 import aiws_cli_adapters as ad
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, replay
 

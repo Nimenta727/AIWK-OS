@@ -1,5 +1,4 @@
 """Work disk: never format anything but one blank disk; snapshot names validated; rollback keeps the old state. System verify: tamper detection."""
-import json
 import os
 import sys
 import tempfile

@@ -1,6 +1,5 @@
 """Local agent loop against a scripted model server: every safety invariant and every persistence property. No real model."""
 import json
-import os
 import stat
 import sys
 import tempfile
@@ -230,7 +229,6 @@ class Safety(Rig):
 
 class Skills(Rig):
     def test_a_skill_is_listed_by_name_and_loaded_only_when_asked_for(self):
-        sys_prompt = self.srv.requests and None
         self.run_turn("why did build.log fail?", act(type="skill", name="aiws-log-tools:read-log"), call("log.digest", path="build.log"), final("Line 7."))
         first = self.srv.requests[0]["messages"]
         self.assertIn("aiws-log-tools:read-log:", first[0]["content"])                                      # level 1: the name and one line
@@ -253,6 +251,7 @@ class Skills(Rig):
         self.agent.run_turn(tid, "why did the build log fail?")
         tools = set(self.agent.store.load(tid)[0]["tools"])
         self.assertTrue({"log.digest", "log.lines"} <= tools)
+        self.assertFalse({"log.digest", "log.lines"} <= visible_before)      # they were brought in, not always there
 
     def test_a_skill_that_is_not_loaded_text_is_refused_cleanly(self):
         with patch.object(S.SkillBook, "load_text", side_effect=S.SkillError("too big")):

@@ -76,6 +76,7 @@ class GuestTaskStore:
             created_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS task_stages_idx ON stages(task_id,created_at);
+        CREATE INDEX IF NOT EXISTS stages_created_idx ON stages(created_at);  -- broker write-budget window scan
         CREATE INDEX IF NOT EXISTS task_audit_idx ON audit(task_id,seq);
         """)
         os.chmod(database, 0o600)

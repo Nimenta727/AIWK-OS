@@ -12,7 +12,7 @@ const RISK_TONE:Record<string,'ok'|'warn'|'err'|undefined>={low:'ok',medium:'war
 const STATE_ICON:Record<string,string>={completed:'pass',running:'sync',failed:'error',pending:'circle-large-outline',interrupted:'warning',unknown:'question'};
 
 /** The plan review area: one row per step, risk computed by the platform, approvals per step. No walls of text. */
-export default function Plans({english,tr,focus,onStop,activeRun,reload}:{english:boolean;tr:Tr;focus:string|null;onStop:(runId:string)=>void;activeRun:string|null;reload:()=>Promise<void>}){
+export default function Plans({tr,focus,onStop,activeRun,reload}:{tr:Tr;focus:string|null;onStop:(runId:string)=>void;activeRun:string|null;reload:()=>Promise<void>}){
  const [plans,setPlans]=useState<Plan[]>([]);
  const [sel,setSel]=useState<string|null>(focus);
  const [error,setError]=useState('');

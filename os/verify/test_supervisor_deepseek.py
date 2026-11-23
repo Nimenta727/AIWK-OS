@@ -1,7 +1,6 @@
 """The REAL supervisor launching the REAL native runner against the SYNTHETIC fake DeepSeek server."""
 import hashlib
 import json
-import os
 import sys
 import tempfile
 import time

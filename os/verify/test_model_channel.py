@@ -5,7 +5,6 @@ import os
 import struct
 import sys
 import threading
-import time
 import unittest
 import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer

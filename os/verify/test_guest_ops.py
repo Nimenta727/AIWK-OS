@@ -2,7 +2,6 @@
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
-import json
 import sys
 import tempfile
 import unittest

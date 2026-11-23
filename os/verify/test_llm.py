@@ -1,5 +1,4 @@
 """Local model client: request shape, graceful degradation, validation, streaming, status, prefix diagnosis. No real model."""
-import json
 import os
 import sys
 import time
@@ -101,7 +100,7 @@ class Chat(unittest.TestCase):
             self.assertEqual(r["degraded"], ["response_format:json_object_schema"])        # cache_prompt and template kwargs survive
             self.assertTrue(llm.features["cache_prompt"] and llm.features["template_kwargs"])
             self.assertIn("cache_prompt", srv.requests[-1])
-            self.assertEqual(blamed := L.blamed_field("unknown field chat_template_kwargs"), "chat_template_kwargs")
+            self.assertEqual(L.blamed_field("unknown field chat_template_kwargs"), "chat_template_kwargs")
             self.assertEqual(L.blamed_field("something else"), None)
 
     def test_the_ladder_goes_all_the_way_down_to_plain_json_and_remembers_the_floor(self):

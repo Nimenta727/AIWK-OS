@@ -30,7 +30,6 @@ import aiws_plans
 import aiws_secrets
 from aiws_cli_adapters import ClaudeStreamAdapter, CodexJsonAdapter, NativeAdapter, MAX_LINE
 from aiws_events import EventError, make_event, redact
-from aiws_mandate import MandateError
 
 APPROVAL_TIMEOUT = 600
 UNKNOWN_USAGE_LIMIT = 3

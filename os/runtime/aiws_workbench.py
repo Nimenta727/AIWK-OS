@@ -18,11 +18,10 @@ import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
-from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, FILE_WRITE_TOOLS, APP_LAUNCH_TOOLS
+from aiws_toolplane import audit, catalog, invoke, READ_TOOLS as PLANE_READ_TOOLS, APP_LAUNCH_TOOLS
 from aiws_guest_boundary import require_guest_runtime, protect_guest_workspace
 from aiws_tasks import GuestTaskStore, TaskError
 from aiws_guest_ops import GuestOperations, TOOLS as GUEST_OP_TOOLS, catalog as guest_catalog
-from aiws_model_registry import GuestModelRegistry
 from aiws_agent_client import AgentClient, TaskProxy, ReadOnlySystemProxy, ReadOnlyToolProxy, AgentUnavailable, AgentError
 from aiws_local_model import LocalPlanner, LocalModelError, stages_from_proposal
 from aiws_events import EventStore, EventError, SAFE_NAME, make_event
@@ -43,14 +42,13 @@ import aiws_deepseek
 import aiws_preview
 import aiws_launcher
 from aiws_toolplane import _path as workspace_path, _workspace
-from aiws_mandate import MandateStore, MandateError
+from aiws_mandate import MandateStore
 from aiws_supervisor import Supervisor, SupervisorError, load_builder_config
 from aiws_model_router import classify, after_local, build_handoff, handoff_stages, load_config, RouterError
 
 HOST = "127.0.0.1"
 PORT = 17640
 READ_ONLY = PLANE_READ_TOOLS
-GUEST_WRITES = FILE_WRITE_TOOLS
 # No direct guest write through transient /jobs: use approved durable DAG.
 EXPOSED = READ_ONLY
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
@@ -985,7 +983,7 @@ class Handler(BaseHTTPRequestHandler):
         expected = "http://" + HOST + ":" + str(self.server.server_port)
         if origin is not None and origin != expected:
             return self.reply(403, {"error": "Invalid origin"})
-        if self.headers.get("X-AIWS-CSRF") != self.server.application.csrf:
+        if not secrets.compare_digest(self.headers.get("X-AIWS-CSRF") or "", self.server.application.csrf):
             return self.reply(403, {"error": "Invalid CSRF"})
         if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
             return self.reply(415, {"error": "JSON required"})

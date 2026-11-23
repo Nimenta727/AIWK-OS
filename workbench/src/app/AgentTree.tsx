@@ -15,7 +15,7 @@ const CTX_ICON:Record<string,string>={file:'file',search:'search',url:'globe',co
 
 /** Cloud sub-agents as a tree: who spawned whom, which model, what context each was given, how far along it is.
  *  Everything comes from what the CLI reported; "inherited" and "unknown" are shown as such, never filled in. */
-export default function AgentTree({english,tr,sessions,focus,onOpenFile}:{english:boolean;tr:Tr;sessions:SessionRow[];focus:string|null;onOpenFile:(path:string)=>void}){
+export default function AgentTree({tr,sessions,focus,onOpenFile}:{tr:Tr;sessions:SessionRow[];focus:string|null;onOpenFile:(path:string)=>void}){
  const agentSessions=sessions.filter(s=>s.agent==='claude'||s.agent==='codex');
  const [session,setSession]=useState<string>(focus||agentSessions[0]?.session||'');
  const [tree,setTree]=useState<Tree|null>(null);

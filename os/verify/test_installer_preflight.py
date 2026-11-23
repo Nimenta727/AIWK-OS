@@ -1,11 +1,9 @@
 """Preflight is read-only; these tests do NOT qualify disk installation."""
 import importlib.util
 import io
-import json
 from pathlib import Path
 import unittest
 from contextlib import redirect_stderr
-from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "os/installer/aiws_install_preflight.py"

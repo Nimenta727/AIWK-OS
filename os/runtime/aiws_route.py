@@ -27,7 +27,6 @@ import json
 import os
 import re
 import threading
-import time
 from pathlib import Path
 
 import aiws_llm
@@ -66,7 +65,6 @@ FLOORS = (
     ("security", r"\b(vulnerab\w*|security (audit|review)|exploit\w*|side[- ]channel|takeover|injection)\b|漏洞|安全审计|侧信道|填充攻击|被盗用", "pro"),
 )
 _COMPILED = tuple((name, re.compile(rx, re.I), tier) for name, rx, tier in FLOORS)
-MARKER_RE = re.compile(r"^[a-z][a-z0-9-]{0,30}\Z")
 
 WHY = {
     "advisory": {"zh": "请求里提到了：{cats}。这不影响选哪一档，但云端智能体做这类操作前会先向你申请批准。",

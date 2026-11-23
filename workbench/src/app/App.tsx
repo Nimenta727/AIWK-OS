@@ -164,8 +164,8 @@ export default function App(){
   if(id&&id.startsWith('file:'))return <div className="legacy fill"><FileViewer path={id.slice(5)} english={english}/></div>;
   switch(id){
    case 'home':return <Home english={english} tr={tr} data={data} onCommand={runCommand} onOpen={(v,f)=>open(v,f)}/>;
-   case 'plans':return <Plans english={english} tr={tr} focus={focus.plans||null} onStop={stopRun} activeRun={s?.status.builder.runId||null} reload={data.reload}/>;
-   case 'agents':return <AgentTree english={english} tr={tr} sessions={s?.sessions||[]} focus={focus.agents||null} onOpenFile={openFile}/>;
+   case 'plans':return <Plans tr={tr} focus={focus.plans||null} onStop={stopRun} activeRun={s?.status.builder.runId||null} reload={data.reload}/>;
+   case 'agents':return <AgentTree tr={tr} sessions={s?.sessions||[]} focus={focus.agents||null} onOpenFile={openFile}/>;
    case 'changes':return <ChangesPage tr={tr} folders={folders}/>;
    case 'build':return <Build tr={tr} english={english} data={data}/>;
    case 'system':return <SystemPage tr={tr}/>;

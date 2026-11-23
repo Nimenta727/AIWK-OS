@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"runtime"))
-from aiws_agent_client import AgentClient, AgentError, AgentUnavailable
+from aiws_agent_client import AgentClient, AgentError
 from aiws_agent_service import AgentCore, serve
 from aiws_permission_broker import BrokerClient, BrokerPolicy, serve as serve_broker
 

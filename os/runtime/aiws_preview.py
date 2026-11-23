@@ -10,7 +10,6 @@ Hardening (each point is tested):
   * it stops by itself after a quiet period, and only one preview runs at a time.
 """
 import mimetypes
-import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
