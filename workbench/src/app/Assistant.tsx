@@ -104,7 +104,7 @@ export default function Assistant({tr,english,onPlan,onModelSwitch}:{tr:Tr;engli
  };
  return <div className="as">
   <aside className="as-side">
-   <div className="as-actions"><Button icon="add" onClick={()=>{setSel(null);setThread(null);setText('');}}>{tr('新对话','New')}</Button>{modelBadge}</div>
+   <div className="as-actions"><Button icon="add" disabled={!sel&&!thread&&!text} title={!sel&&!thread&&!text?tr('已经是新对话','Already a new conversation'):undefined} onClick={()=>{setSel(null);setThread(null);setText('');}}>{tr('新对话','New')}</Button>{modelBadge}</div>
    <div role="list" aria-label={tr('对话','Threads')}>{threads.map(t=><Row key={t.id} icon="comment" label={t.title||t.id} on={t.id===sel} onClick={()=>setSel(t.id)} right={<span className="muted">{t.items}</span>}/>)}
     {!threads.length&&<p className="muted pad">{tr('还没有对话','No conversations yet')}</p>}</div>
    <Section title={tr('插件','Plugins')} count={plugins.length} defaultOpen={false}>

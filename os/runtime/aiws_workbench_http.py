@@ -36,7 +36,7 @@ EXPOSED = READ_TOOLS           # /jobs runs read tools only; guest writes go thr
 MAX_BODY = 16384
 ASSETS = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
           ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon",
-          ".woff2": "font/woff2"}
+          ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf"}   # .ttf: the codicon icon font
 GUEST_SERVICES = ("aiws-workbench.service", "aiws-agent.service",
                   "aiws-permission-broker.service", "aiws-local-model.service")
 

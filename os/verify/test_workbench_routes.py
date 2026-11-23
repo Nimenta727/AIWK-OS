@@ -66,6 +66,23 @@ class Table(unittest.TestCase):
         self.assertEqual(missing, [])
 
 
+class StaticAssets(unittest.TestCase):
+    """The UI's icon font is a .ttf (from @vscode/codicons). It was missing from ASSETS, so the service answered 404 and
+    every icon in the shipped image was blank. Every file type the UI build can emit must be servable."""
+    def test_every_font_and_asset_type_the_ui_uses_is_served(self):
+        suffixes = set()
+        dist = ROOT.parent / "workbench/dist/assets"
+        if dist.is_dir():
+            suffixes |= {p.suffix for p in dist.iterdir() if p.is_file()}
+        css = ROOT.parent / "workbench/node_modules/@vscode/codicons/dist/codicon.css"
+        if css.is_file():
+            suffixes |= {"." + m for m in re.findall(r"url\([\"']?[^)\"'?#]+\.([a-z0-9]+)", css.read_text())}
+        if not suffixes:
+            self.skipTest("neither a built UI nor node_modules is present")
+        self.assertIn(".ttf", suffixes)                              # the scan must see the icon font
+        self.assertEqual(sorted(suffixes - set(H.ASSETS)), [])
+
+
 class Server(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

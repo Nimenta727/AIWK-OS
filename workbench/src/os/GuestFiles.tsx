@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {api} from './api';
 import {AlertTriangle,Check,ChevronDown,ChevronRight,Copy,FileText,Folder,FolderPlus,FolderTree,MoveRight,RefreshCw,Save,Trash2,Undo2,X} from 'lucide-react';
 import {buildStage,buildTree,describeOp,normalizePath,parentOf,parseCommand} from '../model/fileOps.mjs';
 
@@ -11,12 +12,8 @@ type Op={kind:'mkdir'|'copy'|'move'|'trash'|'restore';path?:string;to?:string;tr
 type Pending={id:string;taskId:string;op:Op;state:'awaiting'|'running'|'done'|'failed'|'dismissed';error?:string;fingerprint?:string;undo?:string};
 type Node={name:string;path:string;type:'dir'|'file';children:Node[]};
 
-async function local<T>(path:string, options?:RequestInit):Promise<T>{
- const response=await fetch('/api/v1'+path,{credentials:'omit',cache:'no-store',...options});
- const data=await response.json() as T&{error?:string};
- if(!response.ok)throw new Error(data.error||'Guest file service unavailable');
- return data;
-}
+// shared client: localized errors and one automatic CSRF refresh, like every other page
+const local=<T,>(path:string,options?:RequestInit):Promise<T>=>api<T>(path,options);
 
 const REASONS:Record<string,[string,string]>={
  'empty':['请输入指令','Enter a command'],
@@ -47,7 +44,7 @@ export default function GuestFiles({csrf,onPlanCreated,english,command}:{
   try{
    const [tree,bin]=await Promise.all([local<FileTree>('/workspace/tree'),local<{items:TrashItem[]}>('/workspace/trash')]);
    setFiles(tree);setTrash(bin.items);setError('');
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
  },[]);
  useEffect(()=>{void reload();},[reload]);
 
@@ -63,7 +60,7 @@ export default function GuestFiles({csrf,onPlanCreated,english,command}:{
   try{
    const d=await local<FileDetail>('/workspace/file?path='+encodeURIComponent(node.path));
    setSelected({path:node.path,type:'file'});setDetail(d);setText(d.text);
-  }catch(e){setSelected({path:node.path,type:'file'});setDetail(null);setError(String(e));}
+  }catch(e){setSelected({path:node.path,type:'file'});setDetail(null);setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);lock.current=false;}
  };
 
@@ -140,14 +137,14 @@ export default function GuestFiles({csrf,onPlanCreated,english,command}:{
      arguments:{path:detail.path,text,expectedSha256:detail.sha256},dependsOn:[]}]})});
    if(!planned.task.id||planned.stages[0].approval!==0)throw new Error('Guest write stage did not require explicit approval');
    setEditing(false);onPlanCreated();
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);lock.current=false;}
  };
 
  const tree=buildTree(files?.files||[],files?.dirs||[]) as Node[];
  const render=(nodes:Node[],depth:number):React.ReactNode=>nodes.map(n=><div key={n.path}>
   <button type="button" style={{paddingLeft:9+depth*16}} className={selected?.path===n.path?'selected':''} onClick={()=>void select(n)}>
-   {n.type==='dir'?(open.has(n.path)?<ChevronDown size={14}/>:<ChevronRight size={14}/>):<span style={{width:14}}/>}
+   {n.type==='dir'?(open.has(n.path)?<ChevronDown size={14}/>:<ChevronRight size={14}/>):<i className="aiws-os-tree-pad" aria-hidden="true"/>}
    {n.type==='dir'?<Folder size={15}/>:<FileText size={15}/>}<span>{n.name}</span></button>
   {n.type==='dir'&&open.has(n.path)&&render(n.children,depth+1)}
  </div>);

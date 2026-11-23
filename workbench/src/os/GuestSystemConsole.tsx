@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
+import {api} from './api';
 import {Activity,AlertTriangle,Cpu,FileCheck2,RefreshCw,RotateCcw,ShieldCheck} from 'lucide-react';
 
 type ServiceInfo={service:string;scope:string;status:Record<string,string>};
@@ -7,12 +8,8 @@ type KernelInfo={runningKernel:string;guestOnly:boolean;kernelDeploymentSupporte
 type AuditHealth={valid:boolean;events:number;lastHash:string};
 type GuestFile={path:string;sha256:string;text:string};
 type TaskCreated={task:{id:string};stages:Array<{state:string;approval:number}>};
-async function guest<T>(path:string,options?:RequestInit):Promise<T>{
- const response=await fetch('/api/v1'+path,{cache:'no-store',credentials:'omit',...options});
- const data=await response.json() as T&{error?:string};
- if(!response.ok)throw new Error(data.error||'Guest operation failed');
- return data;
-}
+// shared client: localized errors and one automatic CSRF refresh, like every other page
+const guest=<T,>(path:string,options?:RequestInit):Promise<T>=>api<T>(path,options);
 
 export default function GuestSystemConsole({csrf,english,onPlanCreated}:{
  csrf:string;english:boolean;onPlanCreated:()=>void;
@@ -35,7 +32,7 @@ export default function GuestSystemConsole({csrf,english,onPlanCreated}:{
     guest<AuditHealth>('/audit/verify')
    ]);
    setServices(s);setKernel(k);setAudit(a);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setReady(true);}
  },[]);
  useEffect(()=>{void refresh();},[refresh]);
@@ -51,7 +48,7 @@ export default function GuestSystemConsole({csrf,english,onPlanCreated}:{
    });
    if(!saved.task.id||saved.stages.length!==1)throw new Error('Invalid guest task response');
    onPlanCreated();
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const stageKernel=async()=>{
@@ -72,7 +69,7 @@ export default function GuestSystemConsole({csrf,english,onPlanCreated}:{
    });
    if(!saved.task.id)throw new Error('Missing task ID');
    onPlanCreated();
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  return <div className="aiws-os-stack aiws-os-system-console">
@@ -95,7 +92,7 @@ export default function GuestSystemConsole({csrf,english,onPlanCreated}:{
   </section>
   <section className="aiws-os-card">
    <h2><Cpu size={18}/>{tr('客户机内核候选版本','Guest kernel candidates')}</h2>
-   <dl><dt>{tr('正在运行的内核','Running kernel')}</dt><dd>{kernel?.runningKernel||'unavailable'}</dd>
+   <dl><dt>{tr('正在运行的内核','Running kernel')}</dt><dd>{kernel?.runningKernel||tr('无法读取','unavailable')}</dd>
     <dt>{tr('内核直接部署','Live kernel deployment')}</dt><dd>{tr('禁用','Disabled')}</dd>
     <dt>{tr('真实 A/B 引导回滚','A/B boot rollback')}</dt><dd>{tr('尚未实现','Not implemented')}</dd></dl>
    <p className="aiws-os-muted">{tr('先在客户机文件管理器中新建 .fragment 配置文件。本步骤只建立不可变候选快照；需要任务审批。',

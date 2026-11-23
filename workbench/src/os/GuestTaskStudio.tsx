@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
+import {api} from './api';
 import {BrainCircuit,CheckCircle2,ChevronRight,Clock3,Play,Plus,RefreshCw,ShieldCheck} from 'lucide-react';
 
 type Capability={name:string;description:string;inputSchema:{properties:Record<string,{type:string}>;required:string[]}};
@@ -16,12 +17,8 @@ type RouteInfo={decision:Decision;followUp?:FollowUp;error?:string;refused?:bool
 type Proposal={tool:string;arguments:Record<string,string>;reason:string;requiresReview:boolean;executed:boolean;refused?:boolean;grade?:string;steps?:Step[]};
 const READ_ONLY=new Set(['workspace.tree','file.read','file.stat','file.trashList','code.search','git.inspect','runtime.detect','browser.local_text','platform.inspect','code.symbols','code.references','code.dependencies','code.platformApis','system.info','network.status','download.list','download.progress']);
 
-async function request<T>(url:string,opts?:RequestInit):Promise<T>{
- const r=await fetch('/api/v1'+url,{cache:'no-store',credentials:'omit',...opts});
- const data=await r.json() as T&{error?:string};
- if(!r.ok)throw new Error(data.error||'Local guest API error');
- return data;
-}
+// shared client: localized errors and one automatic CSRF refresh, like every other page
+const request=<T,>(url:string,opts?:RequestInit):Promise<T>=>api<T>(url,opts);
 const newStage=(n:number):StageDraft=>({key:'step'+n,label:'Step '+n,tool:'workspace.tree',
  path:'.',query:'',dependsOn:n>1?'step'+(n-1):''});
 
@@ -49,7 +46,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    setTaskList(rows.tasks);
    if(focus==='model'){setModel(await request<ModelStatus>('/model/status'));
     setRouteCfg((await request<{config:{externalEnabled:boolean}}>('/route/config')).config);}
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
  },[focus]);
  useEffect(()=>{void update();},[update]);
  const open=useCallback(async(id:string)=>{
@@ -57,7 +54,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    setDetail(await request<TaskDetail>('/tasks/'+id));
    const records=await request<{events:typeof audit}>('/tasks/'+id+'/audit');
    setAudit(records.events);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
  },[]);
  useEffect(()=>{
   if(!detail||!detail.stages.some(s=>s.state==='queued'||s.state==='running'))return;
@@ -82,7 +79,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     body:JSON.stringify({title,goal,stages})});
    setDetail(next);setDrafts([newStage(1)]);setTitle('');setGoal('');
    await update();await open(next.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const command=async(stage:Stage,action:'approve'|'dispatch')=>{
@@ -93,7 +90,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     method:'POST',headers,body:'{}'
    });
    await open(detail.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const approveAndRun=async(stage:Stage)=>{
@@ -104,7 +101,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    await request(base+'approve',{method:'POST',headers,body:'{}'});
    await request(base+'dispatch',{method:'POST',headers,body:'{}'});
    await open(detail.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const toggleModel=async(value:boolean)=>{
@@ -116,7 +113,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    });
    await update();
    await open(plan.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const suggest=async()=>{
@@ -126,7 +123,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    const result=await request<Proposal>('/model/suggest',{method:'POST',headers,
     body:JSON.stringify({instruction})});
    setProposal(result);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const createOfflinePlan=async()=>{
@@ -144,7 +141,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    if('routed' in item){setRouteInfo({decision:item.decision,followUp:item.followUp,error:item.error});return;}
    await update();
    await open(item.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const createHandoff=async(agent:string)=>{
@@ -153,7 +150,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   try{
    const out=await request<{task:{id:string}}>('/route/handoff',{method:'POST',headers,body:JSON.stringify({instruction,agent})});
    await update();await open(out.task.id);
-  }catch(e){setError(String(e));}
+  }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
  const addProposal=()=>{
@@ -165,16 +162,18 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
     query:proposal.arguments.query||proposal.arguments.symbol||'',
     dependsOn:''}]);
  };
+ const needWhy=!model?.online?tr('本地模型没有在线：先导入权重并启用','The local model is not online: import weights and enable it first'):!instruction.trim()?tr('先写下希望完成什么','Describe what you want first'):undefined;
  const choices=capabilities.filter(t=>t.name!=='file.replace'||focus==='tasks');
  return <div className="aiws-os-stack aiws-os-studio">
   {error&&<div className="aiws-os-error" role="alert">{error}</div>}
   {focus==='model'&&<section className="aiws-os-card">
-   <div className="aiws-os-studio-title"><h2><BrainCircuit size={18}/>{tr('本地 2B 智能助手','Local 2B assistant')}</h2>
-    <span>{model?.online?'LOCAL ONLINE':model?.configured?'OFFLINE SERVICE NOT READY':'DISABLED'}</span></div>
+   <div className="aiws-os-studio-title"><h2><BrainCircuit size={18}/>{tr('本地模型（Qwen3.5-9B）','Local model (Qwen3.5-9B)')}</h2>
+    <span className="aiws-os-muted">{model?.online?tr('在线','Online'):model?.configured?tr('已启用，服务未就绪','Enabled, service not ready'):tr('未启用','Off')}</span></div>
    <div className="aiws-os-studio-actions">
      <button type="button" disabled={!csrf||busy||!model?.weightsPresent||Boolean(model?.configured)}
+      title={!model?.weightsPresent?tr('还没有导入模型权重：步骤见 docs/AIWS_MODEL_WEIGHTS.md','No model weights imported yet: see docs/AIWS_MODEL_WEIGHTS.md'):model?.configured?tr('模型已经启用','The model is already enabled'):undefined}
       onClick={()=>void toggleModel(true)}>{tr('申请启用模型（需审核）','Request model enable approval')}</button>
-     <button type="button" disabled={!csrf||busy||!model?.configured}
+     <button type="button" disabled={!csrf||busy||!model?.configured} title={!model?.configured?tr('模型没有启用，无需关闭','The model is not enabled'):undefined}
       onClick={()=>void toggleModel(false)}>{tr('申请关闭模型（需审核）','Request model disable approval')}</button>
      <span className="aiws-os-muted">{model?.weightsPresent?tr('已发现客户机权重','Guest weights found'):tr('尚未安装客户机 GGUF 权重','Guest GGUF weights not provisioned')}</span>
     </div>
@@ -183,10 +182,11 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
    <label>{tr('希望 AI 完成什么？','What should the local assistant plan?')}
     <textarea value={instruction} onChange={e=>setInstruction(e.target.value)} rows={3} maxLength={1000}
      placeholder={tr('例如：看看下载进度，把已完成的下载移到 isos 文件夹','e.g. Check download progress and move finished downloads into isos/')}/></label>
-   <button type="button" className="aiws-os-primary" disabled={!model?.online||!csrf||busy||!instruction.trim()}
-    onClick={()=>void suggest()}><BrainCircuit size={16}/>{tr('生成本地工具建议','Suggest a local tool')}</button>
-   <button type="button" disabled={!model?.online||!csrf||busy||!instruction.trim()}
-    onClick={()=>void createOfflinePlan()}>{tr('生成并保存待审核任务','Create a pending audited task')}</button>
+   <div className="aiws-os-studio-actions">
+    <button type="button" className="aiws-os-primary" disabled={!model?.online||!csrf||busy||!instruction.trim()} title={needWhy}
+     onClick={()=>void suggest()}><BrainCircuit size={16}/>{tr('生成本地工具建议','Suggest a local tool')}</button>
+    <button type="button" disabled={!model?.online||!csrf||busy||!instruction.trim()} title={needWhy}
+     onClick={()=>void createOfflinePlan()}>{tr('生成并保存待审核任务','Create a pending audited task')}</button></div>
    <p className="aiws-os-muted">{routeCfg?.externalEnabled?
     tr('外部官方 CLI 已在 routes.json 启用：仅在你确认后生成交接文件，AIWS 不会自动调用它们。','External official CLIs are enabled in routes.json: a handoff file is only prepared after your consent; AIWS never launches them.'):
     tr('外部模型默认关闭，所有请求只在本机离线处理（可在 ~/.config/aiws/routes.json 启用交接）。','External models are off by default: everything stays on this machine (enable handoff in ~/.config/aiws/routes.json).')}</p>
@@ -214,7 +214,7 @@ export default function GuestTaskStudio({csrf,english,capabilities,focus='tasks'
   </section>}
   <section className="aiws-os-card">
    <div className="aiws-os-studio-title"><h2><Plus size={18}/>{tr('创建持久化 AIWS 任务','Create a persistent AIWS task')}</h2>
-    <button type="button" onClick={()=>void update()}><RefreshCw size={15}/></button></div>
+    <button type="button" onClick={()=>void update()} title={tr('刷新','Refresh')} aria-label={tr('刷新','Refresh')}><RefreshCw size={15}/></button></div>
    <p className="aiws-os-muted">{tr('所有阶段、依赖、审批和审计在客户机 SQLite 中保留。文件写入需要审批，任何操作都不会触碰宿主机。',
     'Stages, DAG dependencies, approval and audit remain in guest-local SQLite. File writes require approval; host access is never exposed.')}</p>
    <label>{tr('任务标题','Task title')}<input value={title} maxLength={160} onChange={e=>setTitle(e.target.value)}/></label>

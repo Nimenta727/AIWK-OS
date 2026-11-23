@@ -2,6 +2,11 @@ import {useCallback,useEffect,useState} from 'react';
 import {Button,Empty,IconButton,Notice,Row,Select} from '../ui/kit';
 import {api} from '../os/api';
 import {msg} from './common';
+import {localizeError} from '../model/errors.mjs';
+
+// "not a git project" is a normal state for a folder, not a failure: it gets an explanation instead of a red error
+const NOT_GIT_RAW='Not a git project (nothing to compare against)';
+const NOT_GIT=new Set([NOT_GIT_RAW,localizeError(NOT_GIT_RAW,false),localizeError(NOT_GIT_RAW,true)]);
 import type {Tr} from './common';
 
 type FileRow={path:string;status:string;staged:boolean;added:number|null;removed:number|null};
@@ -11,7 +16,7 @@ const STATUS_ICON:Record<string,string>={modified:'diff-modified',added:'diff-ad
 
 /** What did the AI change? Files with +/- counts on the left, the selected file's diff on the right. Read-only. */
 export default function ChangesPage({tr,folders}:{tr:Tr;folders:string[]}){
- const [project,setProject]=useState(folders[0]||'.');
+ const [project,setProject]=useState('.');            // the workspace root first, like the select lists it
  const [data,setData]=useState<Changes|null>(null);
  const [diff,setDiff]=useState<Diff|null>(null);
  const [error,setError]=useState('');
@@ -24,7 +29,10 @@ export default function ChangesPage({tr,folders}:{tr:Tr;folders:string[]}){
    {[...new Set(['.',...folders])].map(f=><option key={f} value={f}>{f==='.'?tr('工作区根目录','Workspace root'):f}</option>)}</Select>
    <IconButton icon="refresh" label={tr('刷新','Refresh')} onClick={()=>void load(project)}/>
    {data&&<span className="muted">{data.files.length?data.files.length+tr(' 个文件有改动  ','  file(s) changed  ')+'+'+sum.add+' −'+sum.rem+(data.truncated?tr('（已截断）',' (truncated)'):''):tr('没有未提交的改动','No uncommitted changes')}</span>}</header>
-  {error&&<Notice tone="err">{error}</Notice>}
+  {error&&NOT_GIT.has(error)?<Empty icon="source-control" title={tr('这个文件夹不是 Git 项目','This folder is not a Git project')}>
+    {tr('变更审查对比的是 Git 里最近一次提交和现在的文件。在这个文件夹里初始化 Git（或选择另一个项目）后，AI 的改动会显示在这里。',
+      'Review compares the files with the last Git commit. Initialise Git in this folder (or pick another project) and the AI’s changes appear here.')}</Empty>
+   :error&&<Notice tone="err">{error}</Notice>}
   {data&&!data.files.length&&!error&&<Empty icon="pass" title={tr('工作区是干净的','Working tree is clean')}/>}
   <div className="ch-body">
    <div className="ch-list" role="tree">{data?.files.map(f=><Row key={f.path} icon={STATUS_ICON[f.status]||'diff'} label={f.path} on={diff?.file===f.path} onClick={()=>void open(f.path)}

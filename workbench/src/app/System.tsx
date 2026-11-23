@@ -3,6 +3,7 @@ import {Button,Icon,IconButton,Input,Notice,Section,Select} from '../ui/kit';
 import {Dialog} from '../ui/Layout';
 import {api} from '../os/api';
 import {msg} from './common';
+import {localizeError} from '../model/errors.mjs';
 import type {Tr} from './common';
 
 type Output={name:string;modes:string[];current:string|null};
@@ -30,7 +31,7 @@ export default function SystemPage({tr}:{tr:Tr}){
   <header><h2>{tr('系统','System')}</h2><IconButton icon="refresh" label={tr('刷新','Refresh')} onClick={()=>void load()}/></header>
   {note&&<Notice tone={note.tone}>{note.text}</Notice>}
   <Section title={tr('显示','Display')}>
-   <div className="form">{out?<label>{out.name}<Select value={out.current||''} disabled={busy} onChange={e=>void run('display',{output:out.name,mode:e.target.value},tr('分辨率已切换','Resolution changed'))}>{out.modes.map(m=><option key={m} value={m}>{m}</option>)}</Select></label>:<span className="muted">{st?.display.error||tr('未检测到显示器','No display detected')}</span>}</div>
+   <div className="form">{out?<label>{out.name}<Select value={out.current||''} disabled={busy} onChange={e=>void run('display',{output:out.name,mode:e.target.value},tr('分辨率已切换','Resolution changed'))}>{out.modes.map(m=><option key={m} value={m}>{m}</option>)}</Select></label>:<span className="muted">{st?.display.error?localizeError(st.display.error,tr('zh','en')==='en'):tr('未检测到显示器','No display detected')}</span>}</div>
   </Section>
   <Section title={tr('输入法','Input method')}>
    <div className="form">{st?.input.installed?(st.input.running?
@@ -47,7 +48,7 @@ export default function SystemPage({tr}:{tr:Tr}){
      <Button type="submit" variant="primary" disabled={busy||!ssid}>{tr('连接','Connect')}</Button></form>}
    </>:<p className="muted pad">{tr('本镜像未安装网络管理器','NetworkManager is not installed')}</p>}
   </Section>
-  <Section title={tr('电源','Power')}><div className="form"><Button icon="debug-restart" onClick={()=>setPower('reboot')}>{tr('重启','Reboot')}</Button><Button icon="power" onClick={()=>setPower('poweroff')}>{tr('关机','Power off')}</Button></div></Section>
+  <Section title={tr('电源','Power')}><div className="form"><Button icon="debug-restart" onClick={()=>setPower('reboot')}>{tr('重启','Reboot')}</Button><Button icon="stop-circle" onClick={()=>setPower('poweroff')}>{tr('关机','Power off')}</Button></div></Section>
   {power&&<Dialog title={power==='poweroff'?tr('确认关机？','Power off now?'):tr('确认重启？','Reboot now?')} onClose={()=>setPower('')}
    actions={<><Button onClick={()=>setPower('')} autoFocus>{tr('取消','Cancel')}</Button><Button variant="primary" disabled={busy} onClick={()=>{const a=power;setPower('');void run('power',{action:a,confirm:'I-CONFIRM'},tr('已发送','Sent'));}}>{tr('确认','Confirm')}</Button></>}>
    <p>{tr('未保存的工作会丢失。','Unsaved work will be lost.')}</p></Dialog>}

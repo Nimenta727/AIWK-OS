@@ -66,7 +66,8 @@ def main():
         print("AIWS_GUI_BROWSER: DAG stage executed",flush=True)
         go("本地模型开关")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))
-        assert "DISABLED" in browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text
+        studio=browser.find_element(By.CSS_SELECTOR,".aiws-os-studio").text      # the image ships without weights
+        assert "未启用" in studio and "Qwen3.5-9B" in studio, studio[:200]
         # A genuine guest-only *candidate* pipeline, not a running kernel edit.
         go("系统服务与内核")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-system-console"))

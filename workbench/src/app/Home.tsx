@@ -3,7 +3,7 @@ import {Button,Empty,Icon,Input,Notice,Progress,Row,Section} from '../ui/kit';
 import {agentBars,basisText,budgetState,formatTokens,lightTone} from '../model/observatory.mjs';
 import {ActivityTimeline} from '../os/Timeline';
 import {api} from '../os/api';
-import {msg,useAction} from './common';
+import {builderLabel,msg,useAction} from './common';
 import type {Tr} from './common';
 import type {ObservatoryData} from '../os/useObservatoryData';
 import type {Bilingual,Waiting} from '../os/observatoryTypes';
@@ -60,7 +60,7 @@ export default function Home({english,tr,data,onCommand,onOpen}:{english:boolean
 
   <Section title={tr('状态','Status')}>
    <Row icon="circle-filled" tone={model?.online?'ok':model?.configured?'warn':'off'} label={tr('本地模型','Local model')} detail={model?.online?tr('在线','online')+(model.gate?.loaded?' · '+tr('已加载','loaded')+(model.gate.rssMiB?' '+(model.gate.rssMiB>=1024?(model.gate.rssMiB/1024).toFixed(1)+'G':Math.round(model.gate.rssMiB)+'M'):''):''):model?.configured?tr('未就绪','not ready'):tr('未启用','off')} onClick={()=>onOpen('model')}/>
-   <Row icon="circle-filled" tone={s?.status.builder.state==='running'?'ok':s?.status.builder.state==='awaiting-approval'?'warn':'off'} label={tr('构建通道','Builder')} detail={({disabled:tr('未启用','off'),idle:tr('空闲','idle'),running:tr('运行中','running'),'awaiting-approval':tr('等待批准','awaiting approval')} as Record<string,string>)[s?.status.builder.state||'disabled']} onClick={()=>onOpen('build')}/>
+   <Row icon="circle-filled" tone={s?.status.builder.state==='running'?'ok':s?.status.builder.state==='awaiting-approval'?'warn':'off'} label={tr('构建通道','Builder')} detail={builderLabel(tr,s?.status.builder.state)} onClick={()=>onOpen('build')}/>
    <Row icon="circle-filled" tone={s?.status.router.externalEnabled?'warn':'ok'} label={tr('外部模型','External models')} detail={s?.status.router.externalEnabled?tr('已启用（需你确认）','enabled (needs consent)'):tr('关闭','off')} onClick={()=>onOpen('model')}/>
    <Row icon={tone==='red'?'error':tone==='yellow'?'warning':'pass'} label={tr('审计','Audit')} detail={(s?.verdict.sentences[0]?(english?s.verdict.sentences[0].en:s.verdict.sentences[0].zh):'')}/>
   </Section>

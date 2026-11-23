@@ -26,7 +26,7 @@ import useObservatoryData from '../os/useObservatoryData';
 import {api,onCsrfChange,refreshCsrf} from '../os/api';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
 import {closeTab,cycleTab,fileTabId,fileTitle,flattenTree,isEditableTarget,loadPrefs,matchKey,openTab,savePrefs} from '../model/shell.mjs';
-import {msg} from './common';
+import {builderLabel,msg} from './common';
 import {LangProvider} from '../ui/lang';
 import {setLang} from '../os/lang';
 
@@ -198,7 +198,7 @@ export default function App(){
   </div>
   <StatusBar left={[
    {id:'model',icon:'hubot',text:modelOnline?tr('本地模型在线','Local model online'):s?.status.localModel.configured?tr('本地模型待机','Local model idle'):tr('本地模型未配置','Local model off'),onClick:()=>open('assistant')},
-   {id:'build',icon:'rocket',text:tr('构建 ','Build ')+(s?.status.builder.state||'–'),onClick:()=>open('build')},
+   {id:'build',icon:'rocket',text:tr('构建：','Build: ')+builderLabel(tr,s?.status.builder.state),onClick:()=>open('build')},
    ...(health?.systemVerify?[{id:'wd',icon:'database',text:health.workDisk?tr('工作盘','Work disk'):tr('无工作盘','No work disk'),tone:health.workDisk?undefined:('warn' as const),title:tr('AI 的工作区放在独立的工作盘上（只读系统盘、工作盘不可执行）','The AI works on a separate disk (system read-only, work disk noexec)')}]:[]),
    ...(approvals?[{id:'appr',icon:'bell',text:approvals+' '+tr('待审批','to review'),tone:'warn' as const,onClick:()=>open('plans')}]:[])]}
    right={[{id:'audit',icon:s?.verdict.level==='red'?'error':s?.verdict.level==='yellow'?'warning':'pass',tone:s?.verdict.level==='red'?'err':s?.verdict.level==='yellow'?'warn':'ok',text:tr('审计','Audit'),title:s?.verdict.sentences[0]?(english?s.verdict.sentences[0].en:s.verdict.sentences[0].zh):undefined},

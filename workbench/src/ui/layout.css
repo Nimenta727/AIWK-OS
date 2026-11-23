@@ -1,7 +1,7 @@
-.app{display:grid;grid-template-rows:var(--h-title) 1fr var(--h-status);height:100%;background:var(--bg-editor)}
+.app{display:grid;grid-template-rows:var(--h-title) 1fr var(--h-status);grid-template-columns:minmax(0,1fr);height:100%;background:var(--bg-editor)}
 .titlebar{display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--bg-title);border-bottom:1px solid var(--border);color:var(--fg-muted)}
 .titlebar strong{color:var(--fg);font-weight:600}.titlebar .grow{flex:1;text-align:center}
-.main{display:flex;min-height:0}
+.main{display:flex;min-height:0;min-width:0}
 .ab{display:flex;flex-direction:column;justify-content:space-between;width:var(--w-activity);flex:none;background:var(--bg-activity);border-right:1px solid var(--border)}
 .ab-item{position:relative;display:grid;place-items:center;width:100%;height:var(--w-activity);color:var(--fg-faint);font-size:24px}
 .ab-item:hover{color:var(--fg-strong)}.ab-item.on{color:var(--fg-strong)}.ab-item.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;background:var(--accent)}
