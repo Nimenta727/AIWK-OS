@@ -25,11 +25,15 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
-MAX_BODY = 64 * 1024
+MAX_BODY = 256 * 1024
 MAX_RESPONSE = 1024 * 1024
-ALLOWED_KEYS = {"model", "messages", "stream", "temperature", "max_tokens", "response_format", "cache_prompt"}
+# `chat_template_kwargs` is accepted only as {"enable_thinking": true|false}: the local agent turns the model's thinking off with it.
+ALLOWED_KEYS = {"model", "messages", "stream", "temperature", "max_tokens", "response_format", "cache_prompt", "chat_template_kwargs"}
 MODEL_ALIAS = "aiws-local"
-MAX_MESSAGES, MAX_CONTENT, MAX_TOKENS = 8, 16000, 1024
+# The one-shot planner sends 2-3 short messages; the local agent keeps a conversation (system, user, then assistant/user pairs), so the
+# limits are sized for that and stay bounded: at most 64 messages, 16000 characters each and 120000 in all. `system` only at the start.
+MAX_MESSAGES, MAX_CONTENT, MAX_TOTAL, MAX_TOKENS = 64, 16000, 120000, 1024
+ROLES = ("system", "user", "assistant")
 CRASH_WINDOW, CRASH_LIMIT, COOLDOWN = 60.0, 3, 30.0
 
 class GateError(ValueError):
@@ -257,9 +261,16 @@ def validate_request(raw):
         raise GateError("400:Unknown model alias")
     messages = data.get("messages")
     if (not isinstance(messages, list) or not 1 <= len(messages) <= MAX_MESSAGES
-            or any(not isinstance(m, dict) or set(m) != {"role", "content"} or m["role"] not in ("system", "user")
+            or any(not isinstance(m, dict) or set(m) != {"role", "content"} or m["role"] not in ROLES
                    or not isinstance(m["content"], str) or len(m["content"]) > MAX_CONTENT for m in messages)):
         raise GateError("400:Invalid messages")
+    if (messages[0]["role"] not in ("system", "user") or any(m["role"] == "system" for m in messages[1:])
+            or sum(len(m["content"]) for m in messages) > MAX_TOTAL):
+        raise GateError("400:Invalid messages")
+    if "chat_template_kwargs" in data:
+        kw = data["chat_template_kwargs"]
+        if not isinstance(kw, dict) or set(kw) - {"enable_thinking"} or any(not isinstance(v, bool) for v in kw.values()):
+            raise GateError("400:Invalid chat_template_kwargs")
     tokens = data.get("max_tokens", 256)
     if isinstance(tokens, bool) or not isinstance(tokens, int) or not 1 <= tokens <= MAX_TOKENS:
         raise GateError("400:max_tokens must be 1-%d" % MAX_TOKENS)
@@ -326,14 +337,18 @@ def main():
     parser.add_argument("--listen-port", type=int, default=18080)
     parser.add_argument("--child-port", type=int, default=18081)
     parser.add_argument("--idle-seconds", type=float, default=300.0)
+    parser.add_argument("--request-timeout", type=float, default=600.0, help="seconds one model call may take (a long prompt on a CPU is slow)")
     parser.add_argument("--resident", action="store_true", help="keep the model loaded and restart it if it dies")
     parser.add_argument("child", nargs=argparse.REMAINDER, help="-- llama-server ...")
     args = parser.parse_args()
     child = args.child[1:] if args.child and args.child[0] == "--" else args.child
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         parser.error("The model gate must not run as root")
+    if not 30 <= args.request_timeout <= 1800:
+        parser.error("--request-timeout must be 30-1800 seconds")
     try:
-        gate = ModelGate(child, listen_port=args.listen_port, child_port=args.child_port, idle_seconds=0 if args.resident else args.idle_seconds)
+        gate = ModelGate(child, listen_port=args.listen_port, child_port=args.child_port, idle_seconds=0 if args.resident else args.idle_seconds,
+                         request_timeout=args.request_timeout)
     except GateError as exc:
         parser.error(str(exc))
     signal.signal(signal.SIGTERM, lambda *a: (gate.close(), sys.exit(0)))

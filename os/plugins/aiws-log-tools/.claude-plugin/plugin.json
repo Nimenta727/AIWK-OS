@@ -1,0 +1,6 @@
+{
+  "name": "aiws-log-tools",
+  "version": "0.1.0",
+  "description": "Read a long log: compress it, find the first sign of trouble, open the real lines around it.",
+  "license": "Apache-2.0"
+}

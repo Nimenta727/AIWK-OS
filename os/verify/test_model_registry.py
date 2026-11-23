@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"runtime"))
+import aiws_model_registry as REG
 from aiws_model_registry import GuestModelRegistry, ModelArtifactError
 
 class GuestModelRegistryTests(unittest.TestCase):
@@ -65,7 +66,7 @@ class GuestModelRegistryTests(unittest.TestCase):
         preload.mkdir()
         bundled=preload/"aiws-local.gguf"
         bundled.write_bytes(self.weights.read_bytes())
-        manifest={"modelId":"Qwen/Qwen3.5-2B","sha256":self.digest,
+        manifest={"modelId":REG.MODEL_ID,"sha256":self.digest,
                   "source":"test-only fake bytes","licenseReviewed":True}
         (preload/"manifest.json").write_text(json.dumps(manifest))
         read_only=self.reg.import_bundled(preload,verify_only=True)
@@ -86,6 +87,42 @@ class GuestModelRegistryTests(unittest.TestCase):
             bad.import_guest("model.gguf",self.digest,True)
         with self.assertRaises((ValueError,PermissionError)):
             self.reg.import_guest("../host.gguf",self.digest,True)
+
+
+class ProductModelPinTests(unittest.TestCase):
+    def test_product_model_is_the_9b_and_the_size_limit_fits_it(self):
+        self.assertEqual(REG.MODEL_ID, "Qwen/Qwen3.5-9B")
+        self.assertGreater(REG.MAX_BYTES, 6 * 1024 ** 3)                  # Q4_K_M of the 9B is about 5.7 GB
+
+    def test_the_small_model_is_refused_unless_the_ci_marker_exists(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker = Path(d) / "guest-model-acceptance"
+            self.assertEqual(REG.approved_model_ids(marker), {REG.MODEL_ID})          # no marker: product only
+            marker.write_text("AIWS_MODEL_CI_ONLY=1\n")
+            self.assertEqual(REG.approved_model_ids(marker), {REG.MODEL_ID, REG.CI_MODEL_ID})
+            marker.write_text("something else\n")
+            self.assertEqual(REG.approved_model_ids(marker), {REG.MODEL_ID})
+            link = Path(d) / "link"
+            marker.write_text("AIWS_MODEL_CI_ONLY=1\n")
+            link.symlink_to(marker)
+            self.assertEqual(REG.approved_model_ids(link), {REG.MODEL_ID})            # a symlink never counts
+
+    def test_a_manifest_naming_the_small_model_fails_verification_in_a_product_image(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            project = base / "p"; project.mkdir()
+            with patch("aiws_model_registry.protect_guest_workspace", return_value=True), patch("aiws_toolplane.protect_guest_workspace", return_value=True), \
+                 patch("aiws_model_registry.CI_MARKER", base / "absent"):
+                reg = GuestModelRegistry(base / "models", project, guard=lambda: True, runner=lambda *a, **k: SimpleNamespace(returncode=1))
+                weights = project / "m.gguf"; weights.write_bytes(b"GGUF" + b"\x02" * 2048)
+                digest = hashlib.sha256(weights.read_bytes()).hexdigest()
+                reg.import_guest("m.gguf", digest, True)
+                manifest = base / "models" / "registry.json"
+                import json
+                data = json.loads(manifest.read_text()); data["modelId"] = REG.CI_MODEL_ID; manifest.write_text(json.dumps(data))
+                with self.assertRaises(ModelArtifactError):
+                    reg.verify()
+
 
 if __name__=="__main__":
     unittest.main()

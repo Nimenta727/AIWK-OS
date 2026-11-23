@@ -1,0 +1,546 @@
+{
+ "cases": "router_v3_fresh.jsonl",
+ "n": 45,
+ "modelOnly": {
+  "accuracy": 1.0,
+  "underRoute": 0.0,
+  "overRoute": 0.0,
+  "accuracyZh": 1.0,
+  "accuracyEn": 1.0,
+  "confusion": {
+   "local": {
+    "local": 15,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 0,
+    "flash": 15,
+    "pro": 0
+   },
+   "pro": {
+    "local": 0,
+    "flash": 0,
+    "pro": 15
+   }
+  }
+ },
+ "router": {
+  "accuracy": 1.0,
+  "underRoute": 0.0,
+  "overRoute": 0.0,
+  "accuracyZh": 1.0,
+  "accuracyEn": 1.0,
+  "confusion": {
+   "local": {
+    "local": 15,
+    "flash": 0,
+    "pro": 0
+   },
+   "flash": {
+    "local": 0,
+    "flash": 15,
+    "pro": 0
+   },
+   "pro": {
+    "local": 0,
+    "flash": 0,
+    "pro": 15
+   }
+  }
+ },
+ "floorRaises": 0,
+ "floorRaisesWrong": 0,
+ "floorRaisesRight": 0,
+ "modelUnavailable": 0,
+ "withAdvisories": 0,
+ "medianSec": 9.51,
+ "rows": [
+  {
+   "text": "show the top-level folders of this project",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.84
+  },
+  {
+   "text": "把 logs 目录里最新的三个文件列出来",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.6
+  },
+  {
+   "text": "what's the size of dist.zip",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.68
+  },
+  {
+   "text": "copy the schema.sql file to a backup folder",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.95
+  },
+  {
+   "text": "打开 Makefile 让我看看",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.63
+  },
+  {
+   "text": "list everything modified today",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.77
+  },
+  {
+   "text": "读一下 /tmp 以外项目里的 CHANGELOG 前 40 行",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.17
+  },
+  {
+   "text": "find all files named config.json",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.35
+  },
+  {
+   "text": "create folders src, tests and docs",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.17
+  },
+  {
+   "text": "把 old_reports 整个文件夹重命名为 archive_2024",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.74
+  },
+  {
+   "text": "how long is the uptime of this machine",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.18
+  },
+  {
+   "text": "show me the contents of requirements.txt",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.65
+  },
+  {
+   "text": "看一下现在的网络连接状态",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 10.53
+  },
+  {
+   "text": "display lines 100 to 140 of server.log",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 10.86
+  },
+  {
+   "text": "查看回收站里有什么",
+   "gold": "local",
+   "model": "local",
+   "router": "local",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 8.8
+  },
+  {
+   "text": "write a function that returns the n-th fibonacci number",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-task"
+   ],
+   "advisories": [],
+   "sec": 9.69
+  },
+  {
+   "text": "这个函数在列表为空时会崩溃，帮我加个判断",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-error-zh"
+   ],
+   "advisories": [],
+   "sec": 9.75
+  },
+  {
+   "text": "add a docstring to every public method in this class",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.24
+  },
+  {
+   "text": "fix the failing test: expected 3 but got 4",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-task"
+   ],
+   "advisories": [],
+   "sec": 10.05
+  },
+  {
+   "text": "帮我写一个把 CSV 转成 JSON 的脚本",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.87
+  },
+  {
+   "text": "explain what this regex does: ^(?:[a-z0-9]+\\.)+[a-z]{2,}$",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.95
+  },
+  {
+   "text": "rename the variable tmp to buffer in this file",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.95
+  },
+  {
+   "text": "给登录接口加上参数校验",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-error-zh"
+   ],
+   "advisories": [],
+   "sec": 10.7
+  },
+  {
+   "text": "write a unit test for the parse_args function",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-task"
+   ],
+   "advisories": [],
+   "sec": 10.63
+  },
+  {
+   "text": "convert this callback code into a promise",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.84
+  },
+  {
+   "text": "把这个 SQL 语句改成带分页的",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.51
+  },
+  {
+   "text": "implement a simple LRU cache class in python",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [
+    "code-task"
+   ],
+   "advisories": [],
+   "sec": 9.66
+  },
+  {
+   "text": "compile this C file and show me the warnings",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.87
+  },
+  {
+   "text": "生成一个 Go 的 HTTP hello world 服务",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 12.03
+  },
+  {
+   "text": "add error handling around the file open call",
+   "gold": "flash",
+   "model": "flash",
+   "router": "flash",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.33
+  },
+  {
+   "text": "design a plugin architecture so third parties can extend the editor safely",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design"
+   ],
+   "advisories": [],
+   "sec": 8.83
+  },
+  {
+   "text": "为什么线上服务每隔几小时就会出现一次内存暴涨然后被杀掉",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "hard-bug-zh"
+   ],
+   "advisories": [],
+   "sec": 8.95
+  },
+  {
+   "text": "audit our password reset flow for account takeover issues",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "security"
+   ],
+   "advisories": [],
+   "sec": 8.83
+  },
+  {
+   "text": "重新设计整个缓存层，让它在多机部署下依然一致",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design-zh"
+   ],
+   "advisories": [],
+   "sec": 8.89
+  },
+  {
+   "text": "figure out why two nodes occasionally disagree about the leader",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "hard-bug"
+   ],
+   "advisories": [],
+   "sec": 9.12
+  },
+  {
+   "text": "评估从单体迁移到微服务的风险并给出分阶段计划",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design-zh"
+   ],
+   "advisories": [],
+   "sec": 8.77
+  },
+  {
+   "text": "investigate why the build is slower after upgrading the compiler and nothing in the code changed",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 10.06
+  },
+  {
+   "text": "这个线程池偶尔会卡死，找出原因",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "hard-bug-zh"
+   ],
+   "advisories": [],
+   "sec": 9.62
+  },
+  {
+   "text": "design a conflict-free sync protocol for offline edits",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design"
+   ],
+   "advisories": [],
+   "sec": 10.42
+  },
+  {
+   "text": "分析这段加密代码有没有时序侧信道和填充攻击风险",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "security"
+   ],
+   "advisories": [],
+   "sec": 9.52
+  },
+  {
+   "text": "rework the whole error-handling strategy across all twelve services",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 10.24
+  },
+  {
+   "text": "排查为什么数据库在高峰期会出现脏读，只在生产环境复现",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "hard-bug-zh"
+   ],
+   "advisories": [],
+   "sec": 9.44
+  },
+  {
+   "text": "plan a safe rollout of a breaking API change to ten thousand clients",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design"
+   ],
+   "advisories": [],
+   "sec": 9.41
+  },
+  {
+   "text": "设计一个支持多租户和审计的权限系统",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [
+    "design-zh"
+   ],
+   "advisories": [],
+   "sec": 10.02
+  },
+  {
+   "text": "prove that this lock-free stack has no ABA problem or show a counterexample",
+   "gold": "pro",
+   "model": "pro",
+   "router": "pro",
+   "source": "model",
+   "markers": [],
+   "advisories": [],
+   "sec": 9.12
+  }
+ ]
+}

@@ -32,15 +32,19 @@ class RouterError(ValueError):
 
 # --- L0 vocabulary -------------------------------------------------------------------------
 # Forbidden categories: the local model must refuse these and they may never leave the guest.
+# NOTE on "audit": only ATTEMPTS TO SUPPRESS auditing count (disable/erase/hide the audit log ...). The bare word used to flag a request for a
+# security audit, or to design a system with an audit log, as an attempt to evade auditing.
+# NOTE on "root": only phrases about root PRIVILEGES count (as root, root access, root 权限 ...). The bare word used to match "root cause"
+# and "project root", so a debugging question ("find the root cause of the leak") was treated as restricted.
 FORBIDDEN = {
     "network": r"https?://|ftp://|\bping\b|\bcurl\b|\bwget\b|联网|上网|go online|\bfetch\b|从.{0,40}拉取|pull the file|\bscp\b|\bssh\b|"
                r"\b\d{1,3}(\.\d{1,3}){3}\b|\b[a-z0-9-]+\.(com|org|net|io|cn|edu|gov|dev|app)\b|连上|连接到|connect(ion)? to|search the web|browse the (web|internet)|web search|搜索网络|网上搜",
     "download_control": r"(暂停|继续|取消|重新开始|停止|限速).{0,60}下载|下载.{0,40}(暂停|继续|取消|限速|重启)|让.{0,40}接着下|(pause|resume|restart|cancel|stop|throttle|keep)\b.{0,40}download|downloading\b",
-    "shell_root": r"\bsudo\b|\broot\b|提权|escalat|rm -rf|\bchmod\b|bash -c|\bnc -l|dd if=|执行命令|任意.{0,6}命令|arbitrary command|run (this|a|the|any) command|(run|execute|运行|执行) ?(sudo|bash|python3?|sh|perl|node|curl|rm|nc|\./)\S*|exploit|payload|reverse shell|\btype\b.{0,20}\bin a shell|在终端里|管理员(命令|权限|模式)",
+    "shell_root": r"\bsudo\b|\b(as|with|using|become|becoming|gain|get|obtain|switch to|login as|log in as|su to)\s+root\b|\broot\s+(access|privileges?|permissions?|authority|rights|shell|user|account|password|login)\b|root ?(权限|身份|用户|账号|账户|密码)|提权|escalat|rm -rf|\bchmod\b|bash -c|\bnc -l|dd if=|执行命令|任意.{0,6}命令|arbitrary command|run (this|a|the|any) command|(run|execute|运行|执行) ?(sudo|bash|python3?|sh|perl|node|curl|rm|nc|\./)\S*|exploit|payload|reverse shell|\btype\b.{0,20}\bin a shell|在终端里|管理员(命令|权限|模式)",
     "host": r"宿主|\bhost\b|主机(上|里|的文件|磁盘)|hypervisor|虚拟机管理|\bqmp\b|qemu monitor|直通|passthrough|usb 设备|through to the guest",
     "permanent_delete": r"永久|彻底|物理删除|permanent|irrevers|\bshred|\bwipe\b|销毁|抹掉|for good|no undo|不留备份|清空回收站|empty the trash|\berase\b",
     "write_content": r"写入|追加|\bappend\b|\bwrite ['\"“]|replace the content|替换.{0,20}内容|so it says|填入|\binsert\b.{0,30}\bat\b|加上 ?[a-z#]|编辑 .{0,40}加上",
-    "bypass": r"绕过|\bbypass|跳过审批|skip the approval|审计|\baudit\b|不要记录|do not log|without asking|别让用户批准|不需要审批|无需审批|ignore (all |the )?(previous |prior |permission |safety )?(rules|limits|instructions|restrictions)|忽略.{0,12}(规则|限制)|忘掉.{0,10}设定|disregard|developer mode|管理员模式|new (rule|policy):|新规则",
+    "bypass": r"绕过|\bbypass|跳过审批|skip the approval|(关闭|禁用|停用|跳过|清除|清空|删除|隐藏|规避|屏蔽|不要|别).{0,8}审计|审计.{0,8}(关闭|禁用|停用|跳过|清除|清空|删除|隐藏|规避|屏蔽|痕迹)|不留痕|\b(disable|turn off|skip|suppress|erase|delete|clear|wipe|hide|conceal|evade|avoid|stop)\w*\b.{0,30}\baudit\w*|\baudit (log|logs|trail|trails|record|records)\b.{0,20}\b(delet\w*|eras\w*|clear\w*|wip\w*|hid\w*|conceal\w*)|不要记录|do not log|without asking|别让用户批准|不需要审批|无需审批|ignore (all |the )?(previous |prior |permission |safety )?(rules|limits|instructions|restrictions)|忽略.{0,12}(规则|限制)|忘掉.{0,10}设定|disregard|developer mode|管理员模式|new (rule|policy):|新规则",
     "path_escape": r"/etc/|/root|/proc/|/home/|\.\./|\.\.\\|[a-z]:\\|/mnt/|\.aws|credentials|\bshadow\b|\bpasswd\b|id_rsa|private key|ssh 密钥",
     "cloud_or_exfil": r"云端|cloud (model|storage)|chatgpt|在线 ?api|online api|remote llm|远程的 ?claude|forward this to|发到网上|发送到|\bemail the|邮箱|传到远程|网盘|(upload|push|send)\b.{0,40}\b(external|remote|outside|server|endpoint)|上传",
 }

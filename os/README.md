@@ -66,7 +66,7 @@ bash -n os/debian/build.sh
 bash -n os/kernel/ci/firmware-iso-boot.sh
 ```
 
-CI 分为静态契约、Debian 镜像、QEMU 直接内核诊断、ISO BIOS/OVMF UEFI 固件启动、GUI/DAG 和可选真实 2B 模型评测。**静态通过不能替代固件或模型实测。** 请查看对应提交的 [Actions](https://github.com/Nimenta727/AIWK-OS/actions) 结论及附件。
+CI 分为静态契约、Debian 镜像、QEMU 直接内核诊断、ISO BIOS/OVMF UEFI 固件启动、GUI/DAG 和可选真实小模型流水线冒烟（CI 专用小模型，不是产品模型）。**静态通过不能替代固件或模型实测。** 请查看对应提交的 [Actions](https://github.com/Nimenta727/AIWK-OS/actions) 结论及附件。
 
 ## 当前未完成
 

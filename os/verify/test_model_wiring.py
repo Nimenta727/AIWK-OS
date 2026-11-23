@@ -61,7 +61,7 @@ class PackagingTests(unittest.TestCase):
 
     def test_unit_keeps_its_network_confinement(self):
         unit = (ROOT / "debian/config/includes.chroot/etc/systemd/user/aiws-local-model.service").read_text()
-        for line in ("IPAddressDeny=any", "IPAddressAllow=localhost", "RestrictAddressFamilies=AF_INET AF_UNIX", "MemoryMax=5G", "NoNewPrivileges=yes"):
+        for line in ("IPAddressDeny=any", "IPAddressAllow=localhost", "RestrictAddressFamilies=AF_INET AF_UNIX", "MemoryMax=12G", "NoNewPrivileges=yes"):
             self.assertIn(line, unit)
 
 class GuestSmokeTests(unittest.TestCase):

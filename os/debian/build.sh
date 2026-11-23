@@ -51,6 +51,10 @@ fi
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/skills"
 cp -- "$repo"/os/skills/*.md "$out/config/includes.chroot/usr/local/share/aiws/skills/"
 python3 "$repo/os/skills/build_manifest.py" "$out/config/includes.chroot/usr/local/share/aiws/skills" >/dev/null
+# System plugins (text only: skills, commands, guards). Same rule as skills: read-only in the image, pinned by tree hash.
+mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/plugins"
+cp -a -- "$repo"/os/plugins/aiws-* "$out/config/includes.chroot/usr/local/share/aiws/plugins/"
+python3 "$repo/os/plugins/build_manifest.py" "$out/config/includes.chroot/usr/local/share/aiws/plugins" >/dev/null
 mkdir -p -- "$out/config/includes.chroot/usr/local/share/aiws/workbench"
 cp -a -- "$ui/." "$out/config/includes.chroot/usr/local/share/aiws/workbench/"
 
@@ -81,8 +85,10 @@ if [[ -v AIWS_OS_BUNDLED_MODEL_GGUF || -v AIWS_OS_BUNDLED_LLAMA_SERVER ]]; then
   install -m 0444 "$AIWS_OS_BUNDLED_MODEL_GGUF" "$preload/aiws-local.gguf"
   install -m 0755 "$AIWS_OS_BUNDLED_LLAMA_SERVER" \
     "$out/config/includes.chroot/usr/local/bin/llama-server"
-  printf '{"modelId":"Qwen/Qwen3.5-2B","sha256":"%s","source":"license-reviewed-builder-source","licenseReviewed":true}\n' \
-    "$AIWS_OS_MODEL_GGUF_SHA256" > "$preload/manifest.json"
+  model_id="${AIWS_OS_MODEL_ID:-Qwen/Qwen3.5-9B}"
+  [[ "$model_id" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "ERROR: invalid AIWS_OS_MODEL_ID" >&2; exit 2; }
+  printf '{"modelId":"%s","sha256":"%s","source":"license-reviewed-builder-source","licenseReviewed":true}\n' \
+    "$model_id" "$AIWS_OS_MODEL_GGUF_SHA256" > "$preload/manifest.json"
   chmod 0444 "$preload/manifest.json"
   echo "Offline model included in guest ISO with SHA256 provenance; activation remains opt-in."
   if [[ "${AIWS_OS_MODEL_GUEST_CI_TEST:-0}" == "1" ]]; then

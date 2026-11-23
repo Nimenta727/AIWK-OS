@@ -31,6 +31,9 @@ import aiws_observatory
 import aiws_apps
 import aiws_system
 import aiws_capabilities
+import aiws_assistant
+import aiws_route
+from aiws_local_agent import AgentError as LocalAgentError
 import aiws_changes
 import aiws_agent_tree
 import aiws_plans
@@ -86,6 +89,15 @@ class Controller:
         self.system = aiws_system.SystemControls()
         self.memory = aiws_capabilities.MemoryStore(state_home / "aiws" / "memory.jsonl")
         self.capabilities = self._build_capabilities()
+        skills_dir = Path(os.environ.get("AIWS_SKILLS_DIR", self.SKILLS_DIR))
+        try:
+            pinned = {k: v for k, v in json.loads((skills_dir / "manifest.json").read_text(encoding="utf-8")).items() if isinstance(k, str) and isinstance(v, str)}
+        except (OSError, ValueError, AttributeError):
+            pinned = {}
+        self.assistant = aiws_assistant.Assistant(
+            state_home / "aiws", self.file_tools.invoke if self.file_tools is not None else invoke, catalog(), self._persist_proposal,
+            emit=self._assistant_event, enabled=lambda: self.model.status()["configured"], skills_dir=skills_dir, pinned=pinned,
+            system_plugins_dir=os.environ.get("AIWS_PLUGINS_DIR", aiws_assistant.aiws_plugins.SYSTEM_DIR))
         self.events = EventStore(state_home / "aiws-observatory")
         self.mandates = MandateStore(state_home / "aiws-builder", self.workspace)
         self.plans = aiws_plans.PlanStore(state_home / "aiws" / "plans.json")
@@ -539,10 +551,16 @@ class Controller:
             # Explicit refusals are terminal decisions, never DAG tool nodes, never escalated.
             return {"refused": True, "proposal": proposal, "executed": False,
                     "decision": decision, "followUp": after_local(decision, "refused")}
+        return self._persist_proposal(instruction, proposal, decision)
+
+    def _persist_proposal(self, instruction, proposal, decision=None):
+        """A validated proposal -> a durable task whose changing steps wait for approval. The one path for the one-shot planner AND the
+        assistant, so both end up in the same plan review area. Accepts the validated or the canonical shape."""
+        proposal = LocalPlanner.canonical(proposal)
         if self.agent is not None:
             # Production: independent systemd user Agent revalidates the raw model output,
             # computes fingerprints, owns durable state and records prompt/proposal hashes.
-            doc = self.tasks.model_plan(instruction, LocalPlanner.canonical(proposal))
+            doc = self.tasks.model_plan(instruction, proposal)
         else:
             stages = stages_from_proposal(proposal, lambda p: invoke("file.stat", {"path": p}))
             title = ("Local plan: %d steps" % len(stages)) if "steps" in proposal \
@@ -551,13 +569,20 @@ class Controller:
             self.tasks.record_model_proposal(
                 saved["task"]["id"], "aiws-local", instruction, proposal)
             doc = self.tasks.get(saved["task"]["id"])
-        try:
-            doc = self.tasks.route(doc["task"]["id"], self._route_record(decision)) if self.agent is not None \
-                else self.tasks.record_route(doc["task"]["id"], self._route_record(decision))
-        except TaskError:
-            pass   # routing evidence is best effort; the plan itself is already durable
+        if decision is not None:
+            try:
+                doc = self.tasks.route(doc["task"]["id"], self._route_record(decision)) if self.agent is not None \
+                    else self.tasks.record_route(doc["task"]["id"], self._route_record(decision))
+            except TaskError:
+                pass   # routing evidence is best effort; the plan itself is already durable
         self._autorun_reads(doc["task"]["id"])
         return doc
+
+    def _assistant_event(self, event):
+        mapped = aiws_assistant.observatory_events(event)
+        if mapped is not None:
+            kind, fields = mapped
+            self._emit("local", "assistant", kind, **fields)
 
     def create_handoff(self, instruction, agent):
         """Prepare (never send) an external-CLI handoff file. Needs config, a permitted request
@@ -862,6 +887,19 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, aiws_capabilities.CapabilityError) as exc:
                 return self.reply(400, {"error": str(exc)[:120]})
             return self.reply(200, {"hits": hits, "counts": app.capabilities.counts()})
+        if path == "/api/v1/assistant/status":
+            return self.reply(200, app.assistant.status())
+        if path == "/api/v1/assistant/threads":
+            return self.reply(200, app.assistant.threads())
+        if path == "/api/v1/assistant/thread":
+            from urllib.parse import parse_qs
+            ident = (parse_qs(urlsplit(self.path).query).get("id") or [""])[0]
+            try:
+                return self.reply(200, app.assistant.thread(ident))
+            except LocalAgentError as exc:
+                return self.reply(404 if "No such" in str(exc) else 400, {"error": str(exc)[:160]})
+        if path == "/api/v1/assistant/plugins":
+            return self.reply(200, app.assistant.plugin_list())
         if path == "/api/v1/memory":
             return self.reply(200, {"memory": app.memory.list()})
         if path == "/api/v1/cloud/key":
@@ -936,7 +974,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Invalid host"})
         path = urlsplit(self.path).path
         route = path.strip("/").split("/")
-        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key", "/api/v1/preview", "/api/v1/preview/stop", "/api/v1/ide/start", "/api/v1/ide/session") and not (
+        if path not in ("/api/v1/jobs", "/api/v1/tasks", "/api/v1/model/suggest", "/api/v1/model/enable", "/api/v1/model/disable", "/api/v1/model/plan", "/api/v1/route", "/api/v1/route/handoff", "/api/v1/builder/mandates", "/api/v1/builder/runs", "/api/v1/ide/open", "/api/v1/apps/launch", "/api/v1/system/display", "/api/v1/memory", "/api/v1/system/input", "/api/v1/system/network", "/api/v1/system/power", "/api/v1/cloud/key", "/api/v1/preview", "/api/v1/preview/stop", "/api/v1/ide/start", "/api/v1/ide/session", "/api/v1/assistant/turn", "/api/v1/assistant/route", "/api/v1/assistant/route/override", "/api/v1/assistant/plugins/enable", "/api/v1/assistant/plugins/disable") and not (
                 len(route) == 6 and route[:3] == ["api", "v1", "builder"] and (
                     (route[3] == "mandates" and route[5] == "revoke") or
                     (route[3] == "runs" and route[5] in ("stop", "approve", "deny")))) and not (
@@ -976,6 +1014,29 @@ class Handler(BaseHTTPRequestHandler):
                 if set(payload) != {"id"}:
                     raise ValueError("Expected the application id only")
                 result = app.apps_launch(payload["id"])
+            elif path == "/api/v1/assistant/turn":
+                if not {"text"} <= set(payload) <= {"text", "threadId", "tier"} or not isinstance(payload["text"], str):
+                    raise ValueError("Expected text, optionally threadId and tier")
+                tier = payload.get("tier")
+                if tier is not None and tier not in aiws_route.TIERS:
+                    raise ValueError("tier must be local, flash or pro")
+                result = app.assistant.start_turn(payload["text"], payload.get("threadId"), tier)
+            elif path == "/api/v1/assistant/route":
+                if set(payload) != {"text"} or not isinstance(payload["text"], str):
+                    raise ValueError("Expected text")
+                result = app.assistant.route(payload["text"])
+            elif path == "/api/v1/assistant/route/override":
+                if set(payload) != {"from", "to"}:
+                    raise ValueError("Expected from and to")
+                result = app.assistant.route_override(payload["from"], payload["to"])
+            elif path == "/api/v1/assistant/plugins/enable":
+                if not {"name"} <= set(payload) <= {"name", "treeSha256"} or not isinstance(payload["name"], str) or not isinstance(payload.get("treeSha256", ""), (str, type(None))):
+                    raise ValueError("Expected name and treeSha256")
+                result = app.assistant.plugin_enable(payload["name"][:64], payload.get("treeSha256"))
+            elif path == "/api/v1/assistant/plugins/disable":
+                if set(payload) != {"name"} or not isinstance(payload["name"], str):
+                    raise ValueError("Expected name")
+                result = app.assistant.plugin_disable(payload["name"][:64])
             elif path == "/api/v1/memory":
                 result = app.memory_op(payload)
             elif path == "/api/v1/cloud/key":
@@ -1043,6 +1104,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": str(exc)[:240]})
         except SupervisorError as exc:
             return self.reply(409, {"error": str(exc)[:240]})
+        except LocalAgentError as exc:
+            return self.reply({"busy": 409, "unavailable": 503}.get(exc.kind, 400), {"error": str(exc)[:240]})
         except (ValueError, KeyError, TypeError) as exc:
             return self.reply(400, {"error": str(exc)[:240]})
         return self.reply(202, result)

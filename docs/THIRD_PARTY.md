@@ -10,7 +10,7 @@
 | Code - OSS（microsoft/vscode 源码） | AIWS Code 编辑器 | MIT，版权归 Microsoft Corporation 等 | 仅按固定提交在构建时获取；构建产物必须附带上游 `LICENSE.txt` 与 `ThirdPartyNotices.txt`（`build.sh` 缺失即拒绝）；不使用其商标、图标、市场、更新/遥测服务。见 `os/ide/NOTICE.md` |
 | Open VSX（扩展注册表，服务端） | AIWS Code 的扩展来源 | 注册表由 Eclipse Foundation 运营；各扩展各有许可 | 仅作为可配置的网络端点；不内置任何扩展 |
 | llama.cpp | 本地小模型推理 | MIT | 运行时按需获取/调用，不在仓库内 |
-| Qwen3.5-2B（Alibaba Qwen，Q4_K_M GGUF 量化，来源 SoAIHQ/Qwen3.5-2B-GGUF） | 本地小模型 | **Apache-2.0**（2026-11-21 核对 Hugging Face 模型卡：原模型与 GGUF 仓库均声明 apache-2.0，原模型仓库含 Apache-2.0 LICENSE 全文） | 权重不入库；测试版 ISO 随附 `QWEN-LICENSE.txt` 并记录 sha256；量化版由第三方社区制作，仅按其声明的许可分发 |
+| Qwen3.5-9B（Alibaba Qwen，Q4_K_M GGUF 量化，来源 unsloth/Qwen3.5-9B-GGUF） | 本地模型 | **Apache-2.0**（2026-11-22 核对：模型卡、GGUF 元数据 `general.license=apache-2.0`、原模型仓库 LICENSE 全文均为 Apache-2.0） | 权重不入库；测试版 ISO 随附 `QWEN-LICENSE.txt` 并记录 sha256；量化版由第三方社区制作，仅按其声明的许可分发 |
 | Debian 13 软件包（内核、gcc、Python、Node.js、Go、Rust、JDK、clang 等） | 系统与开发工具链 | 各包各自许可（GPL/LGPL/MPL/Apache/MIT 等混合） | 只写入**包名**，由构建时的 Debian 镜像下载；对外分发 ISO 前须满足源码提供等义务 |
 | Linux 内核 | 系统内核 | GPL-2.0-only | 来自 Debian 包 |
 | React、React DOM | 前端 | MIT | npm 依赖 |

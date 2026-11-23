@@ -203,7 +203,9 @@ class RequestValidationTests(Base):
             ({"stream": True}, 400), ({"model": "other"}, 400), ({"max_tokens": 5000}, 400), ({"max_tokens": 0}, 400), ({"max_tokens": True}, 400),
             ({"max_tokens": "64"}, 400), ({"temperature": 9}, 400), ({"cache_prompt": "yes"}, 400), ({"messages": []}, 400),
             ({"messages": [{"role": "assistant", "content": "x"}]}, 400), ({"messages": [{"role": "user", "content": "x", "name": "n"}]}, 400),
-            ({"messages": [{"role": "user", "content": "x" * 17000}]}, 400), ({"messages": [{"role": "user", "content": "x"}] * 9}, 400),
+            ({"messages": [{"role": "user", "content": "x" * 17000}]}, 400), ({"messages": [{"role": "user", "content": "x"}] * 65}, 400),
+            ({"messages": [{"role": "user", "content": "x" * 15000}] * 9}, 400), ({"messages": [{"role": "user", "content": "x"}, {"role": "system", "content": "late"}]}, 400),
+            ({"chat_template_kwargs": {"enable_thinking": "no"}}, 400), ({"chat_template_kwargs": {"other": True}}, 400), ({"chat_template_kwargs": []}, 400),
             ({"grammar": "root ::= x"}, 400), ({"tools": []}, 400), ({"response_format": {"type": "regex"}}, 400), ({"response_format": "json"}, 400),
         ]
         for over, expected in cases:
@@ -216,6 +218,14 @@ class RequestValidationTests(Base):
         self.assertEqual(self.events(), [])
         self.assertEqual(self.gate.status()["coldStarts"], 0)
         self.assertGreater(self.gate.status()["rejected"], 15)
+
+    def test_the_agents_conversation_shape_is_accepted_and_stays_bounded(self):
+        history = [{"role": "system", "content": "s"}, {"role": "user", "content": "q"}] + [{"role": r, "content": "x" * 100} for r in ("assistant", "user") * 20]
+        self.assertEqual(self.chat(messages=history)[0], 200)                                 # 42 messages with assistant turns
+        self.assertEqual(self.chat(messages=history, chat_template_kwargs={"enable_thinking": False})[0], 200)
+        self.assertEqual(self.chat(messages=[{"role": "user", "content": "x"}] * 64)[0], 200)
+        for bad in ([{"role": "assistant", "content": "first"}], [{"role": "tool", "content": "x"}, {"role": "user", "content": "y"}]):
+            self.assertEqual(self.chat(messages=bad)[0], 400)
 
     def test_valid_options_are_accepted(self):
         ok = self.chat(response_format={"type": "json_schema", "json_schema": {"name": "x", "schema": {"type": "object"}}}, cache_prompt=True, temperature=0.1)
@@ -239,6 +249,13 @@ class ConstructionTests(unittest.TestCase):
             self.assertEqual(gate.server.server_address[0], "127.0.0.1")
         finally:
             gate.server.server_close()
+
+    def test_request_timeout_is_a_bounded_argument_and_reaches_the_gate(self):
+        src = (ROOT / "runtime/aiws_model_gate.py").read_text(encoding="utf-8")
+        self.assertIn("--request-timeout", src); self.assertIn("request_timeout=args.request_timeout", src); self.assertIn("30 <= args.request_timeout <= 1800", src)
+        for launcher in ("model/aiws-local-model.sh", "debian/config/includes.chroot/usr/local/bin/aiws-local-model"):
+            text = (ROOT / launcher).read_text(encoding="utf-8")
+            self.assertIn('--request-timeout "$req_timeout"', text, launcher)
 
     def test_request_validator_unit(self):
         self.assertEqual(validate_request(json.dumps(BODY).encode())["max_tokens"], 64)

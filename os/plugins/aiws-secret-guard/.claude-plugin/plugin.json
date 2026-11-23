@@ -1,0 +1,6 @@
+{
+  "name": "aiws-secret-guard",
+  "version": "0.1.0",
+  "description": "Keeps the local assistant away from files that usually hold secrets (.env files, private keys, credentials).",
+  "license": "Apache-2.0"
+}

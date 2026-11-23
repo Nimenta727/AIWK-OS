@@ -46,3 +46,11 @@ aiws_build_tool.py
 aiws_git_tool.py
 aiws_secrets.py
 aiws_egress_proxy.py
+aiws_jsonschema.py
+aiws_llm.py
+aiws_logdigest.py
+aiws_skills.py
+aiws_plugins.py
+aiws_local_agent.py
+aiws_route.py
+aiws_assistant.py

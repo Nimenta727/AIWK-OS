@@ -43,6 +43,8 @@ TOOL_SPECS = [
     ("doc.text", "Extract plain text from a workspace document: PDF (pdftotext), DOCX/ODT/EPUB (pandoc), HTML, or any small text file; bounded output", {"path": "string"}),
     ("app.launch", "Start a registered desktop program (terminal, browser, editor ...). Needs the user's explicit approval; fixed command, no arguments", {"id": "string"}),
     ("code.search", "Search literal text in source files with bounded output", {"query": "string", "path": "string"}),
+    ("log.digest", "Compress a long text log: identical messages are merged (numbers ignored) and each is shown verbatim with the FIRST line number where it appeared and how often it repeated; rare messages are kept first. Use it before reading a long log, then log.lines around a line number", {"path": "string"}),
+    ("log.lines", "Show the numbered lines start..end (at most 200) of a workspace text file or log. start and end are plain numbers such as 340 and 360 (the number after the L in a log.digest entry), not text", {"path": "string", "start": "string", "end": "string"}),
     ("git.inspect", "Read git status or diff (not commit/push)", {"view": "string"}),
     ("runtime.detect", "Discover installed language and build executables", {}),
     ("runtime.test", "Execute a fixed language test command in the guest workspace; opt-in", {"language": "string"}),
@@ -57,7 +59,7 @@ def catalog():
         required = (aiws_exttools.required(name) if name in aiws_exttools.EXT else
                     ["id"] if name == "app.launch" else
                     ["query"] if name == "code.search" else
-                    list(fields) if name in {"doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
+                    list(fields) if name in {"log.digest", "log.lines", "doc.text", "download.progress", "file.read", "file.replace", "file.stat", "file.mkdir", "file.copy", "file.move", "file.trash", "file.restore", "browser.local_text", "browser.snapshot", "runtime.test"} else [])
         tools.append({"name": name, "description": description, "inputSchema": {
             "type": "object", "properties": properties, "required": required, "additionalProperties": False}})
     return tools
@@ -72,7 +74,7 @@ DETECT_TOOLS = (
 
 # Single source of truth for tool classes. Every other module imports these.
 READ_TOOLS = frozenset({
-    "workspace.tree", "file.read", "file.stat", "tools.list", "doc.text", "file.trashList", "code.search", "git.inspect",
+    "workspace.tree", "file.read", "file.stat", "tools.list", "doc.text", "file.trashList", "code.search", "git.inspect", "log.digest", "log.lines",
     "runtime.detect", "browser.local_text",
     "system.info", "network.status", "download.list", "download.progress",
 }) | aiws_exttools.names()
@@ -126,6 +128,22 @@ def _file_read(root, a):
     body = _text_file(p)
     return {"path": a["path"], "text": body,
             "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()}
+
+def _log_digest(root, a):
+    import aiws_logdigest
+    try:
+        result = aiws_logdigest.digest_file(_path(root, a["path"]))
+    except aiws_logdigest.LogError as exc:
+        raise ValueError(str(exc))
+    return {"path": a["path"], **result}
+
+def _log_lines(root, a):
+    import aiws_logdigest
+    try:
+        result = aiws_logdigest.line_range(_path(root, a["path"]), a["start"], a["end"])
+    except aiws_logdigest.LogError as exc:
+        raise ValueError(str(exc))
+    return {"path": a["path"], **result}
 
 def _replace(root, a):
     if not isinstance(a["text"], str) or len(a["text"].encode("utf-8")) > MAX_TEXT:
@@ -737,6 +755,10 @@ def invoke(name, arguments):
         return _file_read(root, arguments)
     if name == "file.replace":
         return _replace(root, arguments)
+    if name == "log.digest":
+        return _log_digest(root, arguments)
+    if name == "log.lines":
+        return _log_lines(root, arguments)
     handler = {"system.info": _system_info, "network.status": _network_status,
                "download.list": _download_list, "download.progress": _download_progress,
                "file.stat": _stat, "file.trashList": _trash_list, "file.mkdir": _mkdir, "file.copy": _copy,

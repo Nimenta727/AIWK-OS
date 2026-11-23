@@ -1,0 +1,45 @@
+{"text": "show the top-level folders of this project", "tier": "local"}
+{"text": "把 logs 目录里最新的三个文件列出来", "tier": "local"}
+{"text": "what's the size of dist.zip", "tier": "local"}
+{"text": "copy the schema.sql file to a backup folder", "tier": "local"}
+{"text": "打开 Makefile 让我看看", "tier": "local"}
+{"text": "list everything modified today", "tier": "local"}
+{"text": "读一下 /tmp 以外项目里的 CHANGELOG 前 40 行", "tier": "local"}
+{"text": "find all files named config.json", "tier": "local"}
+{"text": "create folders src, tests and docs", "tier": "local"}
+{"text": "把 old_reports 整个文件夹重命名为 archive_2024", "tier": "local"}
+{"text": "how long is the uptime of this machine", "tier": "local"}
+{"text": "show me the contents of requirements.txt", "tier": "local"}
+{"text": "看一下现在的网络连接状态", "tier": "local"}
+{"text": "display lines 100 to 140 of server.log", "tier": "local"}
+{"text": "查看回收站里有什么", "tier": "local"}
+{"text": "write a function that returns the n-th fibonacci number", "tier": "flash"}
+{"text": "这个函数在列表为空时会崩溃，帮我加个判断", "tier": "flash"}
+{"text": "add a docstring to every public method in this class", "tier": "flash"}
+{"text": "fix the failing test: expected 3 but got 4", "tier": "flash"}
+{"text": "帮我写一个把 CSV 转成 JSON 的脚本", "tier": "flash"}
+{"text": "explain what this regex does: ^(?:[a-z0-9]+\\.)+[a-z]{2,}$", "tier": "flash"}
+{"text": "rename the variable tmp to buffer in this file", "tier": "flash"}
+{"text": "给登录接口加上参数校验", "tier": "flash"}
+{"text": "write a unit test for the parse_args function", "tier": "flash"}
+{"text": "convert this callback code into a promise", "tier": "flash"}
+{"text": "把这个 SQL 语句改成带分页的", "tier": "flash"}
+{"text": "implement a simple LRU cache class in python", "tier": "flash"}
+{"text": "compile this C file and show me the warnings", "tier": "flash"}
+{"text": "生成一个 Go 的 HTTP hello world 服务", "tier": "flash"}
+{"text": "add error handling around the file open call", "tier": "flash"}
+{"text": "design a plugin architecture so third parties can extend the editor safely", "tier": "pro"}
+{"text": "为什么线上服务每隔几小时就会出现一次内存暴涨然后被杀掉", "tier": "pro"}
+{"text": "audit our password reset flow for account takeover issues", "tier": "pro"}
+{"text": "重新设计整个缓存层，让它在多机部署下依然一致", "tier": "pro"}
+{"text": "figure out why two nodes occasionally disagree about the leader", "tier": "pro"}
+{"text": "评估从单体迁移到微服务的风险并给出分阶段计划", "tier": "pro"}
+{"text": "investigate why the build is slower after upgrading the compiler and nothing in the code changed", "tier": "pro"}
+{"text": "这个线程池偶尔会卡死，找出原因", "tier": "pro"}
+{"text": "design a conflict-free sync protocol for offline edits", "tier": "pro"}
+{"text": "分析这段加密代码有没有时序侧信道和填充攻击风险", "tier": "pro"}
+{"text": "rework the whole error-handling strategy across all twelve services", "tier": "pro"}
+{"text": "排查为什么数据库在高峰期会出现脏读，只在生产环境复现", "tier": "pro"}
+{"text": "plan a safe rollout of a breaking API change to ten thousand clients", "tier": "pro"}
+{"text": "设计一个支持多租户和审计的权限系统", "tier": "pro"}
+{"text": "prove that this lock-free stack has no ABA problem or show a counterexample", "tier": "pro"}

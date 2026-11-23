@@ -1,4 +1,4 @@
-name: AIWS real offline 2B inference baseline
+name: AIWS real offline inference pipeline smoke (small CI model, not the product model)
 on:
   push:
     branches: [main]
@@ -78,9 +78,11 @@ jobs:
           npm install --no-audit --no-fund
           npm run build
           cd "$GITHUB_WORKSPACE"
+          export AIWS_OS_MODEL_ID=Qwen/Qwen3.5-2B
           export AIWS_OS_MODEL_GGUF_SHA256=a8b50de00b780c0f3c16f07cb041a1ecd678b6e22fd8cde91e57fe4b5031523b
           export AIWS_OS_LLAMA_SERVER_SHA256="$(sha256sum out/model-real/llama-server | cut -d' ' -f1)"
           docker run --rm --privileged -v "$PWD":/repo -w /repo \
+            -e AIWS_OS_MODEL_ID \
             -e AIWS_OS_MODEL_GGUF_SHA256 \
             -e AIWS_OS_LLAMA_SERVER_SHA256 \
             -e AIWS_OS_MODEL_LICENSE_REVIEWED=1 \

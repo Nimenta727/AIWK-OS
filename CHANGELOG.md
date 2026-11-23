@@ -7,6 +7,7 @@
 面向程序员的 AI 原生系统方向：观察台首页 + 本地小模型中转 + 官方 CLI 云端构建 + 开发者工具链。
 
 ### 新增
+- **本地模型的专用 Agent 接口**（[docs/AIWS_LOCAL_AGENT.md](docs/AIWS_LOCAL_AGENT.md)）：产品模型定为 Qwen3.5-9B（撤出 2B）；OpenAI 兼容客户端（结构化输出按阶梯降级、缓存/用时/令牌只照搬服务端报告）、受约束的 JSON 动作循环（线程/回合/条目，落盘后可逐字节重建请求，工具输出裁剪、确定性压缩、有界并行只读调用）、Agent Skills 格式的技能与 Claude Code 目录约定的插件（只取文字：技能、命令、只会拒绝的守卫；钩子、MCP、脚本一律列出并不运行）、三档路由（local / flash / pro）、`log.digest` / `log.lines` 读日志工具、工作台「本地助手」页（中英双语）。用真实 9B + 真实 `llama-server` 做过端到端验证；没有在真机/显卡上验证。
 - **云端模型直接接 DeepSeek API**：自带智能体循环（含受限的编译/测试/运行工具，覆盖 C、C++、Go、Python、Rust、C#、Java、JavaScript）（独立进程，受监督器的预算/隔离/批准约束）、工具由我们执行所以批准是同步的、结构化计划审核、原生子智能体树；密钥只存私有文件、经管道传递。详见 [docs/AIWS_DEEPSEEK.md](docs/AIWS_DEEPSEEK.md)（**未对真实服务验证**）。
 - **模型工具箱补齐**：`build_run`（C、C++、Go、Python、Rust、C#、Java、JavaScript、Swift 的固定命令检查/编译/测试/运行）、`deps_install`（经批准的依赖下载）、`git_commit`（仅本地）；项目预览（只读静态服务器）；AIWS Code 作为标签页嵌入工作台。详见 [docs/AIWS_DEV_TOOLS.md](docs/AIWS_DEV_TOOLS.md)。
 - **观察台**（只读首页）：token、模型状态、调用状态、任务、审计结论、待批准；示例数据明确标注为合成回放。

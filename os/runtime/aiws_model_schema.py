@@ -25,6 +25,7 @@ def _app_id_pattern():
 
 # Patterns below are deliberately AT LEAST as strict as LocalPlanner._check_external (the schema may only narrow it).
 # They avoid \b and inline flags so a grammar converter that supports only a regex subset can still use them.
+LINE_NUMBER_PATTERN = r"^[1-9][0-9]{0,8}$"
 GITLOG_COUNT_PATTERN = r"^([1-9]|[1-4][0-9]|50)$"
 JQ_FILTER_PATTERN = r"^[^-].{0,511}$|^.$"
 SQLITE_QUERY_PATTERN = r"^\s*([Ss][Ee][Ll][Ee][Cc][Tt]|[Ww][Ii][Tt][Hh])[\s(*][^;]*;?\s*$"
@@ -39,6 +40,8 @@ def _argument_schema(tool, spec):
             props[name] = {"type": "string", "pattern": TRASH_PATTERN}
         elif name == "id":
             props[name] = {"type": "string", "pattern": _app_id_pattern()}
+        elif tool == "log.lines" and name in ("start", "end"):
+            props[name] = {"type": "string", "pattern": LINE_NUMBER_PATTERN, "maxLength": 9}      # digits only: a real 9B once passed a whole log line here
         elif tool == "ext.gitlog" and name == "count":
             props[name] = {"type": "string", "pattern": GITLOG_COUNT_PATTERN}
         elif tool == "ext.jq" and name == "filter":

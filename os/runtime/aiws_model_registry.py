@@ -17,9 +17,25 @@ import time
 from aiws_guest_boundary import protect_guest_workspace, require_guest_runtime
 from aiws_toolplane import _path
 
-MODEL_ID = "Qwen/Qwen3.5-2B"
-MAX_BYTES = 4 * 1024 * 1024 * 1024
+# The product model. 9B Q4_K_M is about 5.7 GB, so the size limit is 12 GiB (the old 4 GiB limit would refuse it).
+MODEL_ID = "Qwen/Qwen3.5-9B"
+# A small model is accepted ONLY in a disposable CI guest, where the image carries this marker file. Real images never have
+# it, so a product install accepts exactly one model id. (The CI job runs the inference pipeline on an emulated CPU where a
+# 9B model cannot finish; it tests the pipeline, not the product model.)
+CI_MODEL_ID = "Qwen/Qwen3.5-2B"
+CI_MARKER = Path("/etc/aiws/guest-model-acceptance")
+MAX_BYTES = 12 * 1024 * 1024 * 1024
 DIGEST = re.compile(r"^[a-f0-9]{64}\Z")
+
+def approved_model_ids(marker=None):
+    marker = CI_MARKER if marker is None else Path(marker)
+    ids = {MODEL_ID}
+    try:
+        if marker.is_file() and not marker.is_symlink() and "AIWS_MODEL_CI_ONLY=1" in marker.read_text(encoding="utf-8")[:256]:
+            ids.add(CI_MODEL_ID)
+    except OSError:
+        pass
+    return ids
 
 class ModelArtifactError(ValueError):
     pass
@@ -76,7 +92,7 @@ class GuestModelRegistry:
             data=json.loads(path.read_text(encoding="utf-8"))
         except (OSError,ValueError) as exc:
             raise ModelArtifactError("Model manifest damaged") from exc
-        if not isinstance(data,dict) or data.get("modelId") != MODEL_ID or not isinstance(data.get("sha256"),str) or not DIGEST.fullmatch(data["sha256"]):
+        if not isinstance(data,dict) or data.get("modelId") not in approved_model_ids() or not isinstance(data.get("sha256"),str) or not DIGEST.fullmatch(data["sha256"]):
             raise ModelArtifactError("Invalid guest model manifest")
         return data
 
@@ -93,11 +109,12 @@ class GuestModelRegistry:
         with active.open("rb") as stream:
             if stream.read(4) != b"GGUF":
                 raise ModelArtifactError("Model artifact is not GGUF")
-        return {"modelId": MODEL_ID,"sha256":manifest["sha256"],"verified":True,
+        return {"modelId": manifest["modelId"],"sha256":manifest["sha256"],"verified":True,
                 "weightsBytes":active.stat().st_size,"guestOnly":True,
                 "licenseDeclared":manifest.get("licenseDeclared","not-verified")}
 
-    def _activate(self, digest, previous):
+    def _activate(self, digest, previous, model_id=None):
+        model_id = model_id or MODEL_ID
         version=self.root/"versions"/(digest+".gguf")
         active=self.root/"aiws-local.gguf"
         if version.is_symlink() or not version.is_file():
@@ -113,7 +130,7 @@ class GuestModelRegistry:
         finally:
             if os.path.lexists(temp):
                 os.unlink(temp)
-        record={"modelId":MODEL_ID,"sha256":digest,"previousSha256":previous,
+        record={"modelId":model_id,"sha256":digest,"previousSha256":previous,
                 "licenseDeclared":"Apache-2.0 (source declaration; not independently audited)",
                 "activatedAt":int(time.time()),"modelExecutionApproved":False}
         handle,temp=tempfile.mkstemp(dir=self.root,prefix=".manifest-")
@@ -200,7 +217,7 @@ class GuestModelRegistry:
         if not isinstance(data,dict) or set(data)!={"modelId","sha256","source","licenseReviewed"}:
             raise ModelArtifactError("Bundled model manifest schema invalid")
         digest=data["sha256"]
-        if (data["modelId"]!=MODEL_ID or not isinstance(digest,str) or
+        if (data["modelId"] not in approved_model_ids() or not isinstance(digest,str) or
                 not DIGEST.fullmatch(digest) or data["licenseReviewed"] is not True):
             raise ModelArtifactError("Model hash or license review missing")
         if not 1024<=artifact.stat().st_size<=MAX_BYTES or _sha256(artifact)!=digest:
@@ -209,7 +226,7 @@ class GuestModelRegistry:
             if stream.read(4)!=b"GGUF":
                 raise ModelArtifactError("Bundled model does not contain GGUF signature")
         if verify_only:
-            return {"modelId":MODEL_ID,"sha256":digest,"verified":True,
+            return {"modelId":data["modelId"],"sha256":digest,"verified":True,
                     "guestOnly":True,"bundledReadonly":True,
                     "weightsBytes":artifact.stat().st_size,
                     "sourcePath":str(artifact)}
@@ -238,17 +255,18 @@ class GuestModelRegistry:
             if self._manifest()["sha256"]!=digest:
                 raise ModelArtifactError("Existing model must not be overwritten by image preload")
             return self.verify()
-        return self._activate(digest,None)
+        return self._activate(digest,None,data["modelId"])
 
     def rollback(self, digest):
         if not isinstance(digest,str) or not DIGEST.fullmatch(digest):
             raise ModelArtifactError("Rollback requires exact candidate SHA-256")
         self._ready()
         self._not_running()
-        current=self._manifest()["sha256"]
+        manifest=self._manifest()
+        current=manifest["sha256"]
         if digest == current:
             raise ModelArtifactError("Requested model version is already active")
-        return self._activate(digest,current)
+        return self._activate(digest,current,manifest["modelId"])
 
 def main():
     p=argparse.ArgumentParser(description="Verify/provision offline model within AIWS guest only")

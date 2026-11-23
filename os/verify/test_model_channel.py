@@ -67,7 +67,20 @@ class RoundTrip(Rig):
         M.write_frame(self.guest_io, {"id": 99, "method": "POST", "path": "/admin", "body": "{}"}, 4096)
         self.assertEqual(M.read_frame(self.guest_io, 4096, 5)["status"], 404); self.assertEqual(FakeLlama.seen, [])
     def test_oversized_request_is_rejected_before_the_channel(self):
-        status, _ = self.http("POST", "/v1/chat/completions", b"x" * (M.MAX_REQUEST + 10))
+        # The guest server answers 413 and closes as soon as it sees the declared size. Under load it can close before the client
+        # has sent the whole body, and the client then gets a broken pipe instead of the 413. Both mean "rejected early".
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_port, timeout=10)
+        status = None
+        try:
+            c.request("POST", "/v1/chat/completions", body=b"x" * (M.MAX_REQUEST + 10), headers={"Content-Type": "application/json"})
+        except (BrokenPipeError, ConnectionResetError):
+            status = 413
+        if status is None:
+            try:
+                status = c.getresponse().status
+            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected):
+                status = 413
+        c.close()
         self.assertEqual(status, 413); self.assertEqual(FakeLlama.seen, [])
     def test_logs_contain_sizes_never_prompt_text(self):
         self.http("POST", "/v1/chat/completions", json.dumps({"messages": [{"content": "SECRET-PROMPT-TEXT"}]}))

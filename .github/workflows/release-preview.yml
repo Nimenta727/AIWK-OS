@@ -13,8 +13,8 @@ permissions:
 
 env:
   LLAMA_CPP_COMMIT: 29b52d398b294509746ec0a3f28948a3107c0213
-  MODEL_URL: https://huggingface.co/SoAIHQ/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
-  MODEL_SHA256: a8b50de00b780c0f3c16f07cb041a1ecd678b6e22fd8cde91e57fe4b5031523b
+  MODEL_URL: https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+  MODEL_SHA256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
 
 jobs:
   plan:
@@ -141,7 +141,7 @@ jobs:
           test "$(head -c4 inputs/model.gguf)" = GGUF
           (cd inputs/code && sha256sum -c aiws-code-*.tar.zst.sha256)
           (cd inputs/llama && sha256sum -c llama-server.sha256)
-          curl --fail --location --silent https://huggingface.co/Qwen/Qwen3.5-2B/raw/main/LICENSE --output inputs/QWEN-LICENSE.txt
+          curl --fail --location --silent https://huggingface.co/Qwen/Qwen3.5-9B/raw/main/LICENSE --output inputs/QWEN-LICENSE.txt
           grep -q "Apache License" inputs/QWEN-LICENSE.txt
       - name: Build the full ISO (language toolchains, AIWS Code, local model) in a Debian 13 container
         timeout-minutes: 120
@@ -153,6 +153,7 @@ jobs:
             -e AIWS_OS_PROFILE=full \
             -e AIWS_OS_OUTPUT=/repo/out/aiws-os \
             -e AIWS_OS_MODEL_LICENSE_REVIEWED=1 \
+            -e AIWS_OS_MODEL_ID=Qwen/Qwen3.5-9B \
             -e AIWS_OS_MODEL_GGUF_SHA256="$MODEL_SHA256" \
             -e AIWS_OS_LLAMA_SERVER_SHA256="$(sha256sum inputs/llama/llama-server | cut -d' ' -f1)" \
             -e AIWS_OS_BUNDLED_MODEL_GGUF=/repo/inputs/model.gguf \
@@ -253,7 +254,7 @@ jobs:
             echo "- 观察台 + VS Code 风格工作台（\`workbench\`）、Agent、Permission Broker、审批 DAG、模型网关与路由"
             echo "- 开发工具链：Python、Node.js/TypeScript、Go、Rust、Java、Ruby、PHP、Lua、C/C++ 等及常用 CLI 工具"
             echo "- AIWS Code：Code - OSS ${AIWS_CODE_TAG:-1.147.0} 重新品牌化构建（MIT；保留上游许可与声明）"
-            echo "- 本地模型：Qwen3.5-2B Q4_K_M（Apache-2.0），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**已随镜像提供，默认不加载**：在工作台的「本地 AI 助手」页点“申请启用模型”并批准即可使用（建议虚拟机内存 ≥ 6 GB）"
+            echo "- 本地模型：Qwen3.5-9B Q4_K_M（Apache-2.0，约 5.7 GB），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**已随镜像提供，默认不加载**。**在客户机里用 CPU 跑它实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，且很慢）**：推荐经宿主显卡通道使用，或把虚拟机内存调到 ≥ 14 GiB"
             echo
             echo "## 验证状态（如实）"
             echo "- ✅ 构建期：校验和、GGUF 魔数、AIWS Code 许可文件齐全检查、工作台测试通过"

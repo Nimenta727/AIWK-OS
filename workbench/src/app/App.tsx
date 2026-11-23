@@ -16,6 +16,7 @@ import SystemPage from './System';
 import Build from './Build';
 import ProjectPreview from './ProjectPreview';
 import IdeView from './IdeView';
+import Assistant from './Assistant';
 import FileViewer from '../os/FileViewer';
 import BrowserView from '../os/BrowserView';
 import GuestFiles from '../os/GuestFiles';
@@ -36,7 +37,7 @@ type View={id:string;zh:string;en:string;icon:string};
 const VIEWS:View[]=[
  {id:'home',zh:'总览',en:'Overview',icon:'pulse'},{id:'plans',zh:'计划审核',en:'Plan review',icon:'checklist'},{id:'agents',zh:'云端智能体',en:'Cloud agents',icon:'type-hierarchy'},
  {id:'changes',zh:'变更审查',en:'Review changes',icon:'diff'},{id:'build',zh:'构建',en:'Build',icon:'rocket'},{id:'files',zh:'AI 文件管理',en:'AI files',icon:'files'},
- {id:'tasks',zh:'持久任务与 DAG',en:'Persistent tasks',icon:'list-tree'},{id:'model',zh:'本地 AI 助手',en:'Local AI',icon:'hubot'},
+ {id:'tasks',zh:'持久任务与 DAG',en:'Persistent tasks',icon:'list-tree'},{id:'assistant',zh:'本地助手',en:'Local assistant',icon:'hubot'},{id:'model',zh:'本地模型开关',en:'Model switch',icon:'settings'},
  {id:'ide',zh:'代码编辑器',en:'Code editor',icon:'code'},{id:'system',zh:'系统',en:'System',icon:'settings-gear'},{id:'advanced',zh:'系统服务与内核',en:'Services & kernel',icon:'server-process'},{id:'browser',zh:'内置浏览器',en:'Preview browser',icon:'globe'}];
 const ACTIVITIES=[{id:'home',zh:'总览',en:'Overview',icon:'pulse'},{id:'plans',zh:'计划',en:'Plans',icon:'checklist'},{id:'agents',zh:'智能体',en:'Agents',icon:'type-hierarchy'},
  {id:'changes',zh:'变更',en:'Changes',icon:'diff'},{id:'explorer',zh:'文件',en:'Files',icon:'files'},{id:'system',zh:'系统',en:'System',icon:'settings-gear'}];
@@ -150,12 +151,13 @@ export default function App(){
   if(activity==='system')return <SideBar title={tr('系统','System')}>
    <Row icon="settings-gear" label={tr('显示 · 输入法 · 网络 · 电源','Display · input · network · power')} onClick={()=>open('system')}/>
    <Row icon="server-process" label={tr('系统服务与内核','Services & kernel')} onClick={()=>open('advanced')}/>
-   <Row icon="hubot" label={tr('本地 AI 助手','Local AI')} onClick={()=>open('model')}/>
+   <Row icon="hubot" label={tr('本地助手','Local assistant')} onClick={()=>open('assistant')}/>
+   <Row icon="settings" label={tr('本地模型开关','Model switch')} onClick={()=>open('model')}/>
    <Section title={tr('程序','Programs')}>{apps.filter(a=>a.kind==='gui').map(a=><Row key={a.id} icon="play" label={english?a.en:a.zh} detail={a.installed?'':tr('未安装','missing')} onClick={a.launchable?()=>void launch(a.id):undefined}/>)}
     <Row icon="code" label="AIWS Code" onClick={()=>void launch('aiws-code')}/></Section>
    {note&&<p className="muted pad">{note}</p>}</SideBar>;
   return <SideBar title={tr('总览','Overview')}>
-   <Row icon="pulse" label={tr('总览','Overview')} onClick={()=>open('home')}/><Row icon="rocket" label={tr('构建','Build')} onClick={()=>open('build')}/><Row icon="hubot" label={tr('本地 AI 助手','Local AI')} onClick={()=>open('model')}/>
+   <Row icon="pulse" label={tr('总览','Overview')} onClick={()=>open('home')}/><Row icon="rocket" label={tr('构建','Build')} onClick={()=>open('build')}/><Row icon="hubot" label={tr('本地助手','Local assistant')} onClick={()=>open('assistant')}/>
    <Row icon="files" label={tr('AI 文件管理','AI files')} onClick={()=>open('files')}/><Row icon="globe" label={tr('预览浏览器','Preview browser')} onClick={()=>open('browser')}/><Row icon="code" label={tr('代码编辑器（AIWS Code）','Code editor (AIWS Code)')} onClick={()=>open('ide')}/></SideBar>;
  };
  const pageOf=(id:string|null)=>{
@@ -168,6 +170,7 @@ export default function App(){
    case 'build':return <Build tr={tr} english={english} data={data}/>;
    case 'system':return <SystemPage tr={tr}/>;
    case 'files':return <div className="legacy"><GuestFiles csrf={csrf} english={english} command={cmd} onPlanCreated={()=>open('plans')}/></div>;
+   case 'assistant':return <Assistant tr={tr} english={english} onPlan={tid=>open('plans',tid)} onModelSwitch={()=>open('model')}/>;
    case 'tasks':case 'model':return <div className="legacy"><GuestTaskStudio csrf={csrf} english={english} capabilities={caps as never} focus={id==='model'?'model':'tasks'}/></div>;
    case 'advanced':return <div className="legacy"><GuestSystemConsole csrf={csrf} english={english} onPlanCreated={()=>open('plans')}/></div>;
    case 'browser':return <div className="legacy fill"><ProjectPreview tr={tr} folders={folders} onUrl={u=>setNav({url:u,nonce:Date.now()})}/><BrowserView english={english} navigateTo={nav} openExternal={()=>void launch('chromium')} canOpenExternal={apps.some(a=>a.id==='chromium'&&a.launchable)}/></div>;
@@ -194,7 +197,7 @@ export default function App(){
    </div>
   </div>
   <StatusBar left={[
-   {id:'model',icon:'hubot',text:modelOnline?tr('本地模型在线','Local model online'):s?.status.localModel.configured?tr('本地模型待机','Local model idle'):tr('本地模型未配置','Local model off'),onClick:()=>open('model')},
+   {id:'model',icon:'hubot',text:modelOnline?tr('本地模型在线','Local model online'):s?.status.localModel.configured?tr('本地模型待机','Local model idle'):tr('本地模型未配置','Local model off'),onClick:()=>open('assistant')},
    {id:'build',icon:'rocket',text:tr('构建 ','Build ')+(s?.status.builder.state||'–'),onClick:()=>open('build')},
    ...(health?.systemVerify?[{id:'wd',icon:'database',text:health.workDisk?tr('工作盘','Work disk'):tr('无工作盘','No work disk'),tone:health.workDisk?undefined:('warn' as const),title:tr('AI 的工作区放在独立的工作盘上（只读系统盘、工作盘不可执行）','The AI works on a separate disk (system read-only, work disk noexec)')}]:[]),
    ...(approvals?[{id:'appr',icon:'bell',text:approvals+' '+tr('待审批','to review'),tone:'warn' as const,onClick:()=>open('plans')}]:[])]}

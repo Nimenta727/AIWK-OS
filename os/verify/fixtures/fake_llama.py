@@ -3,6 +3,8 @@
 
 Flags: --host H --port P [--delay S] (not healthy for S seconds) [--die] (exit immediately) [--busy S] (each chat takes S seconds)
        [--log FILE] (append pid/concurrency events)
+       [--script FILE] (JSON list of message contents, answered one per chat; afterwards the fixed planner answer)
+       [--record FILE] (append every chat request body, one JSON object per line)
 """
 import json
 import sys
@@ -15,6 +17,9 @@ def arg(name, default=None, cast=str):
 
 host, port = arg("--host", "127.0.0.1"), arg("--port", 18081, int)
 delay, busy, log = arg("--delay", 0.0, float), arg("--busy", 0.0, float), arg("--log")
+script_path, record_path = arg("--script"), arg("--record")
+script = json.load(open(script_path)) if script_path else []
+served = {"n": 0}
 if "--die" in sys.argv:
     sys.exit(7)
 born = time.time()
@@ -40,11 +45,19 @@ class H(BaseHTTPRequestHandler):
         with lock:
             state["now"] += 1; state["max"] = max(state["max"], state["now"])
         note("chat")
+        if record_path:
+            with open(record_path, "a") as f:
+                f.write(json.dumps(body) + "\n")
         time.sleep(busy)
         with lock:
             state["now"] -= 1
         answer = {"tool": "system.info", "arguments": {}, "reason": "fake"}
-        self.send_json(200, {"choices": [{"message": {"content": json.dumps(answer)}, "finish_reason": "stop"}],
+        content = json.dumps(answer)
+        with lock:
+            if served["n"] < len(script):
+                content = script[served["n"]]
+            served["n"] += 1
+        self.send_json(200, {"choices": [{"message": {"content": content}, "finish_reason": "stop"}],
                              "usage": {"prompt_tokens": 100, "completion_tokens": 10}, "echo_max_tokens": body.get("max_tokens")})
 
 note("start")

@@ -1,0 +1,60 @@
+{
+  "guards": [
+    {
+      "deny": {
+        "tool": "*",
+        "path": ".env"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*/.env"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": ".env.*"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*/.env.*"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*.pem"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*.key"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*id_rsa*"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    },
+    {
+      "deny": {
+        "tool": "*",
+        "path": "*credentials*"
+      },
+      "why": "files like this usually hold secrets; open them yourself if you need to"
+    }
+  ]
+}
