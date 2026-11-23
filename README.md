@@ -58,7 +58,7 @@
 | --- | --- |
 | 观察台、审批 DAG、本地模型接口、路由、官方 CLI 监督器、出口代理、AIWS Code 启动接口 | **代码已实现，单元/契约测试通过**（Python 438 项、前端 70 项） |
 | 前端（VS Code 风格外壳） | **已在真实浏览器里点过**（深/浅主题、标签、命令面板、文件查看） |
-| Debian 13 完整镜像（含工具链、AIWS Code、模型权重） | ✅ [v0.2.0-preview.1 测试版](https://github.com/Nimenta727/AIWK-OS/releases/tag/v0.2.0-preview.1)：构建通过、从 ISO 读回校验模型权重、QEMU 启动冒烟（含界面点击）通过 |
+| Debian 13 完整镜像（含工具链、AIWS Code、模型权重） | ✅ [v0.2.0-preview.1 测试版](https://github.com/Nimenta727/AIWK-OS/releases/tag/v0.2.0-preview.1)（带 2B）；**v0.3.0-preview.1（带 9B 与本地助手）正在由发布流程构建，通过全部检查才会发布**。v0.2.0 那版：构建通过、从 ISO 读回校验模型权重、QEMU 启动冒烟（含界面点击）通过 |
 | AIWS Code 的真实构建 | ✅ 构建成功并打进镜像（许可文件已校验）；在镜像里的完整可用性**待验证** |
 | 真实客户机里的模型质量、官方 CLI 实跑、完整镜像体积 | **未验证**（有检查清单，等待真实运行） |
 | 内核强制隔离、通用安装器、Secure Boot、物理机启动 | **未完成**；当前 Permission Broker 是应用层策略，不是内核隔离 |

@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
-import {Button,Check,Icon,Input,Notice,Section,Select,Progress} from '../ui/kit';
+import {Badge,Button,Check,Icon,Input,Notice,Section,Select,Progress} from '../ui/kit';
 import {formatTokens} from '../model/observatory.mjs';
 import {api} from '../os/api';
 import {msg,useAction} from './common';
@@ -43,6 +43,11 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
  const [f,setF]=useState({provider:'deepseek',projectDir:'',prompt:'',inputK:'400',outputK:'100',minutes:'30',turns:'40',tools:'Read,Edit,Write,Bash(npm test)',del:true,install:true,push:true,
   model:'deepseek-flash',thinking:true,effort:'high',planApproval:true,edit:true,remove:false,askWrite:false,build:true,askBuild:true,deps:true,git:true,askCommit:true});
  const set=(k:string,v:string|boolean)=>setF(x=>({...x,[k]:v}));
+ type Sug={text:string;d:{tier:'local'|'flash'|'pro';thinking:boolean;cloud:{model:string;thinking:boolean}|null;source:string;why:{zh:string;en:string}}};
+ const [sug,setSug]=useState<Sug|null>(null);
+ const tierOf=(model:string)=>model==='deepseek-v4-pro'?'pro':'flash';
+ const suggest=async()=>{const t=f.prompt.trim().slice(0,1000);if(!t)return;try{setSug({text:f.prompt,d:await api<Sug['d']>('/assistant/route',{method:'POST',body:JSON.stringify({text:t})})});}catch(e){act.setError(msg(e));}};
+ const apply=()=>{const c=sug?.d.cloud;if(!c)return;if((ds?.models||[]).includes(c.model))set('model',c.model);set('thinking',c.thinking);};
  const native=f.provider==='deepseek';
  const execOk=!!builder?.status.execAllowed;
  const start=async()=>{
@@ -59,6 +64,7 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
     body={provider:f.provider,projectDir:f.projectDir.trim(),allowedTools:f.tools.split(',').map(x=>x.trim()).filter(Boolean),permissionMode:'default',maxTurns:Number(f.turns),
      wallClockMinutes:Number(f.minutes),tokenBudget:{input:Number(f.inputK)*1000,output:Number(f.outputK)*1000},needApprovalFor:approvals};
    }
+   if(native&&sug&&sug.text===f.prompt&&sug.d.tier!=='local'&&tierOf(f.model)!==sug.d.tier){try{await api('/assistant/route/override',{method:'POST',body:JSON.stringify({from:sug.d.tier,to:tierOf(f.model)})});}catch{/* statistics only */}}
    const m=await api<{id:string}>('/builder/mandates',{method:'POST',body:JSON.stringify(body)});
    if(await act.post('/builder/runs',{mandateId:m.id,prompt:f.prompt,language:english?'en':'zh'}))set('prompt','');
   }catch(e){act.setError(msg(e));}
@@ -84,6 +90,9 @@ export default function Build({tr,english,data}:{tr:Tr;english:boolean;data:Obse
      <Check label={tr('思考模式','Thinking mode')} checked={f.thinking} onChange={v=>set('thinking',v)}/></div>}
     <label>{tr('项目文件夹（工作区内的子文件夹）','Project folder (a sub-folder of the workspace)')}<Input value={f.projectDir} placeholder="app" onChange={e=>set('projectDir',e.target.value)}/></label>
     <label>{tr('要构建什么','What to build')}<textarea className="k-input" rows={4} maxLength={4000} value={f.prompt} onChange={e=>set('prompt',e.target.value)}/></label>
+    {native&&<div className="kv"><Button icon="compass" disabled={!f.prompt.trim()} onClick={()=>void suggest()}>{tr('建议用哪档模型','Suggest a model tier')}</Button>
+     {sug&&sug.text===f.prompt&&<span className="grow"><Badge tone={sug.d.tier==='pro'?'warn':sug.d.tier==='local'?'ok':'info'}>{sug.d.tier}</Badge> {sug.d.cloud?<>{sug.d.cloud.model} · {tr('思考 ','thinking ')}{sug.d.cloud.thinking?tr('开','on'):tr('关','off')} <Button variant="ghost" onClick={apply}>{tr('采用','Use')}</Button></>:<span className="muted">{tr('在本机就能完成，不必花云端 token：去“本地助手”试试','Can be done on this machine with no cloud tokens: try the Local assistant')}</span>}
+      <small className="muted"> {english?sug.d.why.en:sug.d.why.zh}{sug.d.source==='rules-fallback'?' '+tr('（本地模型不可用，按默认）','(local model unavailable: default)'):''}</small></span>}</div>}
     <div className="grid4"><label>{tr('输入预算 (k)','Input budget (k)')}<Input value={f.inputK} onChange={e=>set('inputK',e.target.value)}/></label><label>{tr('输出预算 (k)','Output budget (k)')}<Input value={f.outputK} onChange={e=>set('outputK',e.target.value)}/></label>
      <label>{tr('最长分钟','Max minutes')}<Input value={f.minutes} onChange={e=>set('minutes',e.target.value)}/></label><label>{tr('最多调用次数','Max model calls')}<Input value={f.turns} onChange={e=>set('turns',e.target.value)}/></label></div>
     {native?<fieldset><legend>{tr('它可以做什么','What it may do')}</legend>

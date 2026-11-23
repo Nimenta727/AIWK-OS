@@ -245,13 +245,14 @@ jobs:
           {
             echo "# ${TITLE}"
             echo
-            echo "**测试版 / PRE-RELEASE — 仅供在虚拟机里验证，不要写入重要磁盘。** 这是首个可下载的 AIWK-OS 镜像，未经过任何物理机、Secure Boot 或长期使用验证。"
+            echo "**测试版 / PRE-RELEASE — 仅供在虚拟机里验证，不要写入重要磁盘。** 这是 0.2.0-preview.1 之后的第二个测试镜像（本地模型由 2B 换成 9B，新增本地助手），未经过任何物理机、Secure Boot 或长期使用验证；**镜像体积约 9–10 GB，已拆成多个分卷，见下方“校验与重组”**。"
             echo
-            echo "面向程序员的 AI 原生操作系统：首页是只读观察台，本地离线小模型做中转，云端通过官方 CLI 在你授权范围内构建；预装常用语言环境与开源工具，AIWS Code（Code - OSS 重新品牌化）按需打开。"
+            echo "面向程序员的 AI 原生操作系统：工作台就是桌面；本地 9B 模型做路由、读日志和提案（它从不自己改任何东西，改动都要你在计划审核区批准）；云端模型直接接 DeepSeek API（带受限的编译/测试/运行工具），也可经官方 CLI；预装常用语言环境与开源工具，AIWS Code（Code - OSS 重新品牌化）按需打开。"
             echo
             echo "## 这个镜像里有什么"
-            echo "- Debian 13 (trixie) Live，XFCE/Openbox 桌面，自动登录用户 \`user\`（Live 默认密码 \`live\`）"
-            echo "- 观察台 + VS Code 风格工作台（\`workbench\`）、Agent、Permission Broker、审批 DAG、模型网关与路由"
+            echo "- Debian 13 (trixie) Live，无边框 Openbox + 全屏工作台（没有桌面环境），自动登录用户 \`user\`（Live 默认密码 \`live\`）"
+            echo "- VS Code 风格工作台（\`workbench\`，中英双语）：总览、计划审核、云端智能体树、变更审查、构建、**本地助手**（技能、插件、路由）、系统设置；Agent、Permission Broker、审批 DAG、模型网关"
+            echo "- 本地助手：每步一个受约束的 JSON 动作；只读工具自动执行，改动只能提案；技能（Agent Skills 格式）与插件（只取文字，从不运行钩子/脚本）；读日志工具；三档路由（local / flash / pro）。详见 docs/AIWS_LOCAL_AGENT.md"
             echo "- 开发工具链：Python、Node.js/TypeScript、Go、Rust、Java、Ruby、PHP、Lua、C/C++ 等及常用 CLI 工具"
             echo "- AIWS Code：Code - OSS ${AIWS_CODE_TAG:-1.147.0} 重新品牌化构建（MIT；保留上游许可与声明）"
             echo "- 本地模型：Qwen3.5-9B Q4_K_M（Apache-2.0，约 5.7 GB），sha256 \`${MODEL_SHA256}\`；llama.cpp 固定提交 \`${LLAMA_CPP_COMMIT}\`；**已随镜像提供，默认不加载**。**在客户机里用 CPU 跑它实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，且很慢）**：推荐经宿主显卡通道使用，或把虚拟机内存调到 ≥ 14 GiB"
@@ -259,8 +260,9 @@ jobs:
             echo "## 验证状态（如实）"
             echo "- ✅ 构建期：校验和、GGUF 魔数、AIWS Code 许可文件齐全检查、工作台测试通过"
             echo "- ✅ 从成品 ISO 里读回：模型权重 sha256 与官方值一致；llama-server 与构建产物一致；AIWS Code 的 LICENSE / ThirdPartyNotices / 来源记录都在镜像里"
+            echo "- ✅ 本地助手：用真实 Qwen3.5-9B 与真实 llama-server（在开发环境里自己编的，不是镜像里固定的那个提交）做过端到端验证（9 个场景全通过）；Python 913 项、前端 45 项测试通过"
             echo "- ✅ QEMU 启动到 \`AIWS_BOOT_SMOKE_PASS\`（加速方式见 Actions 日志）"
-            echo "- ❓ **未验证**：真实硬件/Secure Boot、模型在本镜像里的真实质量、官方 CLI（Claude Code / Codex）真实端到端、AIWS Code 在镜像内的完整可用性、桌面程序启动"
+            echo "- ❓ **未验证**：9B 在本镜像的客户机里实际运行（默认不加载；CPU 上需约 11 GiB 内存且很慢）、真实模型门与真实 9B 一起运行、显卡通道、新外壳（无桌面环境）的输入法与分辨率、双盘/只读系统盘在真机上的行为、真实硬件/Secure Boot、模型在本镜像里的真实质量、官方 CLI（Claude Code / Codex）真实端到端、AIWS Code 在镜像内的完整可用性、桌面程序启动"
             echo "- 安全边界是应用层（同 UID 的 Broker），**不是内核强制隔离**"
             echo
             echo "## 校验与重组"

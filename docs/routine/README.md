@@ -123,3 +123,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-22 20:00 — 模型工具箱补齐、Swift、项目预览、AIWS Code 嵌入工作台](2026-11-22_2000-dev-toolbox-preview-ide.md)
 - [2026-11-22 10:32 — 本地模型试验：路由 + 读日志，2B 对 9B](2026-11-22_1032-local-model-routing-and-log-reading-bench.md)
 - [2026-11-22 14:46 — 本地模型改为 9B，专用 Agent 接口（循环、技能、插件、路由、读日志）](2026-11-22_1446-local-agent-9b-model-integration.md)
+- [2026-11-23 09:00 — 构建页的模型档位建议；发布 0.3.0-preview.1（带 9B）](2026-11-23_0900-build-tier-suggestion-and-release-0.3.0.md)
