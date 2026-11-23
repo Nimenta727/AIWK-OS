@@ -230,7 +230,7 @@ jobs:
           {
             echo "# ${TITLE}"
             echo
-            echo "**测试版 / PRE-RELEASE — 仅供在虚拟机里验证，不要写入重要磁盘。** 这是 0.2.0-preview.1 之后的第二个测试镜像（本地模型由 2B 换成 9B，新增本地助手），未经过任何物理机、Secure Boot 或长期使用验证；**镜像体积约 9–10 GB，已拆成多个分卷，见下方“校验与重组”**。"
+            echo "**测试版 / PRE-RELEASE — 仅供在虚拟机里验证，不要写入重要磁盘。** 这是 0.2.0-preview.1 之后的第二个测试镜像（本地模型由 2B 换成 9B，新增本地助手），未经过任何物理机、Secure Boot 或长期使用验证；镜像较大，可能被拆成多个分卷，见下方“校验与重组”。"
             echo
             echo "面向程序员的 AI 原生操作系统：工作台就是桌面；本地 9B 模型做路由、读日志和提案（它从不自己改任何东西，改动都要你在计划审核区批准）；云端模型直接接 DeepSeek API（带受限的编译/测试/运行工具），也可经官方 CLI；预装常用语言环境与开源工具，AIWS Code（Code - OSS 重新品牌化）按需打开。"
             echo
@@ -244,7 +244,7 @@ jobs:
             echo
             echo "## 模型权重：自己下载，镜像不带"
             echo "产品模型是 Qwen3.5-9B（Q4_K_M，约 5.7 GB，Apache-2.0）。权重不随镜像发布，请自行下载并校验哈希后放入系统，**完整步骤见仓库文档 docs/AIWS_MODEL_WEIGHTS.md**。没有权重时系统其余部分（工作台、计划审核、云端构建、文件与日志的确定性工具）都能用，只是没有本地助手和本地路由。"
-            echo "- 客户机里用 CPU 跑 9B 实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，而且很慢），请把虚拟机内存调到 ≥ 14 GiB。"
+            echo "- 客户机里用 CPU 跑 9B 实测需要约 11 GiB 内存（默认虚拟机 6 GiB 不够，而且很慢），请把虚拟机内存调到 ≥ 16 GiB。"
             echo "- 宿主显卡通道的代码已在仓库里，但**这个镜像和启动脚本里还没有接线**，所以现在不是可用的路径。"
             echo
             echo "## 验证状态（如实）"
@@ -259,7 +259,7 @@ jobs:
             echo "ISO sha256：\`${iso_sha}\`。文件被拆成 ≤1.9 GiB 的分卷（GitHub 单个附件上限 2 GiB）时，见 \`REASSEMBLE.txt\`，并用 \`SHA256SUMS\` 校验。"
             echo
             echo "## 许可与源码"
-            echo "仓库代码 Apache-2.0。镜像包含 Debian 软件包、Linux 内核、Code - OSS、llama.cpp等第三方组件（模型权重不随镜像发布，其许可见 docs/AIWS_MODEL_WEIGHTS.md），各自保留其许可；见 \`NOTICE\`、\`THIRD_PARTY.md\`、\`QWEN-LICENSE.txt\` 与随 AIWS Code 附带的 \`LICENSE.txt\`/\`ThirdPartyNotices.txt\`。Debian 包清单（含版本）见 \`aiws-os-${VERSION}-packages.txt\`，其源码可从 Debian 归档获取（\`apt-get source <包名>\`，源码索引 https://deb.debian.org/debian/ 下 trixie 的 \`deb-src\`）。"
+            echo "仓库代码 Apache-2.0。镜像包含 Debian 软件包、Linux 内核、Code - OSS、llama.cpp等第三方组件（模型权重不随镜像发布，其许可见 docs/AIWS_MODEL_WEIGHTS.md），各自保留其许可；见 \`NOTICE\`、\`THIRD_PARTY.md\` 与随 AIWS Code 附带的 \`LICENSE.txt\`/\`ThirdPartyNotices.txt\`。Debian 包清单（含版本）见 \`aiws-os-${VERSION}-packages.txt\`，其源码可从 Debian 归档获取（\`apt-get source <包名>\`，源码索引 https://deb.debian.org/debian/ 下 trixie 的 \`deb-src\`）。"
             echo
             echo "构建提交：\`${GITHUB_SHA}\` · Actions 运行：${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } > release-notes.md
