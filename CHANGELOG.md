@@ -2,7 +2,25 @@
 
 遵循「工程预览」语义：版本号带 `-preview`，不代表稳定。条目按时间倒序；每次改动的详细记录、验证与下一步见 [docs/routine](docs/routine/README.md)。
 
-## 0.2.0-preview.1 — 未发布（准备中）
+## 0.3.1-preview.1 — 2026-11-24
+
+修复版。详细记录见 docs/routine 里 2026-11-23 13:54 与 2026-11-24 的两份日志。
+
+### 修复
+- **界面图标全部不显示**：工作台服务的静态资源白名单没有 `.ttf`，图标字体（codicons）一直 404。0.3.0-preview.1 镜像受影响。
+- 标签开多后整个窗口被撑宽；AI 文件管理里根目录文件缩进错位；旧页面主按钮对比度 2.5:1；关机按钮图标空白；"新对话"在空对话时点了没反应；中文界面里的英文状态（`DISABLED`、`构建 disabled`、`unavailable`、`Error:` 前缀等）。
+- UEFI 启动菜单没有超时（live-build 的 GRUB 模板没有 `set timeout`），会一直等待。
+- 发布流程：标签已发布时第一步就停下；有 KVM 时用 KVM；llama.cpp 拉取失败自动重试。
+
+### 变更
+- AI 文件管理、持久任务 / 本地模型开关、系统服务与内核三页用统一组件重写；移除 `lucide-react` 依赖和旧样式表 `OsWorkbench.css`。
+- 工作台 HTTP 层拆到 `aiws_workbench_http.py`，改成显式路由表；工具平面拆成核心、文件类、系统类三个模块。
+- 死代码清理、3 个 SQLite 索引、CSRF 常数时间比较、全部 shell 脚本零 shellcheck 警告。
+
+### CI
+- 静态检查加入 ruff 与 shellcheck；新增浏览器巡检作业（`workbench/e2e/ui-audit.cjs`）：对真实服务巡检全部视图、逐个点击按钮、回放镜像内冒烟步骤。
+
+## 0.3.0-preview.1 — 2026-11-23（包含自 0.2.0-preview.1 以来的全部改动）
 
 面向程序员的 AI 原生系统方向：观察台首页 + 本地小模型中转 + 官方 CLI 云端构建 + 开发者工具链。
 

@@ -128,3 +128,4 @@ Each repository modification requires a timestamped log with changed files, veri
 - [2026-11-23 13:10 — 全项目代码审计与优化（死代码、索引、测试断言、lint 进 CI）](2026-11-23_131044-full-code-audit-and-cleanup.md)
 - [2026-11-23 13:28 — 工作台路由表 + 两个大文件按功能拆分](2026-11-23_132810-workbench-route-table-and-module-split.md)
 - [2026-11-23 13:54 — 前端审计：假按钮、渲染异常、审美（图标字体 404、窗口撑宽等 12 项）](2026-11-23_135437-frontend-render-audit.md)
+- [2026-11-24 01:10 — 三个旧页面重写、浏览器巡检进 CI、发布 0.3.1-preview.1](2026-11-24_0110-legacy-pages-rewrite-ci-ui-audit-release-0.3.1.md)
