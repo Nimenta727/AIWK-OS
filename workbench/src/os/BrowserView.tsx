@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,ExternalLink,RefreshCw} from 'lucide-react';
+import {Button,IconButton,Input} from '../ui/kit';
 import {resolveBrowserTarget} from '../model/apps.mjs';
 
 type Target={kind:string;url?:string;path?:string};
@@ -28,14 +28,14 @@ export default function BrowserView({english,openExternal,canOpenExternal,naviga
  const reload=()=>{if(frame.current&&target?.url)frame.current.src=target.url;};
  return <div className="aiws-sh-file aiws-sh-fill">
   <form className="aiws-sh-urlbar" onSubmit={e=>{e.preventDefault();go(input);}} role="search">
-   <button type="button" className="aiws-sh-icon" disabled={!history.length} onClick={back} aria-label={tr('后退','Back')}><ArrowLeft size={15}/></button>
-   <button type="button" className="aiws-sh-icon" disabled={!target?.url||target.kind==='external'} onClick={reload} aria-label={tr('刷新','Reload')}><RefreshCw size={15}/></button>
-   <input value={input} onChange={e=>setInput(e.target.value)} spellCheck={false} aria-label={tr('地址','Address')}
+   <IconButton icon="arrow-left" label={history.length?tr('后退','Back'):tr('后退（还没有上一页）','Back (nothing to go back to)')} disabled={!history.length} onClick={back}/>
+   <IconButton icon="refresh" label={target?.url&&target.kind!=='external'?tr('刷新','Reload'):tr('刷新（还没有打开页面）','Reload (no page open)')} disabled={!target?.url||target.kind==='external'} onClick={reload}/>
+   <Input className="k-input aiws-sh-url" value={input} onChange={e=>setInput(e.target.value)} aria-label={tr('地址','Address')}
     placeholder={tr('localhost:5173 · docs/index.html · https://…','localhost:5173 · docs/index.html · https://…')}/>
-   <button type="submit" className="aiws-sh-btn">{tr('打开','Go')}</button>
-   <button type="button" className="aiws-sh-icon" disabled={!canOpenExternal} onClick={openExternal} title={tr('在 Chromium 窗口中打开','Open a Chromium window')} aria-label={tr('在 Chromium 窗口中打开','Open a Chromium window')}><ExternalLink size={15}/></button>
+   <Button type="submit" variant="primary">{tr('打开','Go')}</Button>
+   <IconButton icon="link-external" label={canOpenExternal?tr('在 Chromium 窗口中打开','Open a Chromium window'):tr('在 Chromium 窗口中打开（本镜像没有 Chromium）','Open a Chromium window (Chromium is not installed)')} disabled={!canOpenExternal} onClick={openExternal}/>
   </form>
-  {note&&<p className="aiws-os-muted" role="status" style={{padding:'6px 16px'}}>{note}</p>}
+  {note&&<p className="muted pad" role="status">{note}</p>}
   {target&&target.kind!=='external'&&target.url&&<iframe ref={frame} className="aiws-sh-frame" title={tr('预览','Preview')} src={target.url}
    sandbox={target.kind==='workspace'?'allow-scripts':'allow-scripts allow-forms allow-same-origin allow-popups'} referrerPolicy="no-referrer"/>}
   {!target&&<div className="aiws-sh-welcome"><h1>{tr('内置预览浏览器','Preview browser')}</h1>

@@ -38,20 +38,26 @@ fieldset{border:1px solid var(--border-strong);border-radius:var(--r);padding:8p
  --c-red:var(--err);--c-green:var(--ok);--c-amber:var(--warn);--c-red-bg:var(--diff-del);--c-green-bg:var(--diff-add);--c-amber-bg:var(--bg-widget);--c-blue-bg:var(--bg-select-inactive);
  --c-border-red:var(--err);--c-border-green:var(--ok);--c-border-amber:var(--warn);--c-selection:var(--bg-select);padding:8px 12px;color:var(--fg)}
 .legacy button{cursor:var(--cur-action)}.legacy button:disabled{cursor:var(--cur-disabled)}.legacy input,.legacy textarea,.legacy select{background:var(--bg-input);color:var(--fg);border:1px solid var(--border-strong);border-radius:var(--r)}
-/* legacy pages: same geometry as the kit (flat cards, 3px radius, 26px controls), and readable primary buttons.
-   The old pages used the light accent as a button FILL with white text (contrast 2.5:1); the kit fills with --accent. */
-.legacy .aiws-os-card,.legacy .aiws-os-grid section{border-radius:var(--r-lg);padding:16px 20px;box-shadow:none;background:var(--bg-editor)}
-.legacy .aiws-os-card h2{font-size:14px;font-weight:600;color:var(--fg-strong)}
-.legacy .aiws-os-card label{margin:12px 0;gap:6px}
-.legacy .aiws-os-card input,.legacy .aiws-os-card select,.legacy .aiws-os-card textarea{border-radius:var(--r);padding:5px 8px}
-.legacy .aiws-os-primary,.legacy button.aiws-os-primary{background:var(--accent);color:var(--fg-on-accent);border:1px solid transparent;border-radius:var(--r);padding:0 11px;min-height:var(--h-input);font-weight:400;font-size:13px;gap:6px}
-.legacy .aiws-os-primary:hover:not(:disabled){background:var(--accent-hover)}
-.legacy .aiws-os-studio-actions button:not(.aiws-os-primary),.legacy .aiws-os-files-head button,.legacy .aiws-os-file-actions button:not(.aiws-os-primary),
-.legacy .aiws-os-studio-title button,.legacy .aiws-os-stage-status button:not(.aiws-os-primary),.legacy .aiws-os-proposal button:not(.aiws-os-primary){
- background:var(--bg-hover);border:1px solid var(--border-strong);color:var(--fg);border-radius:var(--r);padding:0 11px;min-height:var(--h-input)}
-.legacy .aiws-os-file-list{border-radius:var(--r-lg);padding:4px}.legacy .aiws-os-file-list button{padding:4px 8px;border-radius:var(--r)}
-.legacy .aiws-os-tree-pad{width:14px;flex:none}
-.legacy button:disabled{opacity:.55}
+/* guest pages (AI files, persistent tasks / model switch, services & kernel): built from the kit like every other page */
+.gp{padding:12px 16px 56px;max-width:1180px}.gp>*+*{margin-top:8px}
+.gp>header{display:flex;align-items:center;gap:8px}.gp>header h2{margin-right:auto}
+.gp-split{display:grid;grid-template-columns:minmax(200px,320px) minmax(0,1fr);gap:12px;min-height:260px}
+.gp-tree{border:1px solid var(--border);border-radius:var(--r);padding:4px 0;max-height:60vh;overflow:auto;align-self:start}
+.gp-detail{border:1px solid var(--border);border-radius:var(--r);min-width:0;display:flex;flex-direction:column}
+.gp-detail>header{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:6px 12px;border-bottom:1px solid var(--border)}
+.gp-pre{margin:0;padding:8px 12px;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto}
+.gp-detail .gp-pre{flex:1}.gp-edit{min-height:240px;margin:8px 12px;font-family:var(--font-mono);font-size:12px}
+.gp-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 12px}
+.gp-card{border:1px solid var(--border);border-radius:var(--r);margin:6px 12px}.gp-card-main{padding:8px 12px}.gp-card-main p{margin-top:4px}
+.gp-card[data-state=completed]{border-left:2px solid var(--ok)}.gp-card[data-state=failed]{border-left:2px solid var(--err)}
+.gp-err{color:var(--err);margin-top:4px}.gp-k{min-width:160px;color:var(--fg-muted)}.gp-label{font-weight:600}
+.gp-text{width:100%;min-height:56px;font-family:inherit}
+.gp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding:8px 12px}
+.gp-grid label{display:flex;flex-direction:column;gap:4px;color:var(--fg-muted)}
+.gp-stage-head{display:flex;justify-content:space-between;align-items:center;padding:6px 12px 0}
+.gp-steps{padding:4px 0 4px 20px}.gp-steps li+li{margin-top:4px}
+.gp details summary{cursor:var(--cur-action);color:var(--fg-muted);margin-top:6px}
+@media(max-width:780px){.gp-split{grid-template-columns:1fr}}
 .result{margin:0;padding:8px 12px;white-space:pre-wrap;word-break:break-word;max-height:40vh;overflow:auto;font-family:var(--font-ui)}
 
 /* local assistant */

@@ -48,10 +48,9 @@ def main():
             wait.until(lambda b:not b.find_elements(By.CSS_SELECTOR,".pal"))
 
         go("AI 文件管理")
-        wait.until(lambda b:b.find_elements(By.XPATH,
-            "//div[contains(@class,'aiws-os-file-list')]//button[contains(.,'AIWS-GUEST-SMOKE.txt')]"))
-        browser.find_element(By.XPATH,
-            "//div[contains(@class,'aiws-os-file-list')]//button[contains(.,'AIWS-GUEST-SMOKE.txt')]").click()
+        row="//*[contains(@class,'aiws-os-file-list')]//*[@role='treeitem'][contains(.,'AIWS-GUEST-SMOKE.txt')]"   # tree rows are kit Rows
+        wait.until(lambda b:b.find_elements(By.XPATH,row))
+        browser.find_element(By.XPATH,row).click()
         wait.until(lambda b:"guest-only file manager acceptance fixture" in
             b.find_element(By.CSS_SELECTOR,".aiws-os-file-detail pre").text)
         print("AIWS_GUI_BROWSER: guest file explorer click/read verified",flush=True)
@@ -62,7 +61,7 @@ def main():
         browser.find_element(By.XPATH,"//button[contains(.,'保存任务与 DAG')]").click()
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-stage-status"))
         browser.find_element(By.XPATH,"//button[contains(.,'运行客户机阶段')]").click()
-        wait.until(lambda b:"COMPLETED" in b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").text)
+        wait.until(lambda b:b.find_element(By.CSS_SELECTOR,".aiws-os-stage-status").get_attribute("data-state")=="completed")
         print("AIWS_GUI_BROWSER: DAG stage executed",flush=True)
         go("本地模型开关")
         wait.until(lambda b:b.find_elements(By.CSS_SELECTOR,".aiws-os-studio"))

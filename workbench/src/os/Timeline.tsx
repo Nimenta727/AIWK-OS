@@ -13,7 +13,7 @@ export function ActivityTimeline({rows,english}:{rows:Row[];english:boolean}){
  const tr=(zh:string,en:string)=>english?en:zh;
  const t=useMemo(()=>buildLanes(rows),[rows]);
  const [pick,setPick]=useState<{ts:number;label:string;source:string;status:string}|null>(null);
- if(!t.lanes.length)return <p className="aiws-os-muted">{tr('暂无活动。','No activity yet.')}</p>;
+ if(!t.lanes.length)return <p className="muted pad">{tr('暂无活动。','No activity yet.')}</p>;
  const names=english?LANE_EN:LANE_ZH;
  return <div className="aiws-tl" data-aiws="timeline">
   <div className="aiws-tl-head"><span>{clock(t.start as number)}</span>
@@ -35,12 +35,12 @@ export function TokenBurn({events,limit,english}:{events:EventRow[];limit:number
  const tr=(zh:string,en:string)=>english?en:zh;
  const s=useMemo(()=>tokenSeries(events),[events]);
  const p=useMemo(()=>seriesPath(s,limit),[s,limit]);
- if(s.points.length<2)return <p className="aiws-os-muted">{s.unknown?tr('该会话没有上报用量，无法绘制。','No usage reported for this session; nothing to plot.'):tr('用量点不足，无法绘制曲线。','Not enough usage points to plot.')}</p>;
+ if(s.points.length<2)return <p className="muted pad">{s.unknown?tr('该会话没有上报用量，无法绘制。','No usage reported for this session; nothing to plot.'):tr('用量点不足，无法绘制曲线。','Not enough usage points to plot.')}</p>;
  return <div className="aiws-tb" data-aiws="token-burn">
   <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={tr('累计 token','cumulative tokens')}>
    {p.limitY!==null&&<line x1="0" x2="100" y1={p.limitY} y2={p.limitY} className="limit"/>}
    <polyline points={p.line} className="line"/></svg>
-  <p className="aiws-os-muted">{tr('累计 ','cumulative ')}{formatTokens(s.max)}{limit?' / '+formatTokens(limit):''}
+  <p className="muted pad">{tr('累计 ','cumulative ')}{formatTokens(s.max)}{limit?' / '+formatTokens(limit):''}
    {s.unknown>0&&' · '+tr('未上报 ','unreported ')+s.unknown}{s.unverified&&' · '+tr('逐轮语义未验证','per-turn semantics unverified')}</p>
  </div>;
 }

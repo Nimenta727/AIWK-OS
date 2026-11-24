@@ -46,3 +46,35 @@ jobs:
           npm test
       - name: Static OS security contracts
         run: python3 -m unittest discover -s os/verify -p 'test_*.py' -v
+
+  ui-audit:
+    # Every view in dark/light/small, every button clicked, and the in-image smoke steps replayed, against the REAL guest
+    # service (os/verify/fixtures/serve_workbench.py). Catches what unit tests cannot: a font the server refuses, a
+    # control with no effect, a layout that spills out of the window. Screenshots are kept as an artifact.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the workbench
+        working-directory: workbench
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Install Playwright and Chromium (pinned, test-only)
+        working-directory: workbench
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Browser audit of every view against the real guest service
+        working-directory: workbench
+        run: node e2e/ui-audit.cjs e2e-out
+      - name: Keep the screenshots and the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-audit
+          path: workbench/e2e-out
+          if-no-files-found: ignore
+          retention-days: 14

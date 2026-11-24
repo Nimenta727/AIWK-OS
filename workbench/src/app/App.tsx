@@ -4,7 +4,6 @@ import '../ui/kit.css';
 import '../ui/layout.css';
 import './app.css';
 import './viewer.css';
-import '../os/OsWorkbench.css';
 import {ActivityBar,BottomPanel,Palette,Sash,SideBar,StatusBar,Tabs} from '../ui/Layout';
 import type {Command,Tab} from '../ui/Layout';
 import {Button,IconButton,Icon,Notice,Row,Section} from '../ui/kit';
@@ -23,7 +22,7 @@ import GuestFiles from '../os/GuestFiles';
 import GuestTaskStudio from '../os/GuestTaskStudio';
 import GuestSystemConsole from '../os/GuestSystemConsole';
 import useObservatoryData from '../os/useObservatoryData';
-import {api,onCsrfChange,refreshCsrf} from '../os/api';
+import {api,refreshCsrf} from '../os/api';
 import {buildTree,parseCommand} from '../model/fileOps.mjs';
 import {closeTab,cycleTab,fileTabId,fileTitle,flattenTree,isEditableTarget,loadPrefs,matchKey,openTab,savePrefs} from '../model/shell.mjs';
 import {builderLabel,msg} from './common';
@@ -61,7 +60,6 @@ export default function App(){
  const [active,setActive]=useState<string|null>('home');
  const [focus,setFocus]=useState<Record<string,string>>({});
  const [palette,setPalette]=useState(false);
- const [csrf,setCsrf]=useState('');
  const [caps,setCaps]=useState<Cap[]>([]);
  const [workspace,setWorkspace]=useState('');
  type Health={systemVerify:{ok:boolean;modified:string[];missing:string[];unlisted:string[];error:string|null}|null;workDisk:boolean};
@@ -80,12 +78,10 @@ export default function App(){
  useEffect(()=>{writeNum('aiws.sbw',sbW);},[sbW]);useEffect(()=>{writeNum('aiws.bph',bpH);},[bpH]);
  const loadTree=useCallback(async()=>{try{const t=await api<{files:string[];dirs?:string[]}>('/workspace/tree');setTree(buildTree(t.files,t.dirs) as TreeNode[]);}catch(e){setNote(msg(e));}},[]);
  useEffect(()=>{
-  const off=onCsrfChange(setCsrf);
   void refreshCsrf().catch(e=>setNote(msg(e)));
   void api<{capabilities:Cap[];health:{workspace:string}&Health}>('/snapshot').then(x=>{setCaps(x.capabilities);setWorkspace(x.health.workspace||'');setHealth(x.health);}).catch(e=>setNote(msg(e)));
   void api<{apps:AppRow[]}>('/apps').then(x=>setApps(x.apps)).catch(()=>setApps([]));
   void loadTree();
-  return off;
  },[loadTree]);
 
  const open=useCallback((id:string,focusId?:string)=>{
@@ -169,10 +165,10 @@ export default function App(){
    case 'changes':return <ChangesPage tr={tr} folders={folders}/>;
    case 'build':return <Build tr={tr} english={english} data={data}/>;
    case 'system':return <SystemPage tr={tr}/>;
-   case 'files':return <div className="legacy"><GuestFiles csrf={csrf} english={english} command={cmd} onPlanCreated={()=>open('plans')}/></div>;
+   case 'files':return <GuestFiles english={english} command={cmd} onPlanCreated={()=>open('plans')}/>;
    case 'assistant':return <Assistant tr={tr} english={english} onPlan={tid=>open('plans',tid)} onModelSwitch={()=>open('model')}/>;
-   case 'tasks':case 'model':return <div className="legacy"><GuestTaskStudio csrf={csrf} english={english} capabilities={caps as never} focus={id==='model'?'model':'tasks'}/></div>;
-   case 'advanced':return <div className="legacy"><GuestSystemConsole csrf={csrf} english={english} onPlanCreated={()=>open('plans')}/></div>;
+   case 'tasks':case 'model':return <GuestTaskStudio key={id} english={english} capabilities={caps as never} focus={id==='model'?'model':'tasks'}/>;
+   case 'advanced':return <GuestSystemConsole english={english} onPlanCreated={()=>open('plans')}/>;
    case 'browser':return <div className="legacy fill"><ProjectPreview tr={tr} folders={folders} onUrl={u=>setNav({url:u,nonce:Date.now()})}/><BrowserView english={english} navigateTo={nav} openExternal={()=>void launch('chromium')} canOpenExternal={apps.some(a=>a.id==='chromium'&&a.launchable)}/></div>;
    case 'ide':return <IdeView tr={tr} folders={folders}/>;
    default:return null;

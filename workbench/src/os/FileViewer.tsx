@@ -27,7 +27,7 @@ function Table({text,english}:{text:string;english:boolean}){
  const t=parseTable(text) as {header:string[];rows:string[][];truncated:boolean;columnsTruncated:boolean};
  return <div className="aiws-sh-table-wrap"><table className="aiws-sh-table"><thead><tr>{t.header.map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
   <tbody>{t.rows.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table>
-  {(t.truncated||t.columnsTruncated)&&<p className="aiws-os-muted">{english?'Only the first rows/columns are shown.':'只显示前面的行/列。'}</p>}</div>;
+  {(t.truncated||t.columnsTruncated)&&<p className="muted pad">{english?'Only the first rows/columns are shown.':'只显示前面的行/列。'}</p>}</div>;
 }
 function Code({text,path,sha,english}:{text:string;path:string;sha?:string;english:boolean}){
  const lines=text.split('\n');
@@ -52,7 +52,7 @@ export default function FileViewer({path,english}:{path:string;english:boolean})
   else if(kind!=='image'&&kind!=='html')api<FileDetail>('/workspace/file?path='+encodeURIComponent(path)).then(d=>{if(live)setText(d);}).catch(fail);
   return()=>{live=false;};
  },[path,kind]);
- if(error)return <div className="aiws-os-error" role="alert">{tr('无法读取：','Cannot read: ')}{error}</div>;
+ if(error)return <div className="gp-err pad" role="alert">{tr('无法读取：','Cannot read: ')}{error}</div>;
  const bar=<header className="aiws-sh-viewbar"><strong>{path}</strong><span>{kind}</span></header>;
  if(kind==='image')return <div className="aiws-sh-file">{bar}<div className="aiws-sh-image"><img src={rawUrl(path)} alt={path}/></div></div>;
  if(kind==='pdf')return <div className="aiws-sh-file aiws-sh-fill">{bar}
@@ -60,12 +60,12 @@ export default function FileViewer({path,english}:{path:string;english:boolean})
   {doc&&<details className="aiws-sh-doc"><summary>{tr('提取的文字','Extracted text')} ({doc.source})</summary><pre>{doc.text}{doc.truncated?'\n…':''}</pre></details>}</div>;
  if(kind==='html')return <div className="aiws-sh-file aiws-sh-fill">{bar}
   <iframe className="aiws-sh-frame" title={path} src={rawUrl(path)} sandbox="allow-scripts"/>
-  <p className="aiws-os-muted" style={{padding:'4px 16px'}}>{tr('在隔离沙箱中运行：不能访问系统接口，也不能联网。','Runs in an isolated sandbox: no access to the system API and no network.')}</p></div>;
+  <p className="muted pad">{tr('在隔离沙箱中运行：不能访问系统接口，也不能联网。','Runs in an isolated sandbox: no access to the system API and no network.')}</p></div>;
  if(kind==='document'){
-  if(!doc)return <p className="aiws-os-muted">{tr('正在转换…','Converting…')}</p>;
+  if(!doc)return <p className="muted pad">{tr('正在转换…','Converting…')}</p>;
   return <div className="aiws-sh-file">{bar}<article className="aiws-sh-md"><pre className="aiws-sh-doc-text">{doc.text}{doc.truncated?'\n…':''}</pre></article></div>;
  }
- if(!text)return <p className="aiws-os-muted">{tr('正在读取…','Reading…')}</p>;
+ if(!text)return <p className="muted pad">{tr('正在读取…','Reading…')}</p>;
  if(kind==='markdown')return <div className="aiws-sh-file">{bar}
   <div style={{padding:'6px 16px'}}><button type="button" className="aiws-sh-btn" onClick={()=>setSource(x=>!x)}>{source?tr('渲染视图','Rendered'):tr('查看源码','Source')}</button></div>
   {source?<Code text={text.text} path={path} sha={text.sha256} english={english}/>:<Markdown text={text.text}/>}</div>;
